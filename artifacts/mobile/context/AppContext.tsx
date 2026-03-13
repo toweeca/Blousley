@@ -1,0 +1,70 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  ReactNode,
+} from "react";
+
+export type UserRole = "customer" | "tailor";
+
+interface AppUser {
+  id: string;
+  name: string;
+  role: UserRole;
+  phone?: string;
+}
+
+interface AppContextType {
+  user: AppUser | null;
+  setUser: (user: AppUser | null) => void;
+  isLoading: boolean;
+}
+
+const AppContext = createContext<AppContextType | null>(null);
+
+const USER_STORAGE_KEY = "@saree_blouse_user";
+
+export function AppProvider({ children }: { children: ReactNode }) {
+  const [user, setUserState] = useState<AppUser | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    loadUser();
+  }, []);
+
+  const loadUser = async () => {
+    try {
+      const stored = await AsyncStorage.getItem(USER_STORAGE_KEY);
+      if (stored) {
+        setUserState(JSON.parse(stored));
+      }
+    } catch (e) {
+      console.error("Failed to load user", e);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const setUser = async (u: AppUser | null) => {
+    setUserState(u);
+    if (u) {
+      await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
+    } else {
+      await AsyncStorage.removeItem(USER_STORAGE_KEY);
+    }
+  };
+
+  return (
+    <AppContext.Provider value={{ user, setUser, isLoading }}>
+      {children}
+    </AppContext.Provider>
+  );
+}
+
+export function useApp() {
+  const ctx = useContext(AppContext);
+  if (!ctx) throw new Error("useApp must be used within AppProvider");
+  return ctx;
+}
