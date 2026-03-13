@@ -1,7 +1,7 @@
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React from "react";
+import React, { useRef, useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -11,6 +11,8 @@ import {
   useColorScheme,
   Platform,
   Image,
+  Dimensions,
+  FlatList,
 } from "react-native";
 import Animated, {
   FadeInDown,
@@ -18,11 +20,34 @@ import Animated, {
   useSharedValue,
   useAnimatedStyle,
   withSpring,
+  withTiming,
+  interpolate,
+  useAnimatedScrollHandler,
 } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
+
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
+
+const BLOUSE_IMAGES = [
+  {
+    source: require("@/assets/images/blouse1.png"),
+    label: "Sweetheart Neckline",
+    sublabel: "Classic & Romantic",
+  },
+  {
+    source: require("@/assets/images/blouse2.png"),
+    label: "Boat Neck",
+    sublabel: "Elegant & Timeless",
+  },
+  {
+    source: require("@/assets/images/blouse3.png"),
+    label: "Deep V-Neck",
+    sublabel: "Bold & Contemporary",
+  },
+];
 
 const STYLE_CARDS = [
   {
@@ -50,6 +75,60 @@ const STYLE_CARDS = [
     color: "#5C1636",
   },
 ];
+
+function BlouseCarousel() {
+  const flatListRef = useRef<FlatList>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      const next = (activeIndex + 1) % BLOUSE_IMAGES.length;
+      flatListRef.current?.scrollToIndex({ index: next, animated: true });
+      setActiveIndex(next);
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [activeIndex]);
+
+  return (
+    <View style={styles.carouselWrapper}>
+      <FlatList
+        ref={flatListRef}
+        data={BLOUSE_IMAGES}
+        horizontal
+        pagingEnabled
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(_, i) => String(i)}
+        onMomentumScrollEnd={(e) => {
+          const idx = Math.round(e.nativeEvent.contentOffset.x / (SCREEN_WIDTH - 48 + 12));
+          setActiveIndex(idx);
+        }}
+        snapToInterval={SCREEN_WIDTH - 48 + 12}
+        decelerationRate="fast"
+        contentContainerStyle={{ gap: 12 }}
+        renderItem={({ item }) => (
+          <View style={styles.carouselCard}>
+            <Image source={item.source} style={styles.carouselImage} resizeMode="cover" />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.6)"]}
+              style={styles.carouselOverlay}
+            >
+              <Text style={styles.carouselLabel}>{item.label}</Text>
+              <Text style={styles.carouselSublabel}>{item.sublabel}</Text>
+            </LinearGradient>
+          </View>
+        )}
+      />
+      <View style={styles.dotRow}>
+        {BLOUSE_IMAGES.map((_, i) => (
+          <View
+            key={i}
+            style={[styles.dot, i === activeIndex ? styles.dotActive : styles.dotInactive]}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
 
 function StyleCard({
   item,
@@ -105,40 +184,55 @@ export default function HomeScreen() {
       >
         {/* Header */}
         <LinearGradient
-          colors={[Colors.brand.primaryDark, Colors.brand.primary, Colors.brand.primaryLight]}
+          colors={[Colors.brand.primaryDark, Colors.brand.primary, "#6B1A42"]}
           start={{ x: 0, y: 0 }}
           end={{ x: 1, y: 1 }}
           style={[styles.header, { paddingTop: topPad + 20 }]}
         >
-          <Animated.View entering={FadeInDown.delay(100).springify()}>
-            <Text style={styles.headerGreeting}>
-              {user ? `Namaste, ${user.name.split(" ")[0]}` : "Namaste"}
-            </Text>
-            <Text style={styles.headerTitle}>Your Perfect Blouse</Text>
+          {/* Branding */}
+          <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.brandRow}>
+            <View>
+              <Text style={styles.appName}>Eloquence</Text>
+              <Text style={styles.headerGreeting}>
+                {user ? `Namaste, ${user.name.split(" ")[0]}` : "Namaste"}
+              </Text>
+            </View>
+            <View style={styles.tagBadge}>
+              <Text style={styles.tagText}>✦ AI Powered</Text>
+            </View>
+          </Animated.View>
+
+          <Animated.View entering={FadeInDown.delay(180).springify()}>
+            <Text style={styles.headerTitle}>Your Perfect Blouse,{"\n"}Crafted for You</Text>
             <Text style={styles.headerSubtitle}>
               AI-powered saree blouse fitting for your unique shape
             </Text>
           </Animated.View>
 
-          <Animated.View
-            entering={FadeInUp.delay(300).springify()}
-            style={btnAnimStyle}
-          >
-            <TouchableOpacity
-              style={styles.analyzeButton}
-              onPressIn={() => { btnScale.value = withSpring(0.95); }}
-              onPressOut={() => { btnScale.value = withSpring(1); }}
-              onPress={() => router.push("/analyze")}
-              activeOpacity={1}
-              testID="analyze-button"
-            >
-              <Feather name="camera" size={20} color={Colors.brand.primaryDark} />
-              <Text style={styles.analyzeButtonText}>Analyze My Fit</Text>
-            </TouchableOpacity>
+          {/* Blouse Image Carousel */}
+          <Animated.View entering={FadeInUp.delay(250).springify()}>
+            <BlouseCarousel />
+          </Animated.View>
+
+          {/* CTA Button */}
+          <Animated.View entering={FadeInUp.delay(350).springify()}>
+            <Animated.View style={btnAnimStyle}>
+              <TouchableOpacity
+                style={styles.analyzeButton}
+                onPressIn={() => { btnScale.value = withSpring(0.95); }}
+                onPressOut={() => { btnScale.value = withSpring(1); }}
+                onPress={() => router.push("/analyze")}
+                activeOpacity={1}
+                testID="analyze-button"
+              >
+                <Feather name="camera" size={20} color={Colors.brand.primaryDark} />
+                <Text style={styles.analyzeButtonText}>Analyze My Fit</Text>
+              </TouchableOpacity>
+            </Animated.View>
           </Animated.View>
         </LinearGradient>
 
-        {/* Body Shape Section */}
+        {/* Blouse Styles */}
         <View style={styles.section}>
           <Animated.Text
             entering={FadeInDown.delay(400).springify()}
@@ -212,35 +306,113 @@ const HOW_IT_WORKS = [
   { title: "Share", desc: "Send your fit profile to your tailor", icon: "send" },
 ];
 
+const CARD_WIDTH = SCREEN_WIDTH - 48;
+
 const styles = StyleSheet.create({
   container: { flex: 1 },
   header: {
     paddingHorizontal: 24,
     paddingBottom: 36,
-    gap: 16,
+    gap: 14,
     borderBottomLeftRadius: 32,
     borderBottomRightRadius: 32,
   },
+  brandRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+  },
+  appName: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 28,
+    color: "#FFFFFF",
+    letterSpacing: 1.5,
+  },
   headerGreeting: {
     fontFamily: "Inter_400Regular",
-    fontSize: 14,
-    color: "rgba(255,255,255,0.8)",
-    letterSpacing: 1.2,
+    fontSize: 13,
+    color: "rgba(255,255,255,0.7)",
+    letterSpacing: 1,
     textTransform: "uppercase",
+    marginTop: 2,
+  },
+  tagBadge: {
+    backgroundColor: "rgba(201,169,110,0.25)",
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.brand.gold + "60",
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  tagText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.brand.goldLight,
+    letterSpacing: 0.5,
   },
   headerTitle: {
     fontFamily: "Inter_700Bold",
-    fontSize: 32,
+    fontSize: 26,
     color: "#FFFFFF",
-    lineHeight: 38,
-    marginTop: 4,
+    lineHeight: 34,
   },
   headerSubtitle: {
     fontFamily: "Inter_400Regular",
-    fontSize: 15,
-    color: "rgba(255,255,255,0.75)",
-    lineHeight: 22,
+    fontSize: 14,
+    color: "rgba(255,255,255,0.7)",
+    lineHeight: 20,
+    marginTop: -4,
+  },
+  carouselWrapper: {
+    gap: 10,
     marginTop: 4,
+  },
+  carouselCard: {
+    width: CARD_WIDTH,
+    height: 200,
+    borderRadius: 20,
+    overflow: "hidden",
+    position: "relative",
+  },
+  carouselImage: {
+    width: "100%",
+    height: "100%",
+  },
+  carouselOverlay: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  carouselLabel: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+    color: "#FFFFFF",
+  },
+  carouselSublabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.8)",
+    marginTop: 1,
+  },
+  dotRow: {
+    flexDirection: "row",
+    justifyContent: "center",
+    gap: 6,
+  },
+  dot: {
+    height: 5,
+    borderRadius: 3,
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: Colors.brand.goldLight,
+  },
+  dotInactive: {
+    width: 6,
+    backgroundColor: "rgba(255,255,255,0.35)",
   },
   analyzeButton: {
     flexDirection: "row",
@@ -251,7 +423,6 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 32,
     gap: 10,
-    marginTop: 8,
     shadowColor: Colors.brand.gold,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.4,
