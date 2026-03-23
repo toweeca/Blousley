@@ -2,7 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
-import React, { useState, useRef, useCallback } from "react";
+import React, { useState, useRef } from "react";
 import {
   View,
   Text,
@@ -18,7 +18,7 @@ import {
   Dimensions,
   ActivityIndicator,
 } from "react-native";
-import Animated, { FadeInDown, FadeInRight } from "react-native-reanimated";
+import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -28,38 +28,135 @@ import { useApp, type UserRole } from "@/context/AppContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CANVAS_W = SCREEN_WIDTH - 48;
-const CANVAS_H = 240;
+const CANVAS_H = 300;
 
 type Tab = "account" | "preferences" | "ideas";
+type SketchPath = { d: string; color: string; width: number };
 
 const NECK_OPTIONS = ["Sweetheart", "Boat Neck", "Deep V", "Halter", "Square", "Round", "Keyhole", "Off-Shoulder"];
 const SLEEVE_OPTIONS = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Bell Sleeve", "Puff Sleeve"];
 const BACK_OPTIONS = ["Deep Back", "Mid Back", "High Back", "Tie Back", "Saree Back", "Mirror Work"];
 const FABRIC_OPTIONS = ["Silk", "Cotton", "Georgette", "Chiffon", "Brocade", "Velvet", "Net", "Linen"];
 
+const NECK_IMAGES: Record<string, any> = {
+  "Sweetheart": require("@/assets/images/styles/neck_sweetheart.png"),
+  "Boat Neck": require("@/assets/images/styles/neck_boat.png"),
+  "Deep V": require("@/assets/images/styles/neck_deepv.png"),
+  "Halter": require("@/assets/images/styles/neck_halter.png"),
+  "Square": require("@/assets/images/styles/neck_square.png"),
+  "Round": require("@/assets/images/styles/neck_round.png"),
+  "Keyhole": require("@/assets/images/styles/neck_keyhole.png"),
+  "Off-Shoulder": require("@/assets/images/styles/neck_offshoulder.png"),
+};
+const SLEEVE_IMAGES: Record<string, any> = {
+  "Sleeveless": require("@/assets/images/styles/sleeve_sleeveless.png"),
+  "Cap Sleeve": require("@/assets/images/styles/sleeve_cap.png"),
+  "Elbow Length": require("@/assets/images/styles/sleeve_elbow.png"),
+  "Full Sleeve": require("@/assets/images/styles/sleeve_full.png"),
+  "Bell Sleeve": require("@/assets/images/styles/sleeve_bell.png"),
+  "Puff Sleeve": require("@/assets/images/styles/sleeve_puff.png"),
+};
+const BACK_IMAGES: Record<string, any> = {
+  "Deep Back": require("@/assets/images/styles/back_deep.png"),
+  "Mid Back": require("@/assets/images/styles/back_mid.png"),
+  "High Back": require("@/assets/images/styles/back_high.png"),
+  "Tie Back": require("@/assets/images/styles/back_tie.png"),
+  "Saree Back": require("@/assets/images/styles/back_saree.png"),
+  "Mirror Work": require("@/assets/images/styles/back_mirror.png"),
+};
+const FABRIC_IMAGES: Record<string, any> = {
+  "Silk": require("@/assets/images/styles/fabric_silk.png"),
+  "Cotton": require("@/assets/images/styles/fabric_cotton.png"),
+  "Georgette": require("@/assets/images/styles/fabric_georgette.png"),
+  "Chiffon": require("@/assets/images/styles/fabric_chiffon.png"),
+  "Brocade": require("@/assets/images/styles/fabric_brocade.png"),
+  "Velvet": require("@/assets/images/styles/fabric_velvet.png"),
+  "Net": require("@/assets/images/styles/fabric_net.png"),
+  "Linen": require("@/assets/images/styles/fabric_linen.png"),
+};
+
 const ROLES: { label: string; value: UserRole; icon: string; desc: string }[] = [
   { label: "Customer", value: "customer", icon: "human-female", desc: "Get AI blouse fitting recommendations" },
   { label: "Tailor", value: "tailor", icon: "scissors-cutting", desc: "View customer profiles & add notes" },
 ];
 
-function OptionPill({
-  label, selected, onPress, theme,
-}: { label: string; selected: boolean; onPress: () => void; theme: typeof Colors.light }) {
+function StyleCard({
+  label,
+  image,
+  selected,
+  onPress,
+  theme,
+}: {
+  label: string;
+  image: any;
+  selected: boolean;
+  onPress: () => void;
+  theme: typeof Colors.light;
+}) {
   return (
     <TouchableOpacity
       onPress={onPress}
       style={[
-        styles.pill,
+        styles.styleCard,
         {
-          backgroundColor: selected ? Colors.brand.primary : theme.card,
+          backgroundColor: selected ? Colors.brand.primary + "12" : theme.card,
           borderColor: selected ? Colors.brand.primary : theme.border,
+          borderWidth: selected ? 2 : 1,
         },
       ]}
     >
-      <Text style={[styles.pillText, { color: selected ? "#fff" : theme.textSecondary }]}>
+      <View style={[styles.styleCardImgWrap, selected && { borderColor: Colors.brand.primary, borderWidth: 2 }]}>
+        <Image source={image} style={styles.styleCardImg} resizeMode="cover" />
+        {selected && (
+          <View style={styles.styleCardCheck}>
+            <Feather name="check" size={12} color="#fff" />
+          </View>
+        )}
+      </View>
+      <Text
+        style={[
+          styles.styleCardLabel,
+          { color: selected ? Colors.brand.primary : theme.text },
+        ]}
+        numberOfLines={2}
+      >
         {label}
       </Text>
     </TouchableOpacity>
+  );
+}
+
+function StyleRow({
+  label,
+  options,
+  images,
+  selected,
+  onSelect,
+  theme,
+}: {
+  label: string;
+  options: string[];
+  images: Record<string, any>;
+  selected: string;
+  onSelect: (v: string) => void;
+  theme: typeof Colors.light;
+}) {
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={[styles.groupLabel, { color: theme.text }]}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+        {options.map((opt) => (
+          <StyleCard
+            key={opt}
+            label={opt}
+            image={images[opt]}
+            selected={selected === opt}
+            onPress={() => { onSelect(selected === opt ? "" : opt); Haptics.selectionAsync(); }}
+            theme={theme}
+          />
+        ))}
+      </ScrollView>
+    </View>
   );
 }
 
@@ -75,11 +172,11 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     },
   });
 
-  const [neck, setNeck] = useState<string>("");
-  const [sleeve, setSleeve] = useState<string>("");
-  const [back, setBack] = useState<string>("");
-  const [fabric, setFabric] = useState<string>("");
-  const [notes, setNotes] = useState<string>("");
+  const [neck, setNeck] = useState("");
+  const [sleeve, setSleeve] = useState("");
+  const [back, setBack] = useState("");
+  const [fabric, setFabric] = useState("");
+  const [notes, setNotes] = useState("");
   const [initialized, setInitialized] = useState(false);
 
   React.useEffect(() => {
@@ -118,63 +215,45 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     onError: () => Alert.alert("Error", "Could not save preferences."),
   });
 
-  if (isLoading) return (
-    <View style={styles.centerLoader}>
-      <ActivityIndicator color={Colors.brand.primary} />
-      <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading preferences…</Text>
-    </View>
-  );
+  if (isLoading) {
+    return (
+      <View style={styles.centerLoader}>
+        <ActivityIndicator color={Colors.brand.primary} />
+        <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading preferences…</Text>
+      </View>
+    );
+  }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 60 }}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 24, paddingBottom: 80 }}>
       {prefs && (
         <Animated.View entering={FadeInDown.delay(50).springify()}>
           <View style={[styles.savedBanner, { backgroundColor: Colors.brand.primary + "15", borderColor: Colors.brand.primary + "40" }]}>
             <Feather name="check-circle" size={16} color={Colors.brand.primary} />
             <Text style={[styles.savedBannerText, { color: Colors.brand.primary }]}>
-              Preferences saved — last updated {new Date(prefs.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
+              Last saved {new Date(prefs.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })}
             </Text>
           </View>
         </Animated.View>
       )}
 
-      <Animated.View entering={FadeInDown.delay(100).springify()} style={{ gap: 10 }}>
-        <Text style={[styles.groupLabel, { color: theme.text }]}>Neckline Style</Text>
-        <View style={styles.pillRow}>
-          {NECK_OPTIONS.map(o => (
-            <OptionPill key={o} label={o} selected={neck === o} onPress={() => { setNeck(neck === o ? "" : o); Haptics.selectionAsync(); }} theme={theme} />
-          ))}
-        </View>
+      <Animated.View entering={FadeInDown.delay(80).springify()}>
+        <StyleRow label="Neckline Style" options={NECK_OPTIONS} images={NECK_IMAGES} selected={neck} onSelect={setNeck} theme={theme} />
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(160).springify()} style={{ gap: 10 }}>
-        <Text style={[styles.groupLabel, { color: theme.text }]}>Sleeve Style</Text>
-        <View style={styles.pillRow}>
-          {SLEEVE_OPTIONS.map(o => (
-            <OptionPill key={o} label={o} selected={sleeve === o} onPress={() => { setSleeve(sleeve === o ? "" : o); Haptics.selectionAsync(); }} theme={theme} />
-          ))}
-        </View>
+      <Animated.View entering={FadeInDown.delay(140).springify()}>
+        <StyleRow label="Sleeve Style" options={SLEEVE_OPTIONS} images={SLEEVE_IMAGES} selected={sleeve} onSelect={setSleeve} theme={theme} />
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(220).springify()} style={{ gap: 10 }}>
-        <Text style={[styles.groupLabel, { color: theme.text }]}>Back Design</Text>
-        <View style={styles.pillRow}>
-          {BACK_OPTIONS.map(o => (
-            <OptionPill key={o} label={o} selected={back === o} onPress={() => { setBack(back === o ? "" : o); Haptics.selectionAsync(); }} theme={theme} />
-          ))}
-        </View>
+      <Animated.View entering={FadeInDown.delay(200).springify()}>
+        <StyleRow label="Back Design" options={BACK_OPTIONS} images={BACK_IMAGES} selected={back} onSelect={setBack} theme={theme} />
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(280).springify()} style={{ gap: 10 }}>
-        <Text style={[styles.groupLabel, { color: theme.text }]}>Fabric Preference</Text>
-        <View style={styles.pillRow}>
-          {FABRIC_OPTIONS.map(o => (
-            <OptionPill key={o} label={o} selected={fabric === o} onPress={() => { setFabric(fabric === o ? "" : o); Haptics.selectionAsync(); }} theme={theme} />
-          ))}
-        </View>
+      <Animated.View entering={FadeInDown.delay(260).springify()}>
+        <StyleRow label="Fabric" options={FABRIC_OPTIONS} images={FABRIC_IMAGES} selected={fabric} onSelect={setFabric} theme={theme} />
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(340).springify()} style={{ gap: 8 }}>
+      <Animated.View entering={FadeInDown.delay(320).springify()} style={{ gap: 8 }}>
         <Text style={[styles.groupLabel, { color: theme.text }]}>Additional Notes</Text>
         <TextInput
           style={[styles.notesInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
@@ -187,15 +266,13 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
         />
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(380).springify()}>
+      <Animated.View entering={FadeInDown.delay(360).springify()}>
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary, opacity: saveMutation.isPending ? 0.7 : 1 }]}
           onPress={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
         >
-          {saveMutation.isPending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
+          {saveMutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : (
             <>
               <Feather name="save" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>Save Preferences</Text>
@@ -207,20 +284,22 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   );
 }
 
-type SketchPath = { d: string; color: string; width: number };
-
 function SketchCanvas({
   paths,
   onPathsChange,
+  backgroundImageUri,
   theme,
   color,
+  strokeWidth,
 }: {
   paths: SketchPath[];
   onPathsChange: (p: SketchPath[]) => void;
+  backgroundImageUri: string | null;
   theme: typeof Colors.light;
   color: string;
+  strokeWidth: number;
 }) {
-  const currentPath = useRef<string>("");
+  const currentPath = useRef("");
   const [liveD, setLiveD] = useState("");
 
   const panResponder = useRef(
@@ -239,7 +318,7 @@ function SketchCanvas({
       },
       onPanResponderRelease: () => {
         if (currentPath.current.length > 5) {
-          onPathsChange([...paths, { d: currentPath.current, color, width: 3 }]);
+          onPathsChange([...paths, { d: currentPath.current, color, width: strokeWidth }]);
         }
         currentPath.current = "";
         setLiveD("");
@@ -249,22 +328,41 @@ function SketchCanvas({
 
   return (
     <View
-      style={[styles.sketchCanvas, { backgroundColor: "#FFFAF7", borderColor: theme.border }]}
+      style={[styles.sketchCanvas, { borderColor: theme.border }]}
       {...panResponder.panHandlers}
     >
-      <Svg width={CANVAS_W} height={CANVAS_H}>
+      {backgroundImageUri ? (
+        <Image
+          source={{ uri: backgroundImageUri }}
+          style={StyleSheet.absoluteFill}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={[StyleSheet.absoluteFill, { backgroundColor: "#FFFAF7" }]} />
+      )}
+      <Svg
+        width={CANVAS_W}
+        height={CANVAS_H}
+        style={StyleSheet.absoluteFill}
+      >
         {paths.map((p, i) => (
           <Path key={i} d={p.d} stroke={p.color} strokeWidth={p.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         ))}
         {liveD ? (
-          <Path d={liveD} stroke={color} strokeWidth={3} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d={liveD} stroke={color} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         ) : null}
       </Svg>
-      {paths.length === 0 && !liveD && (
+      {paths.length === 0 && !liveD && !backgroundImageUri && (
         <View style={styles.sketchHint} pointerEvents="none">
-          <Feather name="edit-3" size={24} color={Colors.brand.primary + "40"} />
+          <Feather name="edit-3" size={28} color={Colors.brand.primary + "40"} />
           <Text style={styles.sketchHintText}>Draw your blouse sketch here</Text>
-          <Text style={styles.sketchHintSub}>Sketch neckline, sleeves, back design…</Text>
+          <Text style={styles.sketchHintSub}>Or add a photo as background below</Text>
+        </View>
+      )}
+      {paths.length === 0 && !liveD && backgroundImageUri && (
+        <View style={styles.sketchHint} pointerEvents="none">
+          <Feather name="edit-3" size={28} color="rgba(255,255,255,0.8)" />
+          <Text style={[styles.sketchHintText, { color: "rgba(255,255,255,0.9)" }]}>Draw on top of your photo</Text>
         </View>
       )}
     </View>
@@ -282,6 +380,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [shared, setShared] = useState(false);
   const [sketchPaths, setSketchPaths] = useState<SketchPath[]>([]);
   const [drawColor, setDrawColor] = useState(Colors.brand.primary);
+  const [strokeWidth, setStrokeWidth] = useState(3);
+  const [sketchBackground, setSketchBackground] = useState<string | null>(null);
 
   const { data: ideas = [], isLoading } = useQuery({
     queryKey: ["ideas", user.id],
@@ -291,30 +391,29 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     },
   });
 
-  const pickImage = async (fromCamera: boolean) => {
+  const pickImage = async (fromCamera: boolean, forSketch = false) => {
     const fn = fromCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-    const result = await fn({ mediaTypes: ["images"], allowsEditing: true, quality: 0.7, base64: true });
+    const result = await fn({ mediaTypes: ["images"], allowsEditing: true, quality: 0.8 });
     if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
+      if (forSketch) {
+        setSketchBackground(result.assets[0].uri);
+      } else {
+        setImageUri(result.assets[0].uri);
+      }
     }
   };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      let imageUrl: string | undefined;
-      if (imageUri) {
-        imageUrl = imageUri;
-      }
       const sketchData = sketchPaths.length > 0
         ? { paths: sketchPaths, width: CANVAS_W, height: CANVAS_H }
         : undefined;
-
       const r = await fetch(`${domain}/api/ideas`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          imageUrl,
+          imageUrl: mode === "upload" ? imageUri : sketchBackground,
           sketchCanvas: sketchData,
           notes: notes || null,
           title: title || null,
@@ -326,7 +425,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ideas", user.id] });
-      setTitle(""); setNotes(""); setImageUri(null); setShared(false); setSketchPaths([]);
+      setTitle(""); setNotes(""); setImageUri(null); setShared(false);
+      setSketchPaths([]); setSketchBackground(null);
       setMode("list");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
@@ -343,10 +443,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ideas", user.id] });
-      Haptics.selectionAsync();
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ideas", user.id] }); Haptics.selectionAsync(); },
   });
 
   const deleteMutation = useMutation({
@@ -354,23 +451,20 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
       const r = await fetch(`${domain}/api/ideas/${id}`, { method: "DELETE" });
       if (!r.ok) throw new Error("Failed");
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ["ideas", user.id] });
-      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
-    },
+    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ideas", user.id] }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); },
   });
 
-  const DRAW_COLORS = [Colors.brand.primary, "#C1536A", "#C9A96E", "#2A2A2A", "#E05A77", "#4A90D9"];
+  const DRAW_COLORS = [Colors.brand.primary, "#C1536A", "#C9A96E", "#1A1A1A", "#FFFFFF", "#E05A77", "#4A90D9"];
 
   if (mode === "upload" || mode === "sketch") {
     return (
-      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 60 }}>
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 80 }}>
         <View style={styles.modeHeader}>
-          <TouchableOpacity onPress={() => setMode("list")} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => { setMode("list"); setSketchPaths([]); setSketchBackground(null); setImageUri(null); }} style={styles.backBtn}>
             <Feather name="arrow-left" size={20} color={Colors.brand.primary} />
           </TouchableOpacity>
           <Text style={[styles.modeTitle, { color: theme.text }]}>
-            {mode === "upload" ? "Upload Blouse Idea" : "Sketch Blouse Design"}
+            {mode === "upload" ? "Upload Blouse Idea" : "Sketch on Photo"}
           </Text>
         </View>
 
@@ -386,8 +480,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
         </View>
 
         {mode === "upload" ? (
-          <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
-            <Text style={[styles.groupLabel, { color: theme.text }]}>Photo / Sketch Photo</Text>
+          <View style={{ gap: 12 }}>
+            <Text style={[styles.groupLabel, { color: theme.text }]}>Photo / Inspiration</Text>
             {imageUri ? (
               <View style={styles.imagePreviewWrapper}>
                 <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
@@ -396,60 +490,94 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.uploadZone}>
+              <View style={[styles.uploadZone, { borderColor: Colors.brand.primary + "40" }]}>
                 <Feather name="image" size={32} color={Colors.brand.primary + "60"} />
                 <Text style={[styles.uploadZoneText, { color: theme.textSecondary }]}>
                   Upload a photo of your blouse idea or inspiration
                 </Text>
                 <View style={styles.uploadBtnRow}>
-                  <TouchableOpacity
-                    style={[styles.uploadBtn, { backgroundColor: Colors.brand.primary + "15", borderColor: Colors.brand.primary + "40" }]}
-                    onPress={() => pickImage(false)}
-                  >
+                  <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: Colors.brand.primary + "15", borderColor: Colors.brand.primary + "40" }]} onPress={() => pickImage(false)}>
                     <Feather name="image" size={16} color={Colors.brand.primary} />
                     <Text style={[styles.uploadBtnText, { color: Colors.brand.primary }]}>Gallery</Text>
                   </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[styles.uploadBtn, { backgroundColor: Colors.brand.gold + "15", borderColor: Colors.brand.gold + "40" }]}
-                    onPress={() => pickImage(true)}
-                  >
+                  <TouchableOpacity style={[styles.uploadBtn, { backgroundColor: Colors.brand.gold + "15", borderColor: Colors.brand.gold + "40" }]} onPress={() => pickImage(true)}>
                     <Feather name="camera" size={16} color={Colors.brand.gold} />
                     <Text style={[styles.uploadBtnText, { color: Colors.brand.gold }]}>Camera</Text>
                   </TouchableOpacity>
                 </View>
               </View>
             )}
-          </Animated.View>
+          </View>
         ) : (
-          <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
+          <View style={{ gap: 12 }}>
+            {/* Background photo picker */}
+            <View style={styles.bgPhotoRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.groupLabel, { color: theme.text }]}>Background Photo</Text>
+                <Text style={[styles.bgPhotoSub, { color: theme.textMuted }]}>Add a photo to draw markings on top</Text>
+              </View>
+              <View style={styles.bgPhotoBtns}>
+                <TouchableOpacity style={[styles.bgPhotoBtn, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => pickImage(false, true)}>
+                  <Feather name="image" size={14} color={Colors.brand.primary} />
+                  <Text style={[styles.bgPhotoBtnText, { color: Colors.brand.primary }]}>Gallery</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.bgPhotoBtn, { backgroundColor: theme.card, borderColor: theme.border }]} onPress={() => pickImage(true, true)}>
+                  <Feather name="camera" size={14} color={Colors.brand.gold} />
+                  <Text style={[styles.bgPhotoBtnText, { color: Colors.brand.gold }]}>Camera</Text>
+                </TouchableOpacity>
+                {sketchBackground && (
+                  <TouchableOpacity style={[styles.bgPhotoBtn, { backgroundColor: "#FF4D4D10", borderColor: "#FF4D4D40" }]} onPress={() => setSketchBackground(null)}>
+                    <Feather name="x" size={14} color="#FF4D4D" />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            {/* Canvas toolbar */}
             <View style={styles.sketchToolbar}>
-              <Text style={[styles.groupLabel, { color: theme.text }]}>Sketch Canvas</Text>
               <View style={styles.colorPicker}>
                 {DRAW_COLORS.map(c => (
                   <TouchableOpacity
                     key={c}
-                    style={[styles.colorDot, { backgroundColor: c, borderWidth: drawColor === c ? 3 : 0, borderColor: "#fff" }]}
+                    style={[
+                      styles.colorDot,
+                      { backgroundColor: c, borderWidth: drawColor === c ? 3 : 1, borderColor: drawColor === c ? Colors.brand.gold : "rgba(0,0,0,0.1)" },
+                    ]}
                     onPress={() => setDrawColor(c)}
                   />
                 ))}
-                <TouchableOpacity
-                  style={[styles.clearBtn, { borderColor: theme.border }]}
-                  onPress={() => { setSketchPaths([]); Haptics.selectionAsync(); }}
-                >
+              </View>
+              <View style={styles.strokeRow}>
+                {[2, 4, 7].map(w => (
+                  <TouchableOpacity
+                    key={w}
+                    style={[styles.strokeDot, { width: w + 10, height: w + 10, borderRadius: (w + 10) / 2, backgroundColor: strokeWidth === w ? Colors.brand.primary : theme.border }]}
+                    onPress={() => setStrokeWidth(w)}
+                  />
+                ))}
+                <TouchableOpacity style={[styles.clearBtn, { borderColor: theme.border }]} onPress={() => { setSketchPaths([]); Haptics.selectionAsync(); }}>
                   <Feather name="trash-2" size={14} color={theme.textSecondary} />
                 </TouchableOpacity>
+                {sketchPaths.length > 0 && (
+                  <TouchableOpacity style={[styles.clearBtn, { borderColor: theme.border }]} onPress={() => { setSketchPaths(p => p.slice(0, -1)); Haptics.selectionAsync(); }}>
+                    <Feather name="corner-left-up" size={14} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
+
             <SketchCanvas
               paths={sketchPaths}
               onPathsChange={setSketchPaths}
+              backgroundImageUri={sketchBackground}
               theme={theme}
               color={drawColor}
+              strokeWidth={strokeWidth}
             />
             <Text style={[styles.sketchNote, { color: theme.textMuted }]}>
-              Draw your blouse idea — neckline shape, sleeve length, back design…
+              {sketchBackground ? "Draw annotations, markings, or design notes on your photo" : "Draw neckline shape, sleeve length, back design — or add a photo background above"}
             </Text>
-          </Animated.View>
+          </View>
         )}
 
         <View style={styles.formField}>
@@ -486,9 +614,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           onPress={() => saveMutation.mutate()}
           disabled={saveMutation.isPending}
         >
-          {saveMutation.isPending ? (
-            <ActivityIndicator color="#fff" size="small" />
-          ) : (
+          {saveMutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : (
             <>
               <Feather name="check" size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>Save Idea</Text>
@@ -500,43 +626,31 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   }
 
   return (
-    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 60 }}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 16, paddingBottom: 80 }}>
       <View style={styles.ideasActions}>
-        <TouchableOpacity
-          style={[styles.addIdeaBtn, { backgroundColor: Colors.brand.primary }]}
-          onPress={() => setMode("upload")}
-        >
+        <TouchableOpacity style={[styles.addIdeaBtn, { backgroundColor: Colors.brand.primary }]} onPress={() => setMode("upload")}>
           <Feather name="upload" size={16} color="#fff" />
           <Text style={styles.addIdeaBtnText}>Upload Idea</Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.addIdeaBtn, { backgroundColor: Colors.brand.gold }]}
-          onPress={() => setMode("sketch")}
-        >
+        <TouchableOpacity style={[styles.addIdeaBtn, { backgroundColor: Colors.brand.gold }]} onPress={() => setMode("sketch")}>
           <Feather name="edit-3" size={16} color={Colors.brand.primaryDark} />
-          <Text style={[styles.addIdeaBtnText, { color: Colors.brand.primaryDark }]}>Sketch Design</Text>
+          <Text style={[styles.addIdeaBtnText, { color: Colors.brand.primaryDark }]}>Sketch on Photo</Text>
         </TouchableOpacity>
       </View>
 
       {isLoading ? (
-        <View style={styles.centerLoader}>
-          <ActivityIndicator color={Colors.brand.primary} />
-        </View>
+        <View style={styles.centerLoader}><ActivityIndicator color={Colors.brand.primary} /></View>
       ) : ideas.length === 0 ? (
         <Animated.View entering={FadeInDown.delay(100).springify()} style={[styles.emptyState, { borderColor: theme.border }]}>
           <Feather name="image" size={40} color={Colors.brand.primary + "40"} />
           <Text style={[styles.emptyTitle, { color: theme.text }]}>No ideas yet</Text>
           <Text style={[styles.emptyDesc, { color: theme.textSecondary }]}>
-            Upload blouse inspiration photos or draw a rough sketch to share with your tailor
+            Upload inspiration photos or sketch on a photo to share with your tailor
           </Text>
         </Animated.View>
       ) : (
         ideas.map((idea: any, i: number) => (
-          <Animated.View
-            key={idea.id}
-            entering={FadeInDown.delay(i * 60).springify()}
-            style={[styles.ideaCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-          >
+          <Animated.View key={idea.id} entering={FadeInDown.delay(i * 60).springify()} style={[styles.ideaCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={styles.ideaCardTop}>
               {idea.imageUrl ? (
                 <Image source={{ uri: idea.imageUrl }} style={styles.ideaThumb} resizeMode="cover" />
@@ -553,11 +667,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 <Text style={[styles.ideaTitle, { color: theme.text }]}>
                   {idea.title ?? (idea.sketchCanvas ? "Sketch Design" : "Idea")}
                 </Text>
-                {idea.notes ? (
-                  <Text style={[styles.ideaNotes, { color: theme.textSecondary }]} numberOfLines={2}>
-                    {idea.notes}
-                  </Text>
-                ) : null}
+                {idea.notes ? <Text style={[styles.ideaNotes, { color: theme.textSecondary }]} numberOfLines={2}>{idea.notes}</Text> : null}
                 <Text style={[styles.ideaDate, { color: theme.textMuted }]}>
                   {new Date(idea.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                 </Text>
@@ -565,10 +675,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
             </View>
             <View style={[styles.ideaCardActions, { borderTopColor: theme.border }]}>
               <TouchableOpacity
-                style={[
-                  styles.ideaActionBtn,
-                  { backgroundColor: idea.sharedWithTailors ? Colors.brand.primary + "15" : theme.background },
-                ]}
+                style={[styles.ideaActionBtn, { backgroundColor: idea.sharedWithTailors ? Colors.brand.primary + "15" : theme.background }]}
                 onPress={() => toggleShareMutation.mutate({ id: idea.id, val: !idea.sharedWithTailors })}
               >
                 <Feather name="users" size={14} color={idea.sharedWithTailors ? Colors.brand.primary : theme.textSecondary} />
@@ -578,12 +685,10 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
               </TouchableOpacity>
               <TouchableOpacity
                 style={[styles.ideaActionBtn, { backgroundColor: "#FF4D4D10" }]}
-                onPress={() =>
-                  Alert.alert("Delete Idea?", "This cannot be undone.", [
-                    { text: "Cancel", style: "cancel" },
-                    { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(idea.id) },
-                  ])
-                }
+                onPress={() => Alert.alert("Delete Idea?", "This cannot be undone.", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate(idea.id) },
+                ])}
               >
                 <Feather name="trash-2" size={14} color="#FF4D4D" />
                 <Text style={[styles.ideaActionText, { color: "#FF4D4D" }]}>Delete</Text>
@@ -617,8 +722,7 @@ export default function ProfileScreen() {
     queryFn: async () => {
       const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
       const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`);
-      if (!res.ok) return [];
-      return res.json();
+      return res.ok ? res.json() : [];
     },
     enabled: !!user,
   });
@@ -634,10 +738,7 @@ export default function ProfileScreen() {
   });
 
   const handleSave = () => {
-    if (!name.trim()) {
-      Alert.alert("Name required", "Please enter your name to continue.");
-      return;
-    }
+    if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
     const userId = user?.id ?? `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     setUser({ id: userId, name: name.trim(), phone: phone.trim() || undefined, role });
     setEditing(false);
@@ -647,13 +748,7 @@ export default function ProfileScreen() {
   const handleLogout = () => {
     Alert.alert("Sign Out", "Clear your profile from this device?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out", style: "destructive",
-        onPress: async () => {
-          await setUser(null);
-          setName(""); setPhone(""); setRole("customer"); setEditing(true);
-        },
-      },
+      { text: "Sign Out", style: "destructive", onPress: async () => { await setUser(null); setName(""); setPhone(""); setRole("customer"); setEditing(true); } },
     ]);
   };
 
@@ -671,13 +766,9 @@ export default function ProfileScreen() {
       >
         <View style={styles.avatarRow}>
           <View style={styles.avatarContainer}>
-            {user ? (
-              <Text style={styles.avatarText}>
-                {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
-              </Text>
-            ) : (
-              <Feather name="user" size={32} color="rgba(255,255,255,0.6)" />
-            )}
+            {user
+              ? <Text style={styles.avatarText}>{user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</Text>
+              : <Feather name="user" size={32} color="rgba(255,255,255,0.6)" />}
           </View>
           {user && (
             <TouchableOpacity style={styles.editBtn} onPress={() => { setActiveTab("account"); setEditing(!editing); }}>
@@ -688,15 +779,10 @@ export default function ProfileScreen() {
         <Text style={styles.headerName}>{user?.name ?? "Set Up Profile"}</Text>
         {user && (
           <View style={styles.roleBadge}>
-            <MaterialCommunityIcons
-              name={user.role === "tailor" ? "scissors-cutting" : "human-female"}
-              size={14}
-              color={Colors.brand.goldLight}
-            />
+            <MaterialCommunityIcons name={user.role === "tailor" ? "scissors-cutting" : "human-female"} size={14} color={Colors.brand.goldLight} />
             <Text style={styles.roleBadgeText}>{user.role === "tailor" ? "Tailor" : "Customer"}</Text>
           </View>
         )}
-
         {user && user.role === "customer" && (
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -725,14 +811,8 @@ export default function ProfileScreen() {
               style={[styles.tabBtn, activeTab === t.key && styles.tabBtnActive]}
               onPress={() => { setActiveTab(t.key); Haptics.selectionAsync(); }}
             >
-              <Feather
-                name={t.icon as any}
-                size={15}
-                color={activeTab === t.key ? Colors.brand.primary : theme.textSecondary}
-              />
-              <Text style={[styles.tabBtnText, { color: activeTab === t.key ? Colors.brand.primary : theme.textSecondary }]}>
-                {t.label}
-              </Text>
+              <Feather name={t.icon as any} size={15} color={activeTab === t.key ? Colors.brand.primary : theme.textSecondary} />
+              <Text style={[styles.tabBtnText, { color: activeTab === t.key ? Colors.brand.primary : theme.textSecondary }]}>{t.label}</Text>
               {activeTab === t.key && <View style={styles.tabUnderline} />}
             </TouchableOpacity>
           ))}
@@ -740,55 +820,23 @@ export default function ProfileScreen() {
       )}
 
       {(!user || activeTab === "account") && (
-        <ScrollView
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={{ paddingBottom: 120 + bottomPad }}
-        >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + bottomPad }}>
           {(editing || !user) && (
             <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.section, { paddingTop: 24 }]}>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>{user ? "Edit Profile" : "Create Profile"}</Text>
               <View style={styles.formField}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                  value={name}
-                  onChangeText={setName}
-                  placeholder="Enter your full name"
-                  placeholderTextColor={theme.textMuted}
-                  autoCapitalize="words"
-                  testID="name-input"
-                />
+                <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="Enter your full name" placeholderTextColor={theme.textMuted} autoCapitalize="words" testID="name-input" />
               </View>
               <View style={styles.formField}>
                 <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
-                <TextInput
-                  style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                  value={phone}
-                  onChangeText={setPhone}
-                  placeholder="+91 98765 43210"
-                  placeholderTextColor={theme.textMuted}
-                  keyboardType="phone-pad"
-                  testID="phone-input"
-                />
+                <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={phone} onChangeText={setPhone} placeholder="+91 98765 43210" placeholderTextColor={theme.textMuted} keyboardType="phone-pad" testID="phone-input" />
               </View>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 8 }]}>I am a…</Text>
               <View style={styles.roleCards}>
                 {ROLES.map((r) => (
-                  <TouchableOpacity
-                    key={r.value}
-                    style={[styles.roleCard, {
-                      backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card,
-                      borderColor: role === r.value ? Colors.brand.primary : theme.border,
-                      borderWidth: role === r.value ? 2 : 1,
-                    }]}
-                    onPress={() => { setRole(r.value); Haptics.selectionAsync(); }}
-                    testID={`role-${r.value}`}
-                  >
-                    <MaterialCommunityIcons
-                      name={r.icon as any}
-                      size={24}
-                      color={role === r.value ? Colors.brand.primary : theme.textSecondary}
-                    />
+                  <TouchableOpacity key={r.value} style={[styles.roleCard, { backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card, borderColor: role === r.value ? Colors.brand.primary : theme.border, borderWidth: role === r.value ? 2 : 1 }]} onPress={() => { setRole(r.value); Haptics.selectionAsync(); }} testID={`role-${r.value}`}>
+                    <MaterialCommunityIcons name={r.icon as any} size={24} color={role === r.value ? Colors.brand.primary : theme.textSecondary} />
                     <View style={styles.roleCardText}>
                       <Text style={[styles.roleCardTitle, { color: role === r.value ? Colors.brand.primary : theme.text }]}>{r.label}</Text>
                       <Text style={[styles.roleCardDesc, { color: theme.textMuted }]}>{r.desc}</Text>
@@ -797,17 +845,12 @@ export default function ProfileScreen() {
                   </TouchableOpacity>
                 ))}
               </View>
-              <TouchableOpacity
-                style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
-                onPress={handleSave}
-                testID="save-profile-button"
-              >
+              <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]} onPress={handleSave} testID="save-profile-button">
                 <Feather name="check" size={20} color="#fff" />
                 <Text style={styles.primaryBtnText}>{user ? "Update Profile" : "Create Profile"}</Text>
               </TouchableOpacity>
             </Animated.View>
           )}
-
           {user && !editing && (
             <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.section}>
               <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -816,10 +859,7 @@ export default function ProfileScreen() {
                   ...(user.phone ? [{ icon: "phone", label: "Phone", value: user.phone }] : []),
                   { icon: "hash", label: "User ID", value: user.id.slice(0, 20) + "…" },
                 ].map((row, i) => (
-                  <View
-                    key={row.label}
-                    style={[styles.infoRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 12, marginTop: 4 }]}
-                  >
+                  <View key={row.label} style={[styles.infoRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 12, marginTop: 4 }]}>
                     <Feather name={row.icon as any} size={16} color={Colors.brand.gold} />
                     <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>{row.label}</Text>
                     <Text style={[styles.infoValue, { color: theme.text }]}>{row.value}</Text>
@@ -835,120 +875,38 @@ export default function ProfileScreen() {
         </ScrollView>
       )}
 
-      {user && activeTab === "preferences" && (
-        <PreferencesTab theme={theme} user={user} />
-      )}
-
-      {user && activeTab === "ideas" && (
-        <IdeasTab theme={theme} user={user} />
-      )}
+      {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
+      {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
     </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: { flex: 1 },
-  header: {
-    paddingHorizontal: 24,
-    paddingBottom: 24,
-    alignItems: "center",
-    gap: 8,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
-  },
+  header: { paddingHorizontal: 24, paddingBottom: 24, alignItems: "center", gap: 8, borderBottomLeftRadius: 28, borderBottomRightRadius: 28 },
   avatarRow: { position: "relative", marginBottom: 4 },
-  avatarContainer: {
-    width: 76,
-    height: 76,
-    borderRadius: 38,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    alignItems: "center",
-    justifyContent: "center",
-    borderWidth: 2,
-    borderColor: "rgba(255,255,255,0.4)",
-  },
+  avatarContainer: { width: 76, height: 76, borderRadius: 38, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
   avatarText: { fontFamily: "Inter_700Bold", fontSize: 26, color: "#fff" },
-  editBtn: {
-    position: "absolute",
-    bottom: 0,
-    right: -4,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: Colors.brand.gold,
-    alignItems: "center",
-    justifyContent: "center",
-  },
+  editBtn: { position: "absolute", bottom: 0, right: -4, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.gold, alignItems: "center", justifyContent: "center" },
   headerName: { fontFamily: "Inter_700Bold", fontSize: 22, color: "#fff", textAlign: "center" },
-  roleBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    backgroundColor: "rgba(255,255,255,0.15)",
-    paddingHorizontal: 14,
-    paddingVertical: 5,
-    borderRadius: 20,
-  },
+  roleBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
   roleBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.brand.goldLight },
-  statsRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.12)",
-    borderRadius: 16,
-    paddingVertical: 10,
-    paddingHorizontal: 24,
-    gap: 0,
-    marginTop: 4,
-  },
+  statsRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 16, paddingVertical: 10, paddingHorizontal: 24, marginTop: 4 },
   statItem: { flex: 1, alignItems: "center", gap: 2 },
   statNum: { fontFamily: "Inter_700Bold", fontSize: 20, color: "#fff" },
   statLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.7)" },
   statDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.25)" },
-  tabBar: {
-    flexDirection: "row",
-    borderBottomWidth: 1,
-    paddingHorizontal: 8,
-  },
-  tabBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 5,
-    paddingVertical: 12,
-    position: "relative",
-  },
+  tabBar: { flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 8 },
+  tabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 12, position: "relative" },
   tabBtnActive: {},
   tabBtnText: { fontFamily: "Inter_500Medium", fontSize: 12 },
-  tabUnderline: {
-    position: "absolute",
-    bottom: 0,
-    left: 8,
-    right: 8,
-    height: 2,
-    backgroundColor: Colors.brand.primary,
-    borderRadius: 1,
-  },
+  tabUnderline: { position: "absolute", bottom: 0, left: 8, right: 8, height: 2, backgroundColor: Colors.brand.primary, borderRadius: 1 },
   section: { padding: 20, gap: 16 },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 20 },
   formField: { gap: 6 },
   fieldLabel: { fontFamily: "Inter_500Medium", fontSize: 13, letterSpacing: 0.3 },
-  textInput: {
-    borderRadius: 14,
-    padding: 14,
-    fontSize: 15,
-    fontFamily: "Inter_400Regular",
-    borderWidth: 1,
-  },
-  notesInput: {
-    borderRadius: 14,
-    padding: 14,
-    fontSize: 14,
-    fontFamily: "Inter_400Regular",
-    borderWidth: 1,
-    height: 90,
-    textAlignVertical: "top",
-  },
+  textInput: { borderRadius: 14, padding: 14, fontSize: 15, fontFamily: "Inter_400Regular", borderWidth: 1 },
+  notesInput: { borderRadius: 14, padding: 14, fontSize: 14, fontFamily: "Inter_400Regular", borderWidth: 1, height: 90, textAlignVertical: "top" },
   roleCards: { gap: 10 },
   roleCard: { flexDirection: "row", alignItems: "center", gap: 14, padding: 16, borderRadius: 16 },
   roleCardText: { flex: 1 },
@@ -958,65 +916,24 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: "row", alignItems: "center", gap: 10 },
   infoLabel: { fontFamily: "Inter_400Regular", fontSize: 13, width: 60 },
   infoValue: { fontFamily: "Inter_500Medium", fontSize: 14, flex: 1 },
-  logoutBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
+  logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5 },
   logoutText: { fontFamily: "Inter_500Medium", fontSize: 15 },
-  primaryBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 10,
-    paddingVertical: 16,
-    borderRadius: 16,
-    shadowColor: Colors.brand.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
+  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16, shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
   primaryBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
   groupLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
-  pillRow: { flexDirection: "row", flexWrap: "wrap", gap: 8 },
-  pill: { paddingHorizontal: 14, paddingVertical: 7, borderRadius: 20, borderWidth: 1 },
-  pillText: { fontFamily: "Inter_500Medium", fontSize: 13 },
-  savedBanner: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-    padding: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
+  savedBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   savedBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, flex: 1 },
   centerLoader: { padding: 40, alignItems: "center", gap: 12 },
   loadingText: { fontFamily: "Inter_400Regular", fontSize: 14 },
+  styleCard: { width: 100, borderRadius: 14, padding: 8, alignItems: "center", gap: 8 },
+  styleCardImgWrap: { width: 80, height: 80, borderRadius: 12, overflow: "hidden", position: "relative" },
+  styleCardImg: { width: "100%", height: "100%" },
+  styleCardCheck: { position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brand.primary, alignItems: "center", justifyContent: "center" },
+  styleCardLabel: { fontFamily: "Inter_500Medium", fontSize: 11, textAlign: "center", lineHeight: 14 },
   ideasActions: { flexDirection: "row", gap: 12 },
-  addIdeaBtn: {
-    flex: 1,
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-    paddingVertical: 13,
-    borderRadius: 14,
-  },
+  addIdeaBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 13, borderRadius: 14 },
   addIdeaBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
-  emptyState: {
-    alignItems: "center",
-    padding: 40,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderStyle: "dashed",
-    gap: 12,
-    marginTop: 20,
-  },
+  emptyState: { alignItems: "center", padding: 40, borderRadius: 20, borderWidth: 1, borderStyle: "dashed", gap: 12, marginTop: 20 },
   emptyTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
   emptyDesc: { fontFamily: "Inter_400Regular", fontSize: 14, textAlign: "center", lineHeight: 20 },
   ideaCard: { borderRadius: 16, borderWidth: 1, overflow: "hidden" },
@@ -1025,106 +942,37 @@ const styles = StyleSheet.create({
   ideaTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   ideaNotes: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 },
   ideaDate: { fontFamily: "Inter_400Regular", fontSize: 11 },
-  ideaCardActions: {
-    flexDirection: "row",
-    borderTopWidth: 1,
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    gap: 8,
-  },
-  ideaActionBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 14,
-    paddingVertical: 7,
-    borderRadius: 10,
-  },
+  ideaCardActions: { flexDirection: "row", borderTopWidth: 1, paddingHorizontal: 14, paddingVertical: 10, gap: 8 },
+  ideaActionBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 14, paddingVertical: 7, borderRadius: 10 },
   ideaActionText: { fontFamily: "Inter_500Medium", fontSize: 12 },
   modeHeader: { flexDirection: "row", alignItems: "center", gap: 12 },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: Colors.brand.primary + "15",
-  },
+  backBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center", backgroundColor: Colors.brand.primary + "15" },
   modeTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
   imagePreviewWrapper: { position: "relative", borderRadius: 16, overflow: "hidden" },
-  imagePreview: { width: "100%", height: 200, borderRadius: 16 },
-  removeImageBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: "rgba(0,0,0,0.6)",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  uploadZone: {
-    borderWidth: 2,
-    borderStyle: "dashed",
-    borderColor: Colors.brand.primary + "40",
-    borderRadius: 16,
-    padding: 32,
-    alignItems: "center",
-    gap: 10,
-    backgroundColor: Colors.brand.primary + "05",
-  },
+  imagePreview: { width: "100%", height: 220, borderRadius: 16 },
+  removeImageBtn: { position: "absolute", top: 10, right: 10, width: 28, height: 28, borderRadius: 14, backgroundColor: "rgba(0,0,0,0.6)", alignItems: "center", justifyContent: "center" },
+  uploadZone: { borderWidth: 2, borderStyle: "dashed", borderRadius: 16, padding: 32, alignItems: "center", gap: 10, backgroundColor: Colors.brand.primary + "05" },
   uploadZoneText: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 20 },
   uploadBtnRow: { flexDirection: "row", gap: 12, marginTop: 4 },
-  uploadBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    paddingHorizontal: 18,
-    paddingVertical: 9,
-    borderRadius: 12,
-    borderWidth: 1,
-  },
+  uploadBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 18, paddingVertical: 9, borderRadius: 12, borderWidth: 1 },
   uploadBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  bgPhotoRow: { flexDirection: "row", alignItems: "center", gap: 12 },
+  bgPhotoSub: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 2 },
+  bgPhotoBtns: { flexDirection: "row", gap: 6 },
+  bgPhotoBtn: { flexDirection: "row", alignItems: "center", gap: 5, paddingHorizontal: 10, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  bgPhotoBtnText: { fontFamily: "Inter_500Medium", fontSize: 12 },
   sketchToolbar: { flexDirection: "row", alignItems: "center", justifyContent: "space-between" },
-  colorPicker: { flexDirection: "row", alignItems: "center", gap: 8 },
+  colorPicker: { flexDirection: "row", alignItems: "center", gap: 7 },
   colorDot: { width: 22, height: 22, borderRadius: 11 },
-  clearBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: 8,
-    borderWidth: 1,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  sketchCanvas: {
-    width: CANVAS_W,
-    height: CANVAS_H,
-    borderRadius: 16,
-    borderWidth: 1.5,
-    overflow: "hidden",
-  },
-  sketchHint: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 8,
-  },
+  strokeRow: { flexDirection: "row", alignItems: "center", gap: 8 },
+  strokeDot: { alignItems: "center", justifyContent: "center" },
+  clearBtn: { width: 28, height: 28, borderRadius: 8, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  sketchCanvas: { width: CANVAS_W, height: CANVAS_H, borderRadius: 16, borderWidth: 1.5, overflow: "hidden", position: "relative" },
+  sketchHint: { position: "absolute", top: 0, left: 0, right: 0, bottom: 0, alignItems: "center", justifyContent: "center", gap: 8 },
   sketchHintText: { fontFamily: "Inter_500Medium", fontSize: 14, color: Colors.brand.primary + "60" },
   sketchHintSub: { fontFamily: "Inter_400Regular", fontSize: 12, color: Colors.brand.primary + "40" },
   sketchNote: { fontFamily: "Inter_400Regular", fontSize: 12, textAlign: "center" },
-  shareToggle: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    padding: 14,
-    borderRadius: 14,
-    borderWidth: 1.5,
-  },
+  shareToggle: { flexDirection: "row", alignItems: "center", gap: 12, padding: 14, borderRadius: 14, borderWidth: 1.5 },
   shareToggleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   shareToggleSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 },
   toggleDot: { width: 10, height: 10, borderRadius: 5 },
