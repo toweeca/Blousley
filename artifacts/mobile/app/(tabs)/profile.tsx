@@ -19,7 +19,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import Svg, { Path } from "react-native-svg";
+import Svg, { Path, Circle, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -30,7 +30,7 @@ const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CANVAS_W = SCREEN_WIDTH - 48;
 const CANVAS_H = 300;
 
-type Tab = "account" | "preferences" | "ideas";
+type Tab = "account" | "preferences" | "ideas" | "measurements";
 type SketchPath = { d: string; color: string; width: number };
 
 const NECK_OPTIONS = ["Sweetheart", "Boat Neck", "Deep V", "Halter", "Square", "Round", "Keyhole", "Off-Shoulder"];
@@ -701,6 +701,379 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   );
 }
 
+const MEASURE_FIELDS = [
+  { key: "aboveBust",     label: "Above Bust",     desc: "Around upper chest, above the bust line", icon: "↑" },
+  { key: "bust",          label: "Bust",            desc: "Around the fullest part of the chest",    icon: "◉" },
+  { key: "underBust",     label: "Under Bust",      desc: "Around ribcage just below the bust",      icon: "↓" },
+  { key: "shoulderWidth", label: "Shoulder Width",  desc: "Shoulder tip to shoulder tip across back", icon: "↔" },
+  { key: "armhole",       label: "Armhole",         desc: "Around the top of the arm at shoulder",   icon: "⊙" },
+  { key: "blouseLength",  label: "Blouse Length",   desc: "Shoulder down to where blouse ends",      icon: "↕" },
+] as const;
+
+type MeasureKey = (typeof MEASURE_FIELDS)[number]["key"];
+
+function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
+  const W = SCREEN_WIDTH - 48;
+  const H = 280;
+  const cx = W / 2;
+  const brand = Colors.brand.primary;
+  const gold = Colors.brand.gold;
+
+  return (
+    <Svg width={W} height={H}>
+      <Defs>
+        <SvgGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={brand} stopOpacity="0.15" />
+          <Stop offset="1" stopColor={brand} stopOpacity="0.03" />
+        </SvgGradient>
+      </Defs>
+
+      {/* Neck */}
+      <Path d={`M ${cx - 14} 18 Q ${cx} 8 ${cx + 14} 18`} stroke={brand} strokeWidth="2" fill="none" />
+      {/* Shoulders */}
+      <Path d={`M ${cx - 14} 18 Q ${cx - 48} 36 ${cx - 52} 56`} stroke={brand} strokeWidth="2" fill="none" />
+      <Path d={`M ${cx + 14} 18 Q ${cx + 48} 36 ${cx + 52} 56`} stroke={brand} strokeWidth="2" fill="none" />
+      {/* Torso sides */}
+      <Path d={`M ${cx - 52} 56 Q ${cx - 58} 100 ${cx - 50} 145 Q ${cx - 44} 175 ${cx - 48} 220`} stroke={brand} strokeWidth="2" fill="none" />
+      <Path d={`M ${cx + 52} 56 Q ${cx + 58} 100 ${cx + 50} 145 Q ${cx + 44} 175 ${cx + 48} 220`} stroke={brand} strokeWidth="2" fill="none" />
+      {/* Bottom */}
+      <Path d={`M ${cx - 48} 220 Q ${cx} 228 ${cx + 48} 220`} stroke={brand} strokeWidth="2" fill="none" />
+      {/* Bust fill hint */}
+      <Rect x={cx - 52} y={55} width={104} height={70} rx={8} fill="url(#bodyGrad)" />
+
+      {/* ① Above bust line */}
+      <Line x1={cx - 52} y1={52} x2={cx + 52} y2={52} stroke={brand} strokeWidth="1.5" strokeDasharray="4,3" />
+      <Circle cx={cx - 52} cy={52} r={4} fill={brand} />
+      <Circle cx={cx + 52} cy={52} r={4} fill={brand} />
+      <SvgText x={cx + 56} y={56} fontSize="9" fill={brand} fontWeight="bold">① Above</SvgText>
+
+      {/* ② Bust line */}
+      <Line x1={cx - 58} y1={86} x2={cx + 58} y2={86} stroke="#C1536A" strokeWidth="1.5" strokeDasharray="4,3" />
+      <Circle cx={cx - 58} cy={86} r={4} fill="#C1536A" />
+      <Circle cx={cx + 58} cy={86} r={4} fill="#C1536A" />
+      <SvgText x={cx + 62} y={90} fontSize="9" fill="#C1536A" fontWeight="bold">② Bust</SvgText>
+
+      {/* ③ Under bust */}
+      <Line x1={cx - 54} y1={118} x2={cx + 54} y2={118} stroke={gold} strokeWidth="1.5" strokeDasharray="4,3" />
+      <Circle cx={cx - 54} cy={118} r={4} fill={gold} />
+      <Circle cx={cx + 54} cy={118} r={4} fill={gold} />
+      <SvgText x={cx + 58} y={122} fontSize="9" fill={gold} fontWeight="bold">③ Under</SvgText>
+
+      {/* ④ Shoulder width arrow */}
+      <Line x1={cx - 52} y1={38} x2={cx + 52} y2={38} stroke="#4A90D9" strokeWidth="1.5" />
+      <Path d={`M ${cx - 52} 34 L ${cx - 52} 42`} stroke="#4A90D9" strokeWidth="1.5" />
+      <Path d={`M ${cx + 52} 34 L ${cx + 52} 42`} stroke="#4A90D9" strokeWidth="1.5" />
+      <SvgText x={cx - 26} y={35} fontSize="9" fill="#4A90D9" fontWeight="bold" textAnchor="middle">④ Shoulder</SvgText>
+
+      {/* ⑤ Armhole circle */}
+      <Circle cx={cx - 52} cy={72} r={14} stroke="#9B59B6" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
+      <SvgText x={8} y={76} fontSize="9" fill="#9B59B6" fontWeight="bold">⑤ Arm</SvgText>
+
+      {/* ⑥ Blouse length arrow */}
+      <Line x1={cx + 64} y1={18} x2={cx + 64} y2={220} stroke="#27AE60" strokeWidth="1.5" />
+      <Path d={`M ${cx + 60} 18 L ${cx + 68} 18`} stroke="#27AE60" strokeWidth="1.5" />
+      <Path d={`M ${cx + 60} 220 L ${cx + 68} 220`} stroke="#27AE60" strokeWidth="1.5" />
+      <SvgText x={cx + 68} y={125} fontSize="9" fill="#27AE60" fontWeight="bold" transform={`rotate(90, ${cx + 68}, 125)`}>⑥ Length</SvgText>
+    </Svg>
+  );
+}
+
+function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
+  const qc = useQueryClient();
+  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+
+  const { data: saved, isLoading } = useQuery({
+    queryKey: ["measurements", user.id],
+    queryFn: async () => {
+      const r = await fetch(`${domain}/api/measurements/me?userId=${user.id}`);
+      return r.ok ? r.json() : null;
+    },
+  });
+
+  const [editing, setEditing] = useState(false);
+  const [unit, setUnit] = useState<"cm" | "in">("cm");
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [fields, setFields] = useState<Record<MeasureKey, string>>({
+    aboveBust: "", bust: "", underBust: "",
+    shoulderWidth: "", armhole: "", blouseLength: "",
+  });
+  const [notes, setNotes] = useState("");
+  const [errors, setErrors] = useState<Partial<Record<MeasureKey, string>>>({});
+  const [initialized, setInitialized] = useState(false);
+
+  React.useEffect(() => {
+    if (saved && !initialized) {
+      setUnit((saved.unit as "cm" | "in") ?? "cm");
+      setFields({
+        aboveBust: saved.aboveBust ?? "",
+        bust: saved.bust ?? "",
+        underBust: saved.underBust ?? "",
+        shoulderWidth: saved.shoulderWidth ?? "",
+        armhole: saved.armhole ?? "",
+        blouseLength: saved.blouseLength ?? "",
+      });
+      setNotes(saved.notes ?? "");
+      setInitialized(true);
+      setEditing(false);
+    } else if (!saved && !isLoading) {
+      setEditing(true);
+    }
+  }, [saved, isLoading, initialized]);
+
+  const validate = () => {
+    const errs: Partial<Record<MeasureKey, string>> = {};
+    let hasAny = false;
+    MEASURE_FIELDS.forEach(({ key }) => {
+      const val = fields[key];
+      if (val !== "") {
+        hasAny = true;
+        if (isNaN(Number(val)) || Number(val) <= 0) {
+          errs[key] = "Enter a valid number";
+        }
+      }
+    });
+    if (!hasAny) errs.bust = "Enter at least one measurement";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const saveMutation = useMutation({
+    mutationFn: async () => {
+      const r = await fetch(`${domain}/api/measurements/me`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, unit, ...fields, notes }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      return r.json();
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["measurements", user.id] });
+      setEditing(false);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Saved!", "Your measurements have been stored.");
+    },
+    onError: () => Alert.alert("Error", "Could not save measurements."),
+  });
+
+  const handleSave = () => {
+    if (validate()) saveMutation.mutate();
+  };
+
+  const MEASURE_COLORS: Record<MeasureKey, string> = {
+    aboveBust: Colors.brand.primary,
+    bust: "#C1536A",
+    underBust: Colors.brand.gold,
+    shoulderWidth: "#4A90D9",
+    armhole: "#9B59B6",
+    blouseLength: "#27AE60",
+  };
+
+  if (isLoading) {
+    return (
+      <View style={styles.centerLoader}>
+        <ActivityIndicator color={Colors.brand.primary} />
+        <Text style={[styles.loadingText, { color: theme.textSecondary }]}>Loading measurements…</Text>
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 80 }}>
+
+      {/* How to Measure guide */}
+      <Animated.View entering={FadeInDown.delay(60).springify()}>
+        <TouchableOpacity
+          style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}
+          onPress={() => { setGuideOpen(!guideOpen); Haptics.selectionAsync(); }}
+        >
+          <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
+            <Feather name="info" size={18} color={Colors.brand.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.guideTitle, { color: theme.text }]}>How to Measure</Text>
+            <Text style={[styles.guideSub, { color: theme.textMuted }]}>Tap to {guideOpen ? "hide" : "view"} measurement guide & diagram</Text>
+          </View>
+          <Feather name={guideOpen ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+        </TouchableOpacity>
+
+        {guideOpen && (
+          <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <BodyDiagram theme={theme} />
+            <View style={[styles.guideTipBox, { backgroundColor: Colors.brand.primary + "08", borderColor: Colors.brand.primary + "25" }]}>
+              <Text style={[styles.guideTipTitle, { color: Colors.brand.primary }]}>📏 Tips for accuracy</Text>
+              <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Keep the tape level and snug — not tight.</Text>
+              <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Measure over a thin blouse or innerwear, not a thick sweater.</Text>
+              <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Stand straight with arms relaxed at your sides.</Text>
+              <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Have someone help you measure the back and shoulder.</Text>
+            </View>
+            <View style={{ gap: 10 }}>
+              {MEASURE_FIELDS.map((f) => (
+                <View key={f.key} style={styles.guideFieldRow}>
+                  <View style={[styles.guideFieldDot, { backgroundColor: MEASURE_COLORS[f.key] }]}>
+                    <Text style={styles.guideFieldDotText}>{f.icon}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.guideFieldLabel, { color: theme.text }]}>{f.label}</Text>
+                    <Text style={[styles.guideFieldDesc, { color: theme.textSecondary }]}>{f.desc}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+          </Animated.View>
+        )}
+      </Animated.View>
+
+      {/* View mode — show saved measurements */}
+      {saved && !editing && (
+        <Animated.View entering={FadeInDown.delay(80).springify()} style={{ gap: 16 }}>
+          <View style={styles.savedMeasureHeader}>
+            <View>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>My Measurements</Text>
+              <Text style={[styles.savedDate, { color: theme.textMuted }]}>
+                Saved in {saved.unit?.toUpperCase() ?? "CM"} · {new Date(saved.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+              </Text>
+            </View>
+            <TouchableOpacity style={[styles.editMeasureBtn, { borderColor: Colors.brand.primary + "50" }]} onPress={() => setEditing(true)}>
+              <Feather name="edit-2" size={14} color={Colors.brand.primary} />
+              <Text style={[styles.editMeasureBtnText, { color: Colors.brand.primary }]}>Edit</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={[styles.measureGrid, { borderColor: theme.border }]}>
+            {MEASURE_FIELDS.map((f, i) => {
+              const val = saved[f.key];
+              return (
+                <View
+                  key={f.key}
+                  style={[
+                    styles.measureCell,
+                    { borderColor: theme.border },
+                    i % 2 === 0 && { borderRightWidth: 1 },
+                    i < 4 && { borderBottomWidth: 1 },
+                  ]}
+                >
+                  <View style={[styles.measureCellDot, { backgroundColor: MEASURE_COLORS[f.key] + "20" }]}>
+                    <Text style={[styles.measureCellDotText, { color: MEASURE_COLORS[f.key] }]}>{f.icon}</Text>
+                  </View>
+                  <Text style={[styles.measureCellLabel, { color: theme.textSecondary }]}>{f.label}</Text>
+                  <Text style={[styles.measureCellValue, { color: val ? theme.text : theme.textMuted }]}>
+                    {val ? `${Number(val).toFixed(1)} ${saved.unit ?? "cm"}` : "—"}
+                  </Text>
+                </View>
+              );
+            })}
+          </View>
+
+          {saved.notes ? (
+            <View style={[styles.notesCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <Text style={[styles.notesCardLabel, { color: theme.textSecondary }]}>Notes</Text>
+              <Text style={[styles.notesCardText, { color: theme.text }]}>{saved.notes}</Text>
+            </View>
+          ) : null}
+
+          <View style={[styles.infoHint, { backgroundColor: Colors.brand.gold + "12", borderColor: Colors.brand.gold + "30" }]}>
+            <Feather name="info" size={14} color={Colors.brand.gold} />
+            <Text style={[styles.infoHintText, { color: theme.textSecondary }]}>
+              These measurements are shared with your tailor when you send a fit profile.
+            </Text>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* Edit / create form */}
+      {editing && (
+        <Animated.View entering={FadeInDown.delay(80).springify()} style={{ gap: 20 }}>
+          <View style={styles.savedMeasureHeader}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>
+              {saved ? "Edit Measurements" : "Enter Measurements"}
+            </Text>
+            {saved && (
+              <TouchableOpacity onPress={() => { setEditing(false); setErrors({}); }} style={styles.cancelBtn}>
+                <Feather name="x" size={16} color={theme.textSecondary} />
+              </TouchableOpacity>
+            )}
+          </View>
+
+          {/* Unit toggle */}
+          <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.unitToggleLabel, { color: theme.textSecondary }]}>Unit:</Text>
+            {(["cm", "in"] as const).map((u) => (
+              <TouchableOpacity
+                key={u}
+                style={[styles.unitBtn, unit === u && { backgroundColor: Colors.brand.primary }]}
+                onPress={() => { setUnit(u); Haptics.selectionAsync(); }}
+              >
+                <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>
+                  {u === "cm" ? "Centimetres" : "Inches"}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+
+          {/* Input fields */}
+          <View style={{ gap: 14 }}>
+            {MEASURE_FIELDS.map((f) => (
+              <View key={f.key} style={styles.formField}>
+                <View style={styles.measureInputLabel}>
+                  <View style={[styles.measureDotSmall, { backgroundColor: MEASURE_COLORS[f.key] }]} />
+                  <Text style={[styles.fieldLabel, { color: theme.text }]}>{f.label}</Text>
+                  <Text style={[styles.fieldUnit, { color: theme.textMuted }]}>{unit}</Text>
+                </View>
+                <TextInput
+                  style={[
+                    styles.textInput,
+                    { backgroundColor: theme.card, color: theme.text, borderColor: errors[f.key] ? "#FF4D4D" : theme.border },
+                  ]}
+                  value={fields[f.key]}
+                  onChangeText={(v) => {
+                    setFields((p) => ({ ...p, [f.key]: v }));
+                    if (errors[f.key]) setErrors((e) => ({ ...e, [f.key]: undefined }));
+                  }}
+                  placeholder={`e.g. ${unit === "cm" ? "86.5" : "34"}`}
+                  placeholderTextColor={theme.textMuted}
+                  keyboardType="decimal-pad"
+                />
+                {errors[f.key] && (
+                  <Text style={styles.errorText}>{errors[f.key]}</Text>
+                )}
+                <Text style={[styles.measureInputHint, { color: theme.textMuted }]}>{f.desc}</Text>
+              </View>
+            ))}
+          </View>
+
+          {/* Notes */}
+          <View style={styles.formField}>
+            <Text style={[styles.fieldLabel, { color: theme.text }]}>Notes (optional)</Text>
+            <TextInput
+              style={[styles.notesInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+              value={notes}
+              onChangeText={setNotes}
+              placeholder="Any additional fitting notes for your tailor…"
+              placeholderTextColor={theme.textMuted}
+              multiline
+              numberOfLines={3}
+            />
+          </View>
+
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary, opacity: saveMutation.isPending ? 0.7 : 1 }]}
+            onPress={handleSave}
+            disabled={saveMutation.isPending}
+          >
+            {saveMutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : (
+              <>
+                <Feather name="save" size={18} color="#fff" />
+                <Text style={styles.primaryBtnText}>Save Measurements</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+    </ScrollView>
+  );
+}
+
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -754,8 +1127,9 @@ export default function ProfileScreen() {
 
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: "account", label: "Account", icon: "user" },
-    { key: "preferences", label: "Preferences", icon: "sliders" },
-    { key: "ideas", label: "Idea Board", icon: "image" },
+    { key: "preferences", label: "Styles", icon: "sliders" },
+    { key: "ideas", label: "Ideas", icon: "image" },
+    { key: "measurements", label: "Measures", icon: "bar-chart-2" },
   ];
 
   return (
@@ -877,6 +1251,7 @@ export default function ProfileScreen() {
 
       {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
+      {user && activeTab === "measurements" && <MeasurementsTab theme={theme} user={user} />}
     </View>
   );
 }
@@ -976,4 +1351,42 @@ const styles = StyleSheet.create({
   shareToggleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   shareToggleSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 },
   toggleDot: { width: 10, height: 10, borderRadius: 5 },
+  guideHeader: { flexDirection: "row", alignItems: "center", gap: 12, padding: 16, borderRadius: 16, borderWidth: 1 },
+  guideIconWrap: { width: 40, height: 40, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  guideTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  guideSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
+  guideBody: { padding: 16, borderRadius: 16, borderWidth: 1, marginTop: 8, gap: 16, alignItems: "center" },
+  guideTipBox: { width: "100%", padding: 14, borderRadius: 12, borderWidth: 1, gap: 6 },
+  guideTipTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 4 },
+  guideTipText: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18 },
+  guideFieldRow: { flexDirection: "row", alignItems: "flex-start", gap: 12, width: "100%" },
+  guideFieldDot: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  guideFieldDotText: { fontSize: 14 },
+  guideFieldLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  guideFieldDesc: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17, marginTop: 2 },
+  savedMeasureHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  savedDate: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 3 },
+  editMeasureBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  editMeasureBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  measureGrid: { borderRadius: 16, borderWidth: 1, flexDirection: "row", flexWrap: "wrap" },
+  measureCell: { width: "50%", padding: 16, alignItems: "center", gap: 6 },
+  measureCellDot: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  measureCellDotText: { fontSize: 16 },
+  measureCellLabel: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center" },
+  measureCellValue: { fontFamily: "Inter_700Bold", fontSize: 16, textAlign: "center" },
+  notesCard: { padding: 14, borderRadius: 14, borderWidth: 1 },
+  notesCardLabel: { fontFamily: "Inter_500Medium", fontSize: 12, marginBottom: 4 },
+  notesCardText: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },
+  infoHint: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
+  infoHintText: { fontFamily: "Inter_400Regular", fontSize: 13, flex: 1, lineHeight: 18 },
+  unitToggle: { flexDirection: "row", alignItems: "center", gap: 10, padding: 6, borderRadius: 14, borderWidth: 1 },
+  unitToggleLabel: { fontFamily: "Inter_500Medium", fontSize: 13, paddingLeft: 8 },
+  unitBtn: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: "center" },
+  unitBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  measureInputLabel: { flexDirection: "row", alignItems: "center", gap: 8 },
+  measureDotSmall: { width: 10, height: 10, borderRadius: 5 },
+  fieldUnit: { fontFamily: "Inter_400Regular", fontSize: 12, marginLeft: "auto" as any },
+  measureInputHint: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
+  cancelBtn: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#FF4D4D" },
 });

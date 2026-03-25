@@ -4,6 +4,7 @@ import blouseRouter from "./blouse";
 import tailorRouter from "./tailor";
 import preferencesRouter from "./preferences";
 import ideasRouter from "./ideas";
+import measurementsRouter from "./measurements";
 
 const router: IRouter = Router();
 
@@ -12,5 +13,6 @@ router.use("/blouse", blouseRouter);
 router.use("/tailor", tailorRouter);
 router.use("/preferences", preferencesRouter);
 router.use("/ideas", ideasRouter);
+router.use("/measurements", measurementsRouter);
 
 export default router;
