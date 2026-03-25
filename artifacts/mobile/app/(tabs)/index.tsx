@@ -192,7 +192,7 @@ export default function HomeScreen() {
           {/* Branding */}
           <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.brandRow}>
             <View>
-              <Text style={styles.appName}>Eloquence</Text>
+              <Text style={styles.appName}>Blousify</Text>
               <Text style={styles.headerGreeting}>
                 {user ? `Namaste, ${user.name.split(" ")[0]}` : "Namaste"}
               </Text>
