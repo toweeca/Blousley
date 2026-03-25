@@ -5,3 +5,4 @@ export * from "./messages";
 export * from "./blousePreferences";
 export * from "./customerIdeas";
 export * from "./blouseMeasurements";
+export * from "./blouseDesigns";

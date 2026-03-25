@@ -20,6 +20,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
+import { SvgXml } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -34,7 +35,7 @@ const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
-type Tab = "account" | "preferences" | "ideas" | "measurements";
+type Tab = "account" | "preferences" | "ideas" | "measurements" | "design";
 type SketchPath = { d: string; color: string; width: number };
 type SketchTool = "pen" | "eraser";
 
@@ -69,6 +70,12 @@ const BACK_IMAGES: Record<string, any> = {
   "Saree Back": require("@/assets/images/styles/back_saree.png"),
   "Mirror Work": require("@/assets/images/styles/back_mirror.png"),
 };
+const FABRIC_COLORS = [
+  "#8B2252","#C0392B","#E74C3C","#E67E22","#F1C40F",
+  "#27AE60","#1ABC9C","#2980B9","#1A5276","#7D3C98",
+  "#ECF0F1","#17202A","#F8F9FA","#D4AC0D","#A04030","#6C5CE7",
+];
+
 const FABRIC_IMAGES: Record<string, any> = {
   "Silk": require("@/assets/images/styles/fabric_silk.png"),
   "Cotton": require("@/assets/images/styles/fabric_cotton.png"),
@@ -1471,6 +1478,372 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
   );
 }
 
+// ────────────────────────────────────────────────────────────────────────────
+// My Blouse Design Tab
+// ────────────────────────────────────────────────────────────────────────────
+
+const D_NECK = ["Sweetheart", "Boat Neck", "Deep V", "Round", "Halter", "Square"];
+const D_SLEEVE = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Puff Sleeve"];
+const D_BACK = ["Hook", "Tie Back", "Mid Back", "High Back", "Deep Back", "Open Back"];
+
+function ChipRow({ label, options, value, onSelect, color, theme }: {
+  label: string; options: string[]; value: string;
+  onSelect: (v: string) => void; color: string; theme: typeof Colors.light;
+}) {
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+        {options.map((opt) => {
+          const sel = value === opt;
+          return (
+            <TouchableOpacity
+              key={opt}
+              onPress={() => { onSelect(opt); Haptics.selectionAsync(); }}
+              style={{ paddingHorizontal: 14, paddingVertical: 8, borderRadius: 20, borderWidth: 1.5,
+                backgroundColor: sel ? color + "18" : theme.card, borderColor: sel ? color : theme.border }}
+            >
+              <Text style={{ fontFamily: sel ? "Inter_600SemiBold" : "Inter_400Regular", fontSize: 13,
+                color: sel ? color : theme.textSecondary }}>{opt}</Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+    </View>
+  );
+}
+
+function DesignMeasureRow({ label, value, onChange, hint, unit, theme }: {
+  label: string; value: string; onChange: (v: string) => void;
+  hint: string; unit: string; theme: typeof Colors.light;
+}) {
+  return (
+    <View style={{ gap: 4 }}>
+      <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: theme.text }}>{label}</Text>
+        <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted }}>{unit}</Text>
+      </View>
+      <TextInput
+        style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 12,
+          paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text }}
+        value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={hint}
+        placeholderTextColor={theme.textMuted}
+      />
+    </View>
+  );
+}
+
+function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
+  const [step, setStep] = useState(0);
+  const [unit, setUnit] = useState<"cm" | "in">("cm");
+  const [bust, setBust] = useState("");
+  const [underBust, setUnderBust] = useState("");
+  const [bustPt, setBustPt] = useState("");
+  const [blouseLen, setBlouseLen] = useState("");
+  const [sleeveLen, setSleeveLen] = useState("");
+  const [neckline, setNeckline] = useState("Round");
+  const [sleeve, setSleeve] = useState("Elbow Length");
+  const [back, setBack] = useState("Hook");
+  const [fabricColor, setFabricColor] = useState(Colors.brand.primary);
+  const [generating, setGenerating] = useState(false);
+  const [aiIdeas, setAiIdeas] = useState<{ title: string; description: string }[] | null>(null);
+  const [patternSvg, setPatternSvg] = useState<string | null>(null);
+  const [instructions, setInstructions] = useState<string | null>(null);
+  const [showInstructions, setShowInstructions] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+
+  const { data: savedDesign } = useQuery({
+    queryKey: ["blouse-design", user.id],
+    queryFn: async () => {
+      const r = await fetch(`${API_BASE}/api/blouse/design?userId=${user.id}`);
+      return r.ok ? r.json() : null;
+    },
+  });
+
+  React.useEffect(() => {
+    if (savedDesign) {
+      const m = savedDesign.measurements ?? {};
+      const s = savedDesign.styles ?? {};
+      if (m.unit) setUnit(m.unit);
+      if (m.bust) setBust(String(m.bust));
+      if (m.underBust) setUnderBust(String(m.underBust));
+      if (m.bustPointSpacing) setBustPt(String(m.bustPointSpacing));
+      if (m.blouseLength) setBlouseLen(String(m.blouseLength));
+      if (m.sleeveLength) setSleeveLen(String(m.sleeveLength));
+      if (s.neckline) setNeckline(s.neckline);
+      if (s.sleeve) setSleeve(s.sleeve);
+      if (s.back) setBack(s.back);
+      if (s.fabricColor) setFabricColor(s.fabricColor);
+      if (savedDesign.aiIdeas) setAiIdeas(savedDesign.aiIdeas);
+      if (savedDesign.patternSvg) setPatternSvg(savedDesign.patternSvg);
+      if (savedDesign.instructions) setInstructions(savedDesign.instructions);
+    }
+  }, [savedDesign]);
+
+  const validateMeasures = () => {
+    const errs: Record<string, string> = {};
+    if (!bust || isNaN(+bust) || +bust <= 0) errs.bust = "Required";
+    if (!underBust || isNaN(+underBust) || +underBust <= 0) errs.underBust = "Required";
+    if (!blouseLen || isNaN(+blouseLen) || +blouseLen <= 0) errs.blouseLen = "Required";
+    setErrors(errs);
+    return Object.keys(errs).length === 0;
+  };
+
+  const generate = async () => {
+    if (!validateMeasures()) return;
+    setGenerating(true);
+    setStep(2);
+    try {
+      const resp = await fetch(`${API_BASE}/api/blouse/design`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          measurements: {
+            bust: +bust, underBust: +underBust,
+            bustPointSpacing: +bustPt || (unit === "cm" ? 18 : 7),
+            blouseLength: +blouseLen,
+            sleeveLength: +sleeveLen || 0,
+            unit,
+          },
+          styles: { neckline, sleeve, back, fabricColor },
+        }),
+      });
+      if (!resp.ok) throw new Error("API error");
+      const data = await resp.json();
+      setAiIdeas(data.aiIdeas);
+      setPatternSvg(data.patternSvg);
+      setInstructions(data.instructions);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch {
+      Alert.alert("Error", "Could not generate design. Please try again.");
+      setStep(1);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  const stepLabels = ["Measure", "Style", "Pattern"];
+
+  return (
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 100 }}>
+
+      {/* ── Step Indicator ─────────────────────────────────────── */}
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 0 }}>
+        {stepLabels.map((lbl, i) => {
+          const done = step > i;
+          const active = step === i;
+          const col = done || active ? Colors.brand.primary : theme.border;
+          return (
+            <React.Fragment key={lbl}>
+              <TouchableOpacity
+                onPress={() => { if (i < step || (i === 1 && validateMeasures())) setStep(i); }}
+                style={{ alignItems: "center", gap: 4 }}
+              >
+                <View style={{ width: 32, height: 32, borderRadius: 16, borderWidth: 2, borderColor: col,
+                  backgroundColor: done || active ? col : "transparent",
+                  alignItems: "center", justifyContent: "center" }}>
+                  {done
+                    ? <Feather name="check" size={14} color="#fff" />
+                    : <Text style={{ fontFamily: "Inter_700Bold", fontSize: 12,
+                        color: active ? "#fff" : theme.textMuted }}>{i + 1}</Text>
+                  }
+                </View>
+                <Text style={{ fontFamily: active || done ? "Inter_600SemiBold" : "Inter_400Regular",
+                  fontSize: 10, color: col }}>{lbl}</Text>
+              </TouchableOpacity>
+              {i < stepLabels.length - 1 && (
+                <View style={{ flex: 1, height: 2, marginBottom: 14, marginHorizontal: 6,
+                  backgroundColor: step > i ? Colors.brand.primary : theme.border }} />
+              )}
+            </React.Fragment>
+          );
+        })}
+      </View>
+
+      {/* ── STEP 0: MEASUREMENTS ────────────────────────────────── */}
+      {step === 0 && (
+        <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
+          <View style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
+              <Feather name="ruler" size={18} color={Colors.brand.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.guideTitle, { color: theme.text }]}>Your Measurements</Text>
+              <Text style={[styles.guideSub, { color: theme.textMuted }]}>Measure snugly with a tape, not tight</Text>
+            </View>
+            <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              {(["cm", "in"] as const).map((u) => (
+                <TouchableOpacity key={u} style={[styles.unitBtn, { backgroundColor: unit === u ? Colors.brand.primary : "transparent" }]}
+                  onPress={() => setUnit(u)}>
+                  <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>{u}</Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+
+          {[
+            { lbl: "Bust (fullest point)", val: bust, set: setBust, hint: unit === "cm" ? "e.g. 86" : "e.g. 34", key: "bust" },
+            { lbl: "Under Bust (below bust)", val: underBust, set: setUnderBust, hint: unit === "cm" ? "e.g. 72" : "e.g. 28", key: "underBust" },
+            { lbl: "Bust Point-to-Point (nipple spacing)", val: bustPt, set: setBustPt, hint: unit === "cm" ? "e.g. 18" : "e.g. 7", key: "bustPt" },
+            { lbl: "Blouse Length", val: blouseLen, set: setBlouseLen, hint: unit === "cm" ? "e.g. 15" : "e.g. 6", key: "blouseLen" },
+            { lbl: "Sleeve Length (0 if sleeveless)", val: sleeveLen, set: setSleeveLen, hint: unit === "cm" ? "e.g. 20" : "e.g. 8", key: "sleeveLen" },
+          ].map(({ lbl, val, set, hint, key }) => (
+            <View key={key}>
+              <DesignMeasureRow label={lbl} value={val} onChange={set} hint={hint} unit={unit} theme={theme} />
+              {errors[key] && <Text style={styles.errorText}>{errors[key]}</Text>}
+            </View>
+          ))}
+
+          <TouchableOpacity
+            style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
+            onPress={() => { if (validateMeasures()) { setStep(1); Haptics.selectionAsync(); } }}
+          >
+            <Text style={styles.primaryBtnText}>Next: Choose Styles</Text>
+            <Feather name="arrow-right" size={18} color="#fff" />
+          </TouchableOpacity>
+        </Animated.View>
+      )}
+
+      {/* ── STEP 1: STYLES ──────────────────────────────────────── */}
+      {step === 1 && (
+        <Animated.View entering={FadeInDown.springify()} style={{ gap: 18 }}>
+          <ChipRow label="Neckline" options={D_NECK} value={neckline} onSelect={setNeckline} color={Colors.brand.primary} theme={theme} />
+          <ChipRow label="Sleeve Style" options={D_SLEEVE} value={sleeve} onSelect={setSleeve} color="#2471A3" theme={theme} />
+          <ChipRow label="Back Design" options={D_BACK} value={back} onSelect={setBack} color="#8E44AD" theme={theme} />
+
+          <View style={{ gap: 8 }}>
+            <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>Fabric / Main Color</Text>
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 10 }}>
+              {FABRIC_COLORS.map((col) => (
+                <TouchableOpacity key={col} onPress={() => { setFabricColor(col); Haptics.selectionAsync(); }}
+                  style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: col,
+                    borderWidth: fabricColor === col ? 3 : 1.5,
+                    borderColor: fabricColor === col ? Colors.brand.gold : "rgba(0,0,0,0.12)" }} />
+              ))}
+            </View>
+            <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted }}>
+              Selected: <Text style={{ fontFamily: "Inter_600SemiBold", color: fabricColor }}>{fabricColor}</Text>
+            </Text>
+          </View>
+
+          <View style={{ flexDirection: "row", gap: 12 }}>
+            <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
+              onPress={() => setStep(0)}>
+              <Feather name="arrow-left" size={16} color={theme.textSecondary} />
+              <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Back</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.primaryBtn, { flex: 2, backgroundColor: Colors.brand.primary }]}
+              onPress={generate}
+            >
+              <Feather name="cpu" size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>Generate Pattern</Text>
+            </TouchableOpacity>
+          </View>
+        </Animated.View>
+      )}
+
+      {/* ── STEP 2: RESULTS ─────────────────────────────────────── */}
+      {step === 2 && (
+        <Animated.View entering={FadeInDown.springify()} style={{ gap: 20 }}>
+
+          {generating && (
+            <View style={{ alignItems: "center", gap: 14, padding: 32 }}>
+              <ActivityIndicator size="large" color={Colors.brand.primary} />
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: theme.textSecondary, textAlign: "center" }}>
+                Calculating pattern pieces and generating AI ideas…
+              </Text>
+            </View>
+          )}
+
+          {!generating && aiIdeas && (
+            <>
+              {/* AI Ideas */}
+              <View style={{ gap: 10 }}>
+                <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✨ AI Design Ideas</Text>
+                {aiIdeas.map((idea, i) => (
+                  <View key={i} style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1,
+                    borderRadius: 16, padding: 16, gap: 6 }]}>
+                    <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.primary + "20",
+                        alignItems: "center", justifyContent: "center" }}>
+                        <Text style={{ fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.brand.primary }}>{i + 1}</Text>
+                      </View>
+                      <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: theme.text, flex: 1 }}>{idea.title}</Text>
+                    </View>
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, lineHeight: 19 }}>
+                      {idea.description}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+
+              {/* Sewing Pattern SVG */}
+              {patternSvg && (
+                <View style={{ gap: 10 }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>📐 Sewing Pattern</Text>
+                  <View style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ padding: 12 }}>
+                      <SvgXml xml={patternSvg} />
+                    </ScrollView>
+                    <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
+                        Scroll to see all pieces · Seam allowance 1.5 cm included · Scale: 1cm = 4.5px
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              )}
+
+              {/* Sewing Instructions */}
+              {instructions && (
+                <View style={{ gap: 8 }}>
+                  <TouchableOpacity
+                    style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}
+                    onPress={() => setShowInstructions(!showInstructions)}
+                  >
+                    <View style={[styles.guideIconWrap, { backgroundColor: "#27AE6018" }]}>
+                      <Feather name="book-open" size={18} color="#27AE60" />
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={[styles.guideTitle, { color: theme.text }]}>Sewing Instructions</Text>
+                      <Text style={[styles.guideSub, { color: theme.textMuted }]}>Tap to {showInstructions ? "hide" : "view"} step-by-step guide</Text>
+                    </View>
+                    <Feather name={showInstructions ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+                  </TouchableOpacity>
+                  {showInstructions && (
+                    <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: theme.textSecondary, lineHeight: 20 }}>
+                        {instructions}
+                      </Text>
+                    </Animated.View>
+                  )}
+                </View>
+              )}
+
+              {/* Action buttons */}
+              <View style={{ flexDirection: "row", gap: 12 }}>
+                <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
+                  onPress={() => { setStep(1); Haptics.selectionAsync(); }}>
+                  <Feather name="edit-2" size={15} color={theme.textSecondary} />
+                  <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Edit</Text>
+                </TouchableOpacity>
+                <TouchableOpacity style={[styles.primaryBtn, { flex: 2, backgroundColor: Colors.brand.primary }]}
+                  onPress={generate}>
+                  <Feather name="refresh-cw" size={16} color="#fff" />
+                  <Text style={styles.primaryBtnText}>Regenerate</Text>
+                </TouchableOpacity>
+              </View>
+            </>
+          )}
+        </Animated.View>
+      )}
+    </ScrollView>
+  );
+}
+
 export default function ProfileScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -1527,6 +1900,7 @@ export default function ProfileScreen() {
     { key: "preferences", label: "Styles", icon: "sliders" },
     { key: "ideas", label: "Ideas", icon: "image" },
     { key: "measurements", label: "Measures", icon: "bar-chart-2" },
+    { key: "design", label: "Design", icon: "scissors" },
   ];
 
   return (
@@ -1649,6 +2023,7 @@ export default function ProfileScreen() {
       {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
       {user && activeTab === "measurements" && <MeasurementsTab theme={theme} user={user} />}
+      {user && activeTab === "design" && <BlouseDesignTab theme={theme} user={user} />}
     </View>
   );
 }

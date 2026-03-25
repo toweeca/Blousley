@@ -2,8 +2,11 @@ import { Router, type IRouter } from "express";
 import { db, blouseFitsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
 import { openai } from "@workspace/integrations-openai-ai-server";
+import designRouter from "./design";
 
 const router: IRouter = Router();
+
+router.use("/design", designRouter);
 
 router.post("/analyze", async (req, res) => {
   try {
