@@ -136,7 +136,8 @@ export default function HistoryScreen() {
   const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["blouse-fits", user?.id],
     queryFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const _d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = _d.startsWith("http") ? _d : `https://${_d}`;
       const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`);
       if (!res.ok) throw new Error("Failed to fetch fits");
       return res.json();
@@ -146,7 +147,8 @@ export default function HistoryScreen() {
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const _d2 = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
       const res = await fetch(`${domain}/api/blouse/fits/${id}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
     },

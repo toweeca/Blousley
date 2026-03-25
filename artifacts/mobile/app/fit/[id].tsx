@@ -69,7 +69,7 @@ export default function FitDetailScreen() {
   const { data: fit, isLoading } = useQuery<BlouseFit>({
     queryKey: ["blouse-fit", id],
     queryFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
       const res = await fetch(`${domain}/api/blouse/fits/${id}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();

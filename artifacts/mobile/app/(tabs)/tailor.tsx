@@ -154,7 +154,8 @@ export default function TailorScreen() {
   const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["tailor-customers"],
     queryFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const _d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = _d.startsWith("http") ? _d : `https://${_d}`;
       const endpoint =
         user?.role === "tailor"
           ? `${domain}/api/tailor/customers`
@@ -167,7 +168,8 @@ export default function TailorScreen() {
 
   const noteMutation = useMutation({
     mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const _d2 = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
       const res = await fetch(`${domain}/api/blouse/fits/${id}/notes`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },

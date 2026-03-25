@@ -28,6 +28,10 @@ import { useApp, type UserRole } from "@/context/AppContext";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CANVAS_W = SCREEN_WIDTH - 48;
+
+// Ensure the API base URL always has a protocol so fetch() treats it as absolute
+const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
 type Tab = "account" | "preferences" | "ideas" | "measurements";
@@ -162,7 +166,7 @@ function StyleRow({
 
 function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
   const qc = useQueryClient();
-  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  const domain = API_BASE;
 
   const { data: prefs, isLoading } = useQuery({
     queryKey: ["preferences", user.id],
@@ -441,7 +445,7 @@ function SketchCanvas({
 
 function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
   const qc = useQueryClient();
-  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  const domain = API_BASE;
 
   const [mode, setMode] = useState<"list" | "upload" | "sketch">("list");
   const [title, setTitle] = useState("");
@@ -991,7 +995,7 @@ function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
 
 function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
   const qc = useQueryClient();
-  const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+  const domain = API_BASE;
 
   const { data: saved, isLoading } = useQuery({
     queryKey: ["measurements", user.id],
@@ -1309,7 +1313,7 @@ export default function ProfileScreen() {
   const { data: fitsCount } = useQuery({
     queryKey: ["blouse-fits-count", user?.id],
     queryFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = API_BASE;
       const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`);
       return res.ok ? res.json() : [];
     },
@@ -1319,7 +1323,7 @@ export default function ProfileScreen() {
   const { data: ideasCount } = useQuery({
     queryKey: ["ideas-count", user?.id],
     queryFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = API_BASE;
       const r = await fetch(`${domain}/api/ideas?userId=${user?.id}`);
       return r.ok ? r.json() : [];
     },
