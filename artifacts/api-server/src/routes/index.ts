@@ -5,6 +5,7 @@ import tailorRouter from "./tailor";
 import preferencesRouter from "./preferences";
 import ideasRouter from "./ideas";
 import measurementsRouter from "./measurements";
+import generateBlouseImageRouter from "./generate-blouse-image";
 
 const router: IRouter = Router();
 
@@ -14,5 +15,6 @@ router.use("/tailor", tailorRouter);
 router.use("/preferences", preferencesRouter);
 router.use("/ideas", ideasRouter);
 router.use("/measurements", measurementsRouter);
+router.use("/generate-blouse-image", generateBlouseImageRouter);
 
 export default router;

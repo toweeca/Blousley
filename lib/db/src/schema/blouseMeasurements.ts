@@ -18,6 +18,8 @@ export const blouseMeasurementsTable = pgTable("blouse_measurements", {
   shoulderWidth: numeric("shoulder_width", { precision: 6, scale: 1 }),
   armhole: numeric("armhole", { precision: 6, scale: 1 }),
   blouseLength: numeric("blouse_length", { precision: 6, scale: 1 }),
+  waist: numeric("waist", { precision: 6, scale: 1 }),
+  hip: numeric("hip", { precision: 6, scale: 1 }),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),

@@ -178,6 +178,8 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [fabric, setFabric] = useState("");
   const [notes, setNotes] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (prefs && !initialized) {
@@ -214,6 +216,29 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     },
     onError: () => Alert.alert("Error", "Could not save preferences."),
   });
+
+  const generateAIPreview = async () => {
+    if (!neck && !sleeve && !back && !fabric) {
+      Alert.alert("Select styles first", "Choose at least one style option before generating a preview.");
+      return;
+    }
+    setAiGenerating(true);
+    setAiPreviewUri(null);
+    try {
+      const r = await fetch(`${domain}/api/generate-blouse-image/style`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ neck, sleeve, back, fabric }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      const data = await r.json();
+      if (data.b64_json) setAiPreviewUri(`data:image/png;base64,${data.b64_json}`);
+    } catch {
+      Alert.alert("Generation failed", "Could not generate image. Please try again.");
+    } finally {
+      setAiGenerating(false);
+    }
+  };
 
   if (isLoading) {
     return (
@@ -266,7 +291,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
         />
       </Animated.View>
 
-      <Animated.View entering={FadeInDown.delay(360).springify()}>
+      <Animated.View entering={FadeInDown.delay(360).springify()} style={{ gap: 12 }}>
         <TouchableOpacity
           style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary, opacity: saveMutation.isPending ? 0.7 : 1 }]}
           onPress={() => saveMutation.mutate()}
@@ -279,7 +304,52 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
             </>
           )}
         </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80", opacity: aiGenerating ? 0.7 : 1 }]}
+          onPress={generateAIPreview}
+          disabled={aiGenerating}
+        >
+          {aiGenerating ? (
+            <>
+              <ActivityIndicator color={Colors.brand.gold} size="small" />
+              <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>Generating your blouse…</Text>
+            </>
+          ) : (
+            <>
+              <Text style={styles.aiGenBtnIcon}>✦</Text>
+              <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>AI Preview from Selections</Text>
+            </>
+          )}
+        </TouchableOpacity>
       </Animated.View>
+
+      {(aiGenerating || aiPreviewUri) && (
+        <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
+          <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
+            {aiGenerating ? (
+              <View style={styles.aiPreviewPlaceholder}>
+                <ActivityIndicator color={Colors.brand.gold} size="large" />
+                <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
+                  Creating your blouse design…{"\n"}This may take 15–30 seconds
+                </Text>
+              </View>
+            ) : aiPreviewUri ? (
+              <>
+                <Image source={{ uri: aiPreviewUri }} style={styles.aiPreviewImage} resizeMode="cover" />
+                <View style={styles.aiPreviewFooter}>
+                  <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
+                    ✦ AI-generated preview · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
+                  </Text>
+                  <TouchableOpacity onPress={() => { setAiPreviewUri(null); }}>
+                    <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
+                  </TouchableOpacity>
+                </View>
+              </>
+            ) : null}
+          </View>
+        </Animated.View>
+      )}
     </ScrollView>
   );
 }
@@ -382,6 +452,36 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [drawColor, setDrawColor] = useState(Colors.brand.primary);
   const [strokeWidth, setStrokeWidth] = useState(3);
   const [sketchBackground, setSketchBackground] = useState<string | null>(null);
+  const [aiSketchGenerating, setAiSketchGenerating] = useState(false);
+  const [aiSketchImageUri, setAiSketchImageUri] = useState<string | null>(null);
+
+  const generateAIFromSketch = async () => {
+    if (sketchPaths.length === 0) {
+      Alert.alert("Draw something first", "Add some strokes to your sketch before generating.");
+      return;
+    }
+    const colors = [...new Set(sketchPaths.map((p) => p.color))];
+    setAiSketchGenerating(true);
+    setAiSketchImageUri(null);
+    try {
+      const r = await fetch(`${domain}/api/generate-blouse-image/sketch`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          description: `a blouse design sketch with ${sketchPaths.length} strokes`,
+          colors,
+          strokes: sketchPaths.length,
+        }),
+      });
+      if (!r.ok) throw new Error("Failed");
+      const data = await r.json();
+      if (data.b64_json) setAiSketchImageUri(`data:image/png;base64,${data.b64_json}`);
+    } catch {
+      Alert.alert("Generation failed", "Could not generate image. Please try again.");
+    } finally {
+      setAiSketchGenerating(false);
+    }
+  };
 
   const { data: ideas = [], isLoading } = useQuery({
     queryKey: ["ideas", user.id],
@@ -577,6 +677,50 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
             <Text style={[styles.sketchNote, { color: theme.textMuted }]}>
               {sketchBackground ? "Draw annotations, markings, or design notes on your photo" : "Draw neckline shape, sleeve length, back design — or add a photo background above"}
             </Text>
+
+            {/* AI Generate from Sketch */}
+            <TouchableOpacity
+              style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80", opacity: aiSketchGenerating ? 0.7 : 1 }]}
+              onPress={generateAIFromSketch}
+              disabled={aiSketchGenerating}
+            >
+              {aiSketchGenerating ? (
+                <>
+                  <ActivityIndicator color={Colors.brand.gold} size="small" />
+                  <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>Creating AI image from sketch…</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.aiGenBtnIcon}>✦</Text>
+                  <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>AI Generate from Sketch</Text>
+                </>
+              )}
+            </TouchableOpacity>
+
+            {(aiSketchGenerating || aiSketchImageUri) && (
+              <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
+                {aiSketchGenerating ? (
+                  <View style={styles.aiPreviewPlaceholder}>
+                    <ActivityIndicator color={Colors.brand.gold} size="large" />
+                    <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
+                      Transforming your sketch into a blouse design…{"\n"}This may take 15–30 seconds
+                    </Text>
+                  </View>
+                ) : aiSketchImageUri ? (
+                  <>
+                    <Image source={{ uri: aiSketchImageUri }} style={styles.aiPreviewImage} resizeMode="cover" />
+                    <View style={styles.aiPreviewFooter}>
+                      <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
+                        ✦ AI-generated from your {sketchPaths.length} stroke sketch
+                      </Text>
+                      <TouchableOpacity onPress={() => setAiSketchImageUri(null)}>
+                        <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
+                      </TouchableOpacity>
+                    </View>
+                  </>
+                ) : null}
+              </View>
+            )}
           </View>
         )}
 
@@ -702,78 +846,151 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 }
 
 const MEASURE_FIELDS = [
-  { key: "aboveBust",     label: "Above Bust",     desc: "Around upper chest, above the bust line", icon: "↑" },
-  { key: "bust",          label: "Bust",            desc: "Around the fullest part of the chest",    icon: "◉" },
-  { key: "underBust",     label: "Under Bust",      desc: "Around ribcage just below the bust",      icon: "↓" },
-  { key: "shoulderWidth", label: "Shoulder Width",  desc: "Shoulder tip to shoulder tip across back", icon: "↔" },
-  { key: "armhole",       label: "Armhole",         desc: "Around the top of the arm at shoulder",   icon: "⊙" },
-  { key: "blouseLength",  label: "Blouse Length",   desc: "Shoulder down to where blouse ends",      icon: "↕" },
+  { key: "aboveBust",     label: "Above Bust",     desc: "Around upper chest, above the bust line",        icon: "①" },
+  { key: "bust",          label: "Bust",            desc: "Around the fullest part of the chest",           icon: "②" },
+  { key: "underBust",     label: "Under Bust",      desc: "Around ribcage just below the bust",             icon: "③" },
+  { key: "waist",         label: "Waist",           desc: "Around the narrowest part of the torso",         icon: "④" },
+  { key: "hip",           label: "Hip",             desc: "Around the fullest part of your hips",           icon: "⑤" },
+  { key: "shoulderWidth", label: "Shoulder Width",  desc: "Shoulder tip to shoulder tip across back",        icon: "⑥" },
+  { key: "armhole",       label: "Armhole",         desc: "Around the top of the arm at shoulder",           icon: "⑦" },
+  { key: "blouseLength",  label: "Blouse Length",   desc: "Shoulder down to where the blouse ends",         icon: "⑧" },
 ] as const;
 
 type MeasureKey = (typeof MEASURE_FIELDS)[number]["key"];
 
 function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
   const W = SCREEN_WIDTH - 48;
-  const H = 280;
+  const H = 340;
   const cx = W / 2;
   const brand = Colors.brand.primary;
   const gold = Colors.brand.gold;
 
+  // Key y positions
+  const yNeckTop  = 10;
+  const yShoulder = 40;
+  const yAbove    = 60;
+  const yBust     = 90;
+  const yUnder    = 115;
+  const yWaist    = 178;
+  const yHip      = 240;
+  const yHem      = 290;
+
+  // Key x widths
+  const xNeck     = 16;
+  const xShoulder = 54;
+  const xBust     = 60;
+  const xUnder    = 55;
+  const xWaist    = 38;
+  const xHip      = 56;
+  const xHem      = 50;
+
+  const lx = 6;
+
   return (
     <Svg width={W} height={H}>
       <Defs>
-        <SvgGradient id="bodyGrad" x1="0" y1="0" x2="0" y2="1">
-          <Stop offset="0" stopColor={brand} stopOpacity="0.15" />
-          <Stop offset="1" stopColor={brand} stopOpacity="0.03" />
+        <SvgGradient id="silh" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={brand} stopOpacity="0.10" />
+          <Stop offset="1" stopColor={brand} stopOpacity="0.04" />
         </SvgGradient>
       </Defs>
 
-      {/* Neck */}
-      <Path d={`M ${cx - 14} 18 Q ${cx} 8 ${cx + 14} 18`} stroke={brand} strokeWidth="2" fill="none" />
-      {/* Shoulders */}
-      <Path d={`M ${cx - 14} 18 Q ${cx - 48} 36 ${cx - 52} 56`} stroke={brand} strokeWidth="2" fill="none" />
-      <Path d={`M ${cx + 14} 18 Q ${cx + 48} 36 ${cx + 52} 56`} stroke={brand} strokeWidth="2" fill="none" />
-      {/* Torso sides */}
-      <Path d={`M ${cx - 52} 56 Q ${cx - 58} 100 ${cx - 50} 145 Q ${cx - 44} 175 ${cx - 48} 220`} stroke={brand} strokeWidth="2" fill="none" />
-      <Path d={`M ${cx + 52} 56 Q ${cx + 58} 100 ${cx + 50} 145 Q ${cx + 44} 175 ${cx + 48} 220`} stroke={brand} strokeWidth="2" fill="none" />
-      {/* Bottom */}
-      <Path d={`M ${cx - 48} 220 Q ${cx} 228 ${cx + 48} 220`} stroke={brand} strokeWidth="2" fill="none" />
-      {/* Bust fill hint */}
-      <Rect x={cx - 52} y={55} width={104} height={70} rx={8} fill="url(#bodyGrad)" />
+      {/* ── Silhouette outline ── */}
+      {/* Left side: neck → shoulder → bust → waist → hip → hem */}
+      <Path
+        d={[
+          `M ${cx - xNeck} ${yNeckTop}`,
+          `Q ${cx - xShoulder} ${yShoulder - 4} ${cx - xShoulder} ${yShoulder}`,
+          `Q ${cx - xBust} ${yBust - 10} ${cx - xBust} ${yBust}`,
+          `Q ${cx - xUnder} ${yUnder + 4} ${cx - xUnder} ${yUnder}`,
+          `Q ${cx - xWaist - 4} ${yWaist - 20} ${cx - xWaist} ${yWaist}`,
+          `Q ${cx - xHip + 4} ${yHip - 20} ${cx - xHip} ${yHip}`,
+          `L ${cx - xHem} ${yHem}`,
+        ].join(" ")}
+        stroke={brand} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"
+      />
+      {/* Right side mirrored */}
+      <Path
+        d={[
+          `M ${cx + xNeck} ${yNeckTop}`,
+          `Q ${cx + xShoulder} ${yShoulder - 4} ${cx + xShoulder} ${yShoulder}`,
+          `Q ${cx + xBust} ${yBust - 10} ${cx + xBust} ${yBust}`,
+          `Q ${cx + xUnder} ${yUnder + 4} ${cx + xUnder} ${yUnder}`,
+          `Q ${cx + xWaist + 4} ${yWaist - 20} ${cx + xWaist} ${yWaist}`,
+          `Q ${cx + xHip - 4} ${yHip - 20} ${cx + xHip} ${yHip}`,
+          `L ${cx + xHem} ${yHem}`,
+        ].join(" ")}
+        stroke={brand} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round"
+      />
+      {/* Neck curve top */}
+      <Path d={`M ${cx - xNeck} ${yNeckTop} Q ${cx} ${yNeckTop - 8} ${cx + xNeck} ${yNeckTop}`} stroke={brand} strokeWidth="2" fill="none" />
+      {/* Bottom hem */}
+      <Line x1={cx - xHem} y1={yHem} x2={cx + xHem} y2={yHem} stroke={brand} strokeWidth="2" />
 
-      {/* ① Above bust line */}
-      <Line x1={cx - 52} y1={52} x2={cx + 52} y2={52} stroke={brand} strokeWidth="1.5" strokeDasharray="4,3" />
-      <Circle cx={cx - 52} cy={52} r={4} fill={brand} />
-      <Circle cx={cx + 52} cy={52} r={4} fill={brand} />
-      <SvgText x={cx + 56} y={56} fontSize="9" fill={brand} fontWeight="bold">① Above</SvgText>
+      {/* Fill */}
+      <Path
+        d={[
+          `M ${cx - xNeck} ${yNeckTop}`,
+          `Q ${cx - xShoulder} ${yShoulder - 4} ${cx - xShoulder} ${yShoulder}`,
+          `Q ${cx - xBust} ${yBust - 10} ${cx - xBust} ${yBust}`,
+          `Q ${cx - xUnder} ${yUnder + 4} ${cx - xUnder} ${yUnder}`,
+          `Q ${cx - xWaist - 4} ${yWaist - 20} ${cx - xWaist} ${yWaist}`,
+          `Q ${cx - xHip + 4} ${yHip - 20} ${cx - xHip} ${yHip}`,
+          `L ${cx - xHem} ${yHem} L ${cx + xHem} ${yHem}`,
+          `L ${cx + xHip} ${yHip}`,
+          `Q ${cx + xHip - 4} ${yHip - 20} ${cx + xWaist} ${yWaist}`,
+          `Q ${cx + xWaist + 4} ${yWaist - 20} ${cx + xUnder} ${yUnder}`,
+          `Q ${cx + xBust} ${yBust} ${cx + xBust} ${yBust}`,
+          `Q ${cx + xShoulder} ${yShoulder - 4} ${cx + xNeck} ${yNeckTop}`,
+          `Q ${cx} ${yNeckTop - 8} ${cx - xNeck} ${yNeckTop} Z`,
+        ].join(" ")}
+        fill="url(#silh)"
+      />
 
-      {/* ② Bust line */}
-      <Line x1={cx - 58} y1={86} x2={cx + 58} y2={86} stroke="#C1536A" strokeWidth="1.5" strokeDasharray="4,3" />
-      <Circle cx={cx - 58} cy={86} r={4} fill="#C1536A" />
-      <Circle cx={cx + 58} cy={86} r={4} fill="#C1536A" />
-      <SvgText x={cx + 62} y={90} fontSize="9" fill="#C1536A" fontWeight="bold">② Bust</SvgText>
+      {/* ── Measurement lines (left edge to right, with dots) ── */}
+
+      {/* ① Above bust */}
+      <Line x1={cx - xShoulder} y1={yAbove} x2={cx + xShoulder} y2={yAbove} stroke={brand} strokeWidth="1.5" strokeDasharray="5,3" />
+      <Circle cx={cx - xShoulder} cy={yAbove} r={3.5} fill={brand} />
+      <Circle cx={cx + xShoulder} cy={yAbove} r={3.5} fill={brand} />
+      <SvgText x={lx} y={yAbove + 4} fontSize="9" fill={brand} fontWeight="bold">① Above Bust</SvgText>
+
+      {/* ② Bust */}
+      <Line x1={cx - xBust} y1={yBust} x2={cx + xBust} y2={yBust} stroke="#C1536A" strokeWidth="2" strokeDasharray="5,3" />
+      <Circle cx={cx - xBust} cy={yBust} r={4} fill="#C1536A" />
+      <Circle cx={cx + xBust} cy={yBust} r={4} fill="#C1536A" />
+      <SvgText x={lx} y={yBust + 4} fontSize="9" fill="#C1536A" fontWeight="bold">② Bust</SvgText>
 
       {/* ③ Under bust */}
-      <Line x1={cx - 54} y1={118} x2={cx + 54} y2={118} stroke={gold} strokeWidth="1.5" strokeDasharray="4,3" />
-      <Circle cx={cx - 54} cy={118} r={4} fill={gold} />
-      <Circle cx={cx + 54} cy={118} r={4} fill={gold} />
-      <SvgText x={cx + 58} y={122} fontSize="9" fill={gold} fontWeight="bold">③ Under</SvgText>
+      <Line x1={cx - xUnder} y1={yUnder} x2={cx + xUnder} y2={yUnder} stroke={gold} strokeWidth="1.5" strokeDasharray="5,3" />
+      <Circle cx={cx - xUnder} cy={yUnder} r={3.5} fill={gold} />
+      <Circle cx={cx + xUnder} cy={yUnder} r={3.5} fill={gold} />
+      <SvgText x={lx} y={yUnder + 4} fontSize="9" fill={gold} fontWeight="bold">③ Under Bust</SvgText>
 
-      {/* ④ Shoulder width arrow */}
-      <Line x1={cx - 52} y1={38} x2={cx + 52} y2={38} stroke="#4A90D9" strokeWidth="1.5" />
-      <Path d={`M ${cx - 52} 34 L ${cx - 52} 42`} stroke="#4A90D9" strokeWidth="1.5" />
-      <Path d={`M ${cx + 52} 34 L ${cx + 52} 42`} stroke="#4A90D9" strokeWidth="1.5" />
-      <SvgText x={cx - 26} y={35} fontSize="9" fill="#4A90D9" fontWeight="bold" textAnchor="middle">④ Shoulder</SvgText>
+      {/* ④ Waist */}
+      <Line x1={cx - xWaist} y1={yWaist} x2={cx + xWaist} y2={yWaist} stroke="#27AE60" strokeWidth="2" strokeDasharray="5,3" />
+      <Circle cx={cx - xWaist} cy={yWaist} r={4} fill="#27AE60" />
+      <Circle cx={cx + xWaist} cy={yWaist} r={4} fill="#27AE60" />
+      <SvgText x={lx} y={yWaist + 4} fontSize="9" fill="#27AE60" fontWeight="bold">④ Waist</SvgText>
 
-      {/* ⑤ Armhole circle */}
-      <Circle cx={cx - 52} cy={72} r={14} stroke="#9B59B6" strokeWidth="1.5" strokeDasharray="3,3" fill="none" />
-      <SvgText x={8} y={76} fontSize="9" fill="#9B59B6" fontWeight="bold">⑤ Arm</SvgText>
+      {/* ⑤ Hip */}
+      <Line x1={cx - xHip} y1={yHip} x2={cx + xHip} y2={yHip} stroke="#9B59B6" strokeWidth="2" strokeDasharray="5,3" />
+      <Circle cx={cx - xHip} cy={yHip} r={4} fill="#9B59B6" />
+      <Circle cx={cx + xHip} cy={yHip} r={4} fill="#9B59B6" />
+      <SvgText x={lx} y={yHip + 4} fontSize="9" fill="#9B59B6" fontWeight="bold">⑤ Hip</SvgText>
 
-      {/* ⑥ Blouse length arrow */}
-      <Line x1={cx + 64} y1={18} x2={cx + 64} y2={220} stroke="#27AE60" strokeWidth="1.5" />
-      <Path d={`M ${cx + 60} 18 L ${cx + 68} 18`} stroke="#27AE60" strokeWidth="1.5" />
-      <Path d={`M ${cx + 60} 220 L ${cx + 68} 220`} stroke="#27AE60" strokeWidth="1.5" />
-      <SvgText x={cx + 68} y={125} fontSize="9" fill="#27AE60" fontWeight="bold" transform={`rotate(90, ${cx + 68}, 125)`}>⑥ Length</SvgText>
+      {/* ⑥ Shoulder width double-arrow at top */}
+      <Line x1={cx - xShoulder} y1={yShoulder - 10} x2={cx + xShoulder} y2={yShoulder - 10} stroke="#4A90D9" strokeWidth="1.5" />
+      <Line x1={cx - xShoulder} y1={yShoulder - 14} x2={cx - xShoulder} y2={yShoulder - 6} stroke="#4A90D9" strokeWidth="1.5" />
+      <Line x1={cx + xShoulder} y1={yShoulder - 14} x2={cx + xShoulder} y2={yShoulder - 6} stroke="#4A90D9" strokeWidth="1.5" />
+      <SvgText x={cx} y={yShoulder - 14} fontSize="9" fill="#4A90D9" fontWeight="bold" textAnchor="middle">⑥ Shoulder Width</SvgText>
+
+      {/* ⑧ Blouse length vertical arrow on far right */}
+      <Line x1={W - 18} y1={yNeckTop} x2={W - 18} y2={yHem} stroke="#E67E22" strokeWidth="1.5" />
+      <Line x1={W - 22} y1={yNeckTop} x2={W - 14} y2={yNeckTop} stroke="#E67E22" strokeWidth="1.5" />
+      <Line x1={W - 22} y1={yHem} x2={W - 14} y2={yHem} stroke="#E67E22" strokeWidth="1.5" />
+      <SvgText x={W - 10} y={(yNeckTop + yHem) / 2 + 4} fontSize="9" fill="#E67E22" fontWeight="bold"
+        transform={`rotate(90, ${W - 10}, ${(yNeckTop + yHem) / 2})`}>⑧ Length</SvgText>
     </Svg>
   );
 }
@@ -795,6 +1012,7 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [guideOpen, setGuideOpen] = useState(false);
   const [fields, setFields] = useState<Record<MeasureKey, string>>({
     aboveBust: "", bust: "", underBust: "",
+    waist: "", hip: "",
     shoulderWidth: "", armhole: "", blouseLength: "",
   });
   const [notes, setNotes] = useState("");
@@ -808,6 +1026,8 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
         aboveBust: saved.aboveBust ?? "",
         bust: saved.bust ?? "",
         underBust: saved.underBust ?? "",
+        waist: saved.waist ?? "",
+        hip: saved.hip ?? "",
         shoulderWidth: saved.shoulderWidth ?? "",
         armhole: saved.armhole ?? "",
         blouseLength: saved.blouseLength ?? "",
@@ -864,9 +1084,11 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
     aboveBust: Colors.brand.primary,
     bust: "#C1536A",
     underBust: Colors.brand.gold,
+    waist: "#27AE60",
+    hip: "#9B59B6",
     shoulderWidth: "#4A90D9",
-    armhole: "#9B59B6",
-    blouseLength: "#27AE60",
+    armhole: "#E67E22",
+    blouseLength: "#F39C12",
   };
 
   if (isLoading) {
@@ -1389,4 +1611,13 @@ const styles = StyleSheet.create({
   measureInputHint: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
   cancelBtn: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
   errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#FF4D4D" },
+  aiGenBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, backgroundColor: "transparent" },
+  aiGenBtnIcon: { fontSize: 16, color: Colors.brand.gold },
+  aiGenBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  aiPreviewCard: { borderRadius: 20, borderWidth: 1, overflow: "hidden" },
+  aiPreviewPlaceholder: { padding: 40, alignItems: "center", gap: 14 },
+  aiPreviewLoadingText: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 20 },
+  aiPreviewImage: { width: "100%", aspectRatio: 1 },
+  aiPreviewFooter: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", padding: 12 },
+  aiPreviewLabel: { fontFamily: "Inter_400Regular", fontSize: 12, flex: 1 },
 });

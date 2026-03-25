@@ -29,7 +29,8 @@ router.post("/me", async (req, res) => {
     const {
       userId, unit,
       aboveBust, bust, underBust,
-      shoulderWidth, armhole, blouseLength, notes,
+      shoulderWidth, armhole, blouseLength,
+      waist, hip, notes,
     } = req.body as {
       userId: string;
       unit?: string;
@@ -39,6 +40,8 @@ router.post("/me", async (req, res) => {
       shoulderWidth?: string;
       armhole?: string;
       blouseLength?: string;
+      waist?: string;
+      hip?: string;
       notes?: string;
     };
 
@@ -61,6 +64,8 @@ router.post("/me", async (req, res) => {
       shoulderWidth: shoulderWidth ?? null,
       armhole: armhole ?? null,
       blouseLength: blouseLength ?? null,
+      waist: waist ?? null,
+      hip: hip ?? null,
       notes: notes ?? null,
       updatedAt: new Date(),
     };
