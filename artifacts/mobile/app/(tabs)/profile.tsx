@@ -961,13 +961,13 @@ function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
   const cx = W / 2;
   const isDark = theme === Colors.dark;
 
-  // Colour palette
-  const bodyFill = isDark ? "#3A2D48" : "#EDE6F5";
-  const bodySk   = isDark ? "#7868A8" : "#7060A0";
-  const skinFill = isDark ? "#5A4050" : "#FAE5C8";
-  const skinSk   = isDark ? "#9878A8" : "#C8983A";
-  const hairFill = isDark ? "#3A2825" : "#4A2E1C";
-  const circleBg = isDark ? "#1A1020" : "#FFFFFF";
+  // Mannequin palette — single unified material, no skin/hair
+  const mannFill  = isDark ? "#4A4258" : "#DDD6E8";  // main body fill
+  const mannShade = isDark ? "#3A3248" : "#C8BED8";  // shaded areas (arms, neck, head shadow)
+  const mannSk    = isDark ? "#6858A0" : "#8878B8";  // outline stroke
+  const bustFill  = isDark ? "#524860" : "#CFC6DE";  // bust dome fill (slightly darker)
+  const bustSk    = isDark ? "#6858A0" : "#9080B8";  // bust outline
+  const circleBg  = isDark ? "#1A1020" : "#FFFFFF";
 
   // Measurement colours (each body part gets its own hue)
   const c1 = "#D63031"; // above bust
@@ -993,7 +993,6 @@ function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
 
   // ── Half-widths ─────────────────────────────────────────────────
   const hHead      = 24;
-  const hHair      = 27;
   const hNeck      = 13;
   const hShoulder  = 80;
   const hAbove     = 76;
@@ -1058,63 +1057,61 @@ function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
     `Z`,
   ].join(" ");
 
-  // ── Bust contour curves (decorative inner detail) ────────────────
-  const leftBustCurve  = `M ${cx - 4} ${yBust - 6} C ${cx - 18} ${yBust - 22}, ${cx - hBust + 6} ${yBust - 8}, ${cx - hBust + 14} ${yBust + 14}`;
-  const rightBustCurve = `M ${cx + 4} ${yBust - 6} C ${cx + 18} ${yBust - 22}, ${cx + hBust - 6} ${yBust - 8}, ${cx + hBust - 14} ${yBust + 14}`;
+  // ── Realistic bust dome paths (filled closed shapes) ─────────────
+  // Each dome is a teardrop/hemisphere shape sitting between center and side seam
+  const leftBustDome = [
+    `M ${cx - 6} ${yBust - 4}`,
+    `C ${cx - 10} ${yBust - 28}, ${cx - hBust + 10} ${yBust - 24}, ${cx - hBust + 8} ${yBust - 2}`,
+    `C ${cx - hBust + 4} ${yBust + 18}, ${cx - 20} ${yBust + 20}, ${cx - 6} ${yBust + 10}`,
+    `C ${cx - 4} ${yBust + 4}, ${cx - 5} ${yBust}, ${cx - 6} ${yBust - 4}`,
+    `Z`,
+  ].join(" ");
+
+  const rightBustDome = [
+    `M ${cx + 6} ${yBust - 4}`,
+    `C ${cx + 10} ${yBust - 28}, ${cx + hBust - 10} ${yBust - 24}, ${cx + hBust - 8} ${yBust - 2}`,
+    `C ${cx + hBust - 4} ${yBust + 18}, ${cx + 20} ${yBust + 20}, ${cx + 6} ${yBust + 10}`,
+    `C ${cx + 4} ${yBust + 4}, ${cx + 5} ${yBust}, ${cx + 6} ${yBust - 4}`,
+    `Z`,
+  ].join(" ");
+
+  // Highlight streak on top of each dome (gives 3-D convex appearance)
+  const leftHighlight  = `M ${cx - 14} ${yBust - 20} C ${cx - 10} ${yBust - 28}, ${cx - hBust + 18} ${yBust - 22}, ${cx - hBust + 22} ${yBust - 10}`;
+  const rightHighlight = `M ${cx + 14} ${yBust - 20} C ${cx + 10} ${yBust - 28}, ${cx + hBust - 18} ${yBust - 22}, ${cx + hBust - 22} ${yBust - 10}`;
 
   return (
     <Svg width={W} height={H}>
 
-      {/* ── HAIR (behind head) ── */}
-      <Ellipse cx={cx} cy={yHeadC - 2} rx={hHair} ry={32} fill={hairFill} />
-      {/* Side hair strands */}
-      <Path d={`M ${cx - hHair + 2} ${yHeadC + 16} C ${cx - hHair - 8} ${yHeadC + 28}, ${cx - hHair - 4} ${yNeckTop}, ${cx - hHead + 4} ${yNeckTop + 4}`}
-        stroke={hairFill} strokeWidth="11" fill="none" strokeLinecap="round" />
-      <Path d={`M ${cx + hHair - 2} ${yHeadC + 16} C ${cx + hHair + 8} ${yHeadC + 28}, ${cx + hHair + 4} ${yNeckTop}, ${cx + hHead - 4} ${yNeckTop + 4}`}
-        stroke={hairFill} strokeWidth="11" fill="none" strokeLinecap="round" />
-
-      {/* ── HEAD (face) ── */}
-      <Ellipse cx={cx} cy={yHeadC} rx={hHead} ry={27} fill={skinFill} stroke={skinSk} strokeWidth="1.4" />
-
-      {/* Face features */}
-      {/* Eyebrows */}
-      <Path d={`M ${cx - 13} ${yHeadC - 11} Q ${cx - 8} ${yHeadC - 14} ${cx - 3} ${yHeadC - 11}`}
-        stroke={hairFill} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      <Path d={`M ${cx + 3} ${yHeadC - 11} Q ${cx + 8} ${yHeadC - 14} ${cx + 13} ${yHeadC - 11}`}
-        stroke={hairFill} strokeWidth="1.5" fill="none" strokeLinecap="round" />
-      {/* Eyes */}
-      <Ellipse cx={cx - 8} cy={yHeadC - 4} rx={3.5} ry={4.5} fill={isDark ? "#2A1A30" : "#3D2B1F"} />
-      <Ellipse cx={cx + 8} cy={yHeadC - 4} rx={3.5} ry={4.5} fill={isDark ? "#2A1A30" : "#3D2B1F"} />
-      {/* Eye shine */}
-      <Circle cx={cx - 6.5} cy={yHeadC - 5.5} r={1} fill="#FFFFFF" opacity="0.8" />
-      <Circle cx={cx + 9.5} cy={yHeadC - 5.5} r={1} fill="#FFFFFF" opacity="0.8" />
-      {/* Nose */}
-      <Path d={`M ${cx - 3} ${yHeadC + 4} Q ${cx} ${yHeadC + 10} ${cx + 3} ${yHeadC + 4}`}
-        stroke={skinSk} strokeWidth="1.2" fill="none" strokeLinecap="round" />
-      {/* Lips */}
-      <Path d={`M ${cx - 7} ${yHeadC + 15} Q ${cx} ${yHeadC + 20} ${cx + 7} ${yHeadC + 15}`}
-        stroke={skinSk} strokeWidth="1.8" fill="none" strokeLinecap="round" />
-      <Path d={`M ${cx - 7} ${yHeadC + 15} Q ${cx} ${yHeadC + 12} ${cx + 7} ${yHeadC + 15}`}
-        stroke={skinSk} strokeWidth="0.8" fill="none" strokeLinecap="round" />
+      {/* ── MANNEQUIN HEAD — smooth featureless oval ── */}
+      {/* Subtle shadow ellipse for depth */}
+      <Ellipse cx={cx + 2} cy={yHeadC + 3} rx={hHead + 1} ry={28} fill={mannShade} opacity="0.5" />
+      {/* Main head */}
+      <Ellipse cx={cx} cy={yHeadC} rx={hHead} ry={27} fill={mannFill} stroke={mannSk} strokeWidth="1.6" />
+      {/* Subtle highlight streak across forehead */}
+      <Path d={`M ${cx - 10} ${yHeadC - 16} Q ${cx} ${yHeadC - 22} ${cx + 10} ${yHeadC - 16}`}
+        stroke="#FFFFFF" strokeWidth="1.5" fill="none" strokeLinecap="round" opacity={isDark ? 0.12 : 0.28} />
 
       {/* ── NECK ── */}
       <Path d={`M ${cx - hNeck} ${yNeckTop} L ${cx - hNeck + 2} ${yNeckBot} L ${cx + hNeck - 2} ${yNeckBot} L ${cx + hNeck} ${yNeckTop} Z`}
-        fill={skinFill} stroke={skinSk} strokeWidth="1" />
+        fill={mannShade} stroke={mannSk} strokeWidth="1" />
 
-      {/* ── ARMS (behind torso) ── */}
-      <Path d={leftArm}  fill={skinFill} stroke={skinSk} strokeWidth="1.2" />
-      <Path d={rightArm} fill={skinFill} stroke={skinSk} strokeWidth="1.2" />
+      {/* ── ARMS (behind torso) — same mannequin material, slightly shaded ── */}
+      <Path d={leftArm}  fill={mannShade} stroke={mannSk} strokeWidth="1.3" />
+      <Path d={rightArm} fill={mannShade} stroke={mannSk} strokeWidth="1.3" />
 
       {/* ── TORSO ── */}
-      <Path d={torso} fill={bodyFill} stroke={bodySk} strokeWidth="2" />
+      <Path d={torso} fill={mannFill} stroke={mannSk} strokeWidth="2.2" />
 
-      {/* Bust contour detail */}
-      <Path d={leftBustCurve}  stroke={bodySk} strokeWidth="1.2" fill="none" opacity="0.45" />
-      <Path d={rightBustCurve} stroke={bodySk} strokeWidth="1.2" fill="none" opacity="0.45" />
+      {/* ── BUST DOMES — filled closed shapes with highlight streak ── */}
+      <Path d={leftBustDome}  fill={bustFill} stroke={bustSk} strokeWidth="1.4" />
+      <Path d={rightBustDome} fill={bustFill} stroke={bustSk} strokeWidth="1.4" />
+      {/* Dome highlights (convex sheen) */}
+      <Path d={leftHighlight}  stroke="#FFFFFF" strokeWidth="1.6" fill="none" strokeLinecap="round" opacity={isDark ? 0.12 : 0.30} />
+      <Path d={rightHighlight} stroke="#FFFFFF" strokeWidth="1.6" fill="none" strokeLinecap="round" opacity={isDark ? 0.12 : 0.30} />
 
-      {/* Center front dashed line */}
+      {/* Center front seam */}
       <Line x1={cx} y1={yNeckBot} x2={cx} y2={yHem}
-        stroke={bodySk} strokeWidth="0.8" strokeDasharray="4,5" opacity="0.30" />
+        stroke={mannSk} strokeWidth="0.9" strokeDasharray="4,5" opacity="0.35" />
 
       {/* ══════════════════════════════════════════
            MEASUREMENT LINES
