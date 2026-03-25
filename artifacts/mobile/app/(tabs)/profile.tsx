@@ -36,6 +36,7 @@ const CANVAS_H = 300;
 
 type Tab = "account" | "preferences" | "ideas" | "measurements";
 type SketchPath = { d: string; color: string; width: number };
+type SketchTool = "pen" | "eraser";
 
 const NECK_OPTIONS = ["Sweetheart", "Boat Neck", "Deep V", "Halter", "Square", "Round", "Keyhole", "Off-Shoulder"];
 const SLEEVE_OPTIONS = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Bell Sleeve", "Puff Sleeve"];
@@ -358,6 +359,20 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   );
 }
 
+const ERASE_RADIUS = 20;
+
+function pathNearPoint(d: string, px: number, py: number): boolean {
+  const tokens = d.split(/\s+/);
+  for (let i = 0; i < tokens.length; i++) {
+    if (tokens[i] === "M" || tokens[i] === "L") {
+      const x = parseFloat(tokens[i + 1]);
+      const y = parseFloat(tokens[i + 2]);
+      if (!isNaN(x) && !isNaN(y) && Math.hypot(x - px, y - py) < ERASE_RADIUS) return true;
+    }
+  }
+  return false;
+}
+
 function SketchCanvas({
   paths,
   onPathsChange,
@@ -365,6 +380,7 @@ function SketchCanvas({
   theme,
   color,
   strokeWidth,
+  tool,
 }: {
   paths: SketchPath[];
   onPathsChange: (p: SketchPath[]) => void;
@@ -372,27 +388,58 @@ function SketchCanvas({
   theme: typeof Colors.light;
   color: string;
   strokeWidth: number;
+  tool: SketchTool;
 }) {
   const currentPath = useRef("");
   const [liveD, setLiveD] = useState("");
+  const [eraserPos, setEraserPos] = useState<{ x: number; y: number } | null>(null);
+
+  // Refs keep PanResponder callbacks always reading the latest prop values
+  const pathsRef = useRef(paths);
+  const colorRef = useRef(color);
+  const strokeWidthRef = useRef(strokeWidth);
+  const toolRef = useRef(tool);
+  pathsRef.current = paths;
+  colorRef.current = color;
+  strokeWidthRef.current = strokeWidth;
+  toolRef.current = tool;
 
   const panResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: (e) => {
-        const { locationX, locationY } = e.nativeEvent;
-        currentPath.current = `M ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+        const { locationX: x, locationY: y } = e.nativeEvent;
+        if (toolRef.current === "eraser") {
+          setEraserPos({ x, y });
+          const next = pathsRef.current.filter((p) => !pathNearPoint(p.d, x, y));
+          if (next.length !== pathsRef.current.length) onPathsChange(next);
+          return;
+        }
+        currentPath.current = `M ${x.toFixed(1)} ${y.toFixed(1)}`;
         setLiveD(currentPath.current);
       },
       onPanResponderMove: (e) => {
-        const { locationX, locationY } = e.nativeEvent;
-        currentPath.current += ` L ${locationX.toFixed(1)} ${locationY.toFixed(1)}`;
+        const { locationX: x, locationY: y } = e.nativeEvent;
+        if (toolRef.current === "eraser") {
+          setEraserPos({ x, y });
+          const next = pathsRef.current.filter((p) => !pathNearPoint(p.d, x, y));
+          if (next.length !== pathsRef.current.length) onPathsChange(next);
+          return;
+        }
+        currentPath.current += ` L ${x.toFixed(1)} ${y.toFixed(1)}`;
         setLiveD(currentPath.current);
       },
       onPanResponderRelease: () => {
+        if (toolRef.current === "eraser") {
+          setEraserPos(null);
+          return;
+        }
         if (currentPath.current.length > 5) {
-          onPathsChange([...paths, { d: currentPath.current, color, width: strokeWidth }]);
+          onPathsChange([
+            ...pathsRef.current,
+            { d: currentPath.current, color: colorRef.current, width: strokeWidthRef.current },
+          ]);
         }
         currentPath.current = "";
         setLiveD("");
@@ -400,30 +447,33 @@ function SketchCanvas({
     })
   ).current;
 
+  const isEraser = tool === "eraser";
+
   return (
     <View
-      style={[styles.sketchCanvas, { borderColor: theme.border }]}
+      style={[styles.sketchCanvas, { borderColor: isEraser ? "#FF4D4D60" : theme.border }]}
       {...panResponder.panHandlers}
     >
       {backgroundImageUri ? (
-        <Image
-          source={{ uri: backgroundImageUri }}
-          style={StyleSheet.absoluteFill}
-          resizeMode="cover"
-        />
+        <Image source={{ uri: backgroundImageUri }} style={StyleSheet.absoluteFill} resizeMode="cover" />
       ) : (
         <View style={[StyleSheet.absoluteFill, { backgroundColor: "#FFFAF7" }]} />
       )}
-      <Svg
-        width={CANVAS_W}
-        height={CANVAS_H}
-        style={StyleSheet.absoluteFill}
-      >
+      <Svg width={CANVAS_W} height={CANVAS_H} style={StyleSheet.absoluteFill}>
         {paths.map((p, i) => (
           <Path key={i} d={p.d} stroke={p.color} strokeWidth={p.width} fill="none" strokeLinecap="round" strokeLinejoin="round" />
         ))}
         {liveD ? (
-          <Path d={liveD} stroke={color} strokeWidth={strokeWidth} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+          <Path d={liveD} stroke={colorRef.current} strokeWidth={strokeWidthRef.current} fill="none" strokeLinecap="round" strokeLinejoin="round" />
+        ) : null}
+        {eraserPos ? (
+          <Circle
+            cx={eraserPos.x} cy={eraserPos.y} r={ERASE_RADIUS}
+            fill="rgba(255,100,100,0.12)"
+            stroke="#FF4D4D"
+            strokeWidth="1.5"
+            strokeDasharray="4,3"
+          />
         ) : null}
       </Svg>
       {paths.length === 0 && !liveD && !backgroundImageUri && (
@@ -455,6 +505,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [sketchPaths, setSketchPaths] = useState<SketchPath[]>([]);
   const [drawColor, setDrawColor] = useState(Colors.brand.primary);
   const [strokeWidth, setStrokeWidth] = useState(3);
+  const [sketchTool, setSketchTool] = useState<SketchTool>("pen");
   const [sketchBackground, setSketchBackground] = useState<string | null>(null);
   const [aiSketchGenerating, setAiSketchGenerating] = useState(false);
   const [aiSketchImageUri, setAiSketchImageUri] = useState<string | null>(null);
@@ -639,8 +690,9 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 
             {/* Canvas toolbar */}
             <View style={styles.sketchToolbar}>
+              {/* Color swatches (only when pen active) */}
               <View style={styles.colorPicker}>
-                {DRAW_COLORS.map(c => (
+                {sketchTool === "pen" ? DRAW_COLORS.map(c => (
                   <TouchableOpacity
                     key={c}
                     style={[
@@ -649,24 +701,64 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                     ]}
                     onPress={() => setDrawColor(c)}
                   />
-                ))}
+                )) : (
+                  <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+                    <Feather name="info" size={12} color={theme.textMuted} />
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted }}>
+                      Drag over strokes to erase them
+                    </Text>
+                  </View>
+                )}
               </View>
+
+              {/* Right-side controls */}
               <View style={styles.strokeRow}>
-                {[2, 4, 7].map(w => (
+                {/* Pen / Eraser toggle */}
+                <TouchableOpacity
+                  style={[styles.toolBtn, {
+                    backgroundColor: sketchTool === "pen" ? Colors.brand.primary + "20" : "transparent",
+                    borderColor: sketchTool === "pen" ? Colors.brand.primary : theme.border,
+                  }]}
+                  onPress={() => { setSketchTool("pen"); Haptics.selectionAsync(); }}
+                >
+                  <Feather name="edit-3" size={14} color={sketchTool === "pen" ? Colors.brand.primary : theme.textSecondary} />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.toolBtn, {
+                    backgroundColor: sketchTool === "eraser" ? "#FF4D4D20" : "transparent",
+                    borderColor: sketchTool === "eraser" ? "#FF4D4D" : theme.border,
+                  }]}
+                  onPress={() => { setSketchTool("eraser"); Haptics.selectionAsync(); }}
+                >
+                  <MaterialCommunityIcons name="eraser" size={15} color={sketchTool === "eraser" ? "#FF4D4D" : theme.textSecondary} />
+                </TouchableOpacity>
+
+                {/* Stroke width (only in pen mode) */}
+                {sketchTool === "pen" && [2, 4, 7].map(w => (
                   <TouchableOpacity
                     key={w}
                     style={[styles.strokeDot, { width: w + 10, height: w + 10, borderRadius: (w + 10) / 2, backgroundColor: strokeWidth === w ? Colors.brand.primary : theme.border }]}
                     onPress={() => setStrokeWidth(w)}
                   />
                 ))}
-                <TouchableOpacity style={[styles.clearBtn, { borderColor: theme.border }]} onPress={() => { setSketchPaths([]); Haptics.selectionAsync(); }}>
+
+                {/* Undo */}
+                <TouchableOpacity
+                  style={[styles.clearBtn, { borderColor: theme.border, opacity: sketchPaths.length > 0 ? 1 : 0.3 }]}
+                  onPress={() => { setSketchPaths(p => p.slice(0, -1)); Haptics.selectionAsync(); }}
+                  disabled={sketchPaths.length === 0}
+                >
+                  <Feather name="corner-left-up" size={14} color={theme.textSecondary} />
+                </TouchableOpacity>
+
+                {/* Clear all */}
+                <TouchableOpacity
+                  style={[styles.clearBtn, { borderColor: theme.border, opacity: sketchPaths.length > 0 ? 1 : 0.3 }]}
+                  onPress={() => { setSketchPaths([]); Haptics.selectionAsync(); }}
+                  disabled={sketchPaths.length === 0}
+                >
                   <Feather name="trash-2" size={14} color={theme.textSecondary} />
                 </TouchableOpacity>
-                {sketchPaths.length > 0 && (
-                  <TouchableOpacity style={[styles.clearBtn, { borderColor: theme.border }]} onPress={() => { setSketchPaths(p => p.slice(0, -1)); Haptics.selectionAsync(); }}>
-                    <Feather name="corner-left-up" size={14} color={theme.textSecondary} />
-                  </TouchableOpacity>
-                )}
               </View>
             </View>
 
@@ -677,6 +769,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
               theme={theme}
               color={drawColor}
               strokeWidth={strokeWidth}
+              tool={sketchTool}
             />
             <Text style={[styles.sketchNote, { color: theme.textMuted }]}>
               {sketchBackground ? "Draw annotations, markings, or design notes on your photo" : "Draw neckline shape, sleeve length, back design — or add a photo background above"}
@@ -1608,6 +1701,7 @@ const styles = StyleSheet.create({
   fieldUnit: { fontFamily: "Inter_400Regular", fontSize: 12, marginLeft: "auto" as any },
   measureInputHint: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
   cancelBtn: { width: 32, height: 32, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  toolBtn: { width: 30, height: 30, borderRadius: 9, alignItems: "center", justifyContent: "center", borderWidth: 1.5 },
   errorText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "#FF4D4D" },
   aiGenBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, backgroundColor: "transparent" },
   aiGenBtnIcon: { fontSize: 16, color: Colors.brand.gold },
