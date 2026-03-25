@@ -19,7 +19,7 @@ import {
   ActivityIndicator,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import Svg, { Path, Circle, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
+import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -957,131 +957,218 @@ type MeasureKey = (typeof MEASURE_FIELDS)[number]["key"];
 
 function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
   const W = SCREEN_WIDTH - 48;
-  const H = 400;
+  const H = 530;
   const cx = W / 2;
+  const isDark = theme === Colors.dark;
 
-  // Palette matching the reference image style
-  const fillColor   = theme === Colors.dark ? "#2A2030" : "#EDEAF2";
-  const strokeColor = theme === Colors.dark ? "#9488A8" : "#8878A8";
-  const red  = "#C0392B";
-  const blue = "#2471A3";
+  // Colour palette
+  const bodyFill = isDark ? "#3A2D48" : "#EDE6F5";
+  const bodySk   = isDark ? "#7868A8" : "#7060A0";
+  const skinFill = isDark ? "#5A4050" : "#FAE5C8";
+  const skinSk   = isDark ? "#9878A8" : "#C8983A";
+  const hairFill = isDark ? "#3A2825" : "#4A2E1C";
+  const circleBg = isDark ? "#1A1020" : "#FFFFFF";
 
-  // ── Vertical landmarks ──────────────────────────────────────────
-  const yNeck      = 18;
-  const yShoulder  = 55;
-  const yAbove     = 85;
-  const yBust      = 115;
-  const yUnder     = 143;
-  const yWaist     = 228;
-  const yHip       = 305;
-  const yHem       = 358;
+  // Measurement colours (each body part gets its own hue)
+  const c1 = "#D63031"; // above bust
+  const c2 = "#C0392B"; // bust
+  const c3 = "#E74C3C"; // under bust
+  const c4 = "#27AE60"; // waist
+  const c5 = "#2980B9"; // hip
+  const c6 = "#8E44AD"; // shoulder width
+  const c7 = "#E67E22"; // armhole
+  const c8 = "#F39C12"; // blouse length
 
-  // ── Half-widths at each landmark ────────────────────────────────
-  const hNeck      = 17;
-  const hShoulder  = 76;
-  const hBust      = 74;
-  const hUnder     = 70;
-  const hWaist     = 48;
-  const hHip       = 72;
-  const hHem       = 64;
+  // ── Vertical landmarks ───────────────────────────────────────────
+  const yHeadC    = 38;
+  const yNeckTop  = 64;
+  const yNeckBot  = 90;
+  const yShoulder = 112;
+  const yAbove    = 142;
+  const yBust     = 172;
+  const yUnder    = 200;
+  const yWaist    = 292;
+  const yHip      = 368;
+  const yHem      = 428;
 
-  // Helper: numbered circle drawn at (x, y)
-  const numCircle = (x: number, y: number, label: string, color: string) => (
+  // ── Half-widths ─────────────────────────────────────────────────
+  const hHead      = 24;
+  const hHair      = 27;
+  const hNeck      = 13;
+  const hShoulder  = 80;
+  const hAbove     = 76;
+  const hBust      = 76;
+  const hUnder     = 72;
+  const hWaist     = 50;
+  const hHip       = 80;
+  const hHem       = 70;
+  const armW       = 19;
+  const yArmEnd    = yWaist + 52;
+
+  // Right-side circle column (just outside widest body point)
+  const rCX = Math.min(cx + hHip + 30, W - 14);
+
+  const numCircle = (x: number, y: number, n: string, color: string) => (
     <>
-      <Circle cx={x} cy={y} r={12} fill={theme === Colors.dark ? "#1A1020" : "#FFFFFF"} stroke={color} strokeWidth="1.8" />
-      <SvgText x={x} y={y + 4.5} fontSize="11" fill={color} fontWeight="bold" textAnchor="middle">{label}</SvgText>
+      <Circle cx={x} cy={y} r={12} fill={circleBg} stroke={color} strokeWidth="1.8" />
+      <SvgText x={x} y={y + 4.5} fontSize="11" fill={color} fontWeight="bold" textAnchor="middle">{n}</SvgText>
     </>
   );
 
-  // ── Closed silhouette path ───────────────────────────────────────
-  // Left half (top → bottom), right half (bottom → top), closed at neck
-  const silhouette = [
-    // Start: left neck
-    `M ${cx - hNeck} ${yNeck}`,
-    // neck → left shoulder (curves outward)
-    `C ${cx - 44} ${yNeck + 8},  ${cx - hShoulder + 2} ${yShoulder - 10},  ${cx - hShoulder} ${yShoulder}`,
-    // shoulder → bust (armhole: slight inward concave then outward to bust)
-    `C ${cx - hShoulder - 3} ${yShoulder + 18},  ${cx - hBust - 6} ${yBust - 18},  ${cx - hBust} ${yBust}`,
-    // bust → waist (tapers inward)
-    `C ${cx - hUnder - 2} ${yUnder + 10},  ${cx - hWaist - 8} ${yWaist - 32},  ${cx - hWaist} ${yWaist}`,
-    // waist → hip (flares outward)
-    `C ${cx - hWaist - 6} ${yWaist + 28},  ${cx - hHip + 4} ${yHip - 26},  ${cx - hHip} ${yHip}`,
-    // hip → hem
+  // ── Body torso path ──────────────────────────────────────────────
+  const torso = [
+    `M ${cx - hNeck} ${yNeckBot}`,
+    `C ${cx - 36} ${yNeckBot + 5}, ${cx - hShoulder + 8} ${yShoulder - 8}, ${cx - hShoulder} ${yShoulder}`,
+    `C ${cx - hShoulder - 5} ${yShoulder + 18}, ${cx - hAbove - 8} ${yAbove - 12}, ${cx - hAbove} ${yAbove}`,
+    `C ${cx - hAbove + 2} ${yAbove + 12}, ${cx - hBust - 4} ${yBust - 10}, ${cx - hBust} ${yBust}`,
+    `C ${cx - hBust - 2} ${yBust + 14}, ${cx - hUnder - 2} ${yUnder - 8}, ${cx - hUnder} ${yUnder}`,
+    `C ${cx - hUnder + 4} ${yUnder + 24}, ${cx - hWaist - 8} ${yWaist - 36}, ${cx - hWaist} ${yWaist}`,
+    `C ${cx - hWaist - 4} ${yWaist + 32}, ${cx - hHip + 4} ${yHip - 28}, ${cx - hHip} ${yHip}`,
     `L ${cx - hHem} ${yHem}`,
-    // bottom hem across
     `L ${cx + hHem} ${yHem}`,
-    // right hip → waist (mirror)
     `L ${cx + hHip} ${yHip}`,
-    `C ${cx + hHip - 4} ${yHip - 26},  ${cx + hWaist + 6} ${yWaist + 28},  ${cx + hWaist} ${yWaist}`,
-    // waist → bust (mirror)
-    `C ${cx + hWaist + 8} ${yWaist - 32},  ${cx + hUnder + 2} ${yUnder + 10},  ${cx + hBust} ${yBust}`,
-    // bust → shoulder (mirror)
-    `C ${cx + hBust + 6} ${yBust - 18},  ${cx + hShoulder + 3} ${yShoulder + 18},  ${cx + hShoulder} ${yShoulder}`,
-    // shoulder → right neck (mirror)
-    `C ${cx + hShoulder - 2} ${yShoulder - 10},  ${cx + 44} ${yNeck + 8},  ${cx + hNeck} ${yNeck}`,
-    // neck arc (shallow curve across top)
-    `Q ${cx} ${yNeck - 10} ${cx - hNeck} ${yNeck}`,
+    `C ${cx + hHip - 4} ${yHip - 28}, ${cx + hWaist + 4} ${yWaist + 32}, ${cx + hWaist} ${yWaist}`,
+    `C ${cx + hWaist + 8} ${yWaist - 36}, ${cx + hUnder - 4} ${yUnder + 24}, ${cx + hUnder} ${yUnder}`,
+    `C ${cx + hUnder + 2} ${yUnder - 8}, ${cx + hBust + 2} ${yBust + 14}, ${cx + hBust} ${yBust}`,
+    `C ${cx + hBust + 4} ${yBust - 10}, ${cx + hAbove - 2} ${yAbove + 12}, ${cx + hAbove} ${yAbove}`,
+    `C ${cx + hAbove + 8} ${yAbove - 12}, ${cx + hShoulder + 5} ${yShoulder + 18}, ${cx + hShoulder} ${yShoulder}`,
+    `C ${cx + hShoulder - 8} ${yShoulder - 8}, ${cx + 36} ${yNeckBot + 5}, ${cx + hNeck} ${yNeckBot}`,
+    `Q ${cx} ${yNeckBot - 10} ${cx - hNeck} ${yNeckBot}`,
     `Z`,
   ].join(" ");
 
-  // Circle x-positions (placed just outside the body on the right side)
-  const circleX = (hHalf: number) => cx + hHalf + 22;
+  // ── Arm paths (sit behind torso) ─────────────────────────────────
+  const leftArm = [
+    `M ${cx - hShoulder} ${yShoulder}`,
+    `C ${cx - hShoulder - 12} ${yShoulder + 10}, ${cx - hAbove - armW + 2} ${yAbove}, ${cx - hAbove - armW + 4} ${yBust}`,
+    `C ${cx - hAbove - armW + 6} ${yWaist - 40}, ${cx - hAbove - armW + 8} ${yWaist + 18}, ${cx - hAbove - armW + 10} ${yArmEnd}`,
+    `Q ${cx - hAbove - armW / 2 + 8} ${yArmEnd + 14} ${cx - hAbove + 4} ${yArmEnd}`,
+    `L ${cx - hAbove + 4} ${yAbove + 16}`,
+    `C ${cx - hAbove + 2} ${yAbove}, ${cx - hShoulder - 4} ${yShoulder + 16}, ${cx - hShoulder} ${yShoulder}`,
+    `Z`,
+  ].join(" ");
+
+  const rightArm = [
+    `M ${cx + hShoulder} ${yShoulder}`,
+    `C ${cx + hShoulder + 12} ${yShoulder + 10}, ${cx + hAbove + armW - 2} ${yAbove}, ${cx + hAbove + armW - 4} ${yBust}`,
+    `C ${cx + hAbove + armW - 6} ${yWaist - 40}, ${cx + hAbove + armW - 8} ${yWaist + 18}, ${cx + hAbove + armW - 10} ${yArmEnd}`,
+    `Q ${cx + hAbove + armW / 2 - 8} ${yArmEnd + 14} ${cx + hAbove - 4} ${yArmEnd}`,
+    `L ${cx + hAbove - 4} ${yAbove + 16}`,
+    `C ${cx + hAbove - 2} ${yAbove}, ${cx + hShoulder + 4} ${yShoulder + 16}, ${cx + hShoulder} ${yShoulder}`,
+    `Z`,
+  ].join(" ");
+
+  // ── Bust contour curves (decorative inner detail) ────────────────
+  const leftBustCurve  = `M ${cx - 4} ${yBust - 6} C ${cx - 18} ${yBust - 22}, ${cx - hBust + 6} ${yBust - 8}, ${cx - hBust + 14} ${yBust + 14}`;
+  const rightBustCurve = `M ${cx + 4} ${yBust - 6} C ${cx + 18} ${yBust - 22}, ${cx + hBust - 6} ${yBust - 8}, ${cx + hBust - 14} ${yBust + 14}`;
 
   return (
     <Svg width={W} height={H}>
-      {/* ── Silhouette ── */}
-      <Path d={silhouette} fill={fillColor} stroke={strokeColor} strokeWidth="2.2" strokeLinejoin="round" />
 
-      {/* Center front line */}
-      <Line x1={cx} y1={yNeck} x2={cx} y2={yHem}
-        stroke={strokeColor} strokeWidth="1" strokeDasharray="5,5" opacity="0.45" />
+      {/* ── HAIR (behind head) ── */}
+      <Ellipse cx={cx} cy={yHeadC - 2} rx={hHair} ry={32} fill={hairFill} />
+      {/* Side hair strands */}
+      <Path d={`M ${cx - hHair + 2} ${yHeadC + 16} C ${cx - hHair - 8} ${yHeadC + 28}, ${cx - hHair - 4} ${yNeckTop}, ${cx - hHead + 4} ${yNeckTop + 4}`}
+        stroke={hairFill} strokeWidth="11" fill="none" strokeLinecap="round" />
+      <Path d={`M ${cx + hHair - 2} ${yHeadC + 16} C ${cx + hHair + 8} ${yHeadC + 28}, ${cx + hHair + 4} ${yNeckTop}, ${cx + hHead - 4} ${yNeckTop + 4}`}
+        stroke={hairFill} strokeWidth="11" fill="none" strokeLinecap="round" />
 
-      {/* ── Measurement lines + circles ── */}
+      {/* ── HEAD (face) ── */}
+      <Ellipse cx={cx} cy={yHeadC} rx={hHead} ry={27} fill={skinFill} stroke={skinSk} strokeWidth="1.4" />
 
-      {/* ① Above Bust — brand rose */}
-      <Line x1={cx - hShoulder} y1={yAbove} x2={cx + hShoulder} y2={yAbove} stroke={red} strokeWidth="1.8" />
-      <Circle cx={cx - hShoulder} cy={yAbove} r={3.5} fill={red} />
-      <Circle cx={cx + hShoulder} cy={yAbove} r={3.5} fill={red} />
-      {numCircle(circleX(hShoulder), yAbove, "1", red)}
+      {/* Face features */}
+      {/* Eyebrows */}
+      <Path d={`M ${cx - 13} ${yHeadC - 11} Q ${cx - 8} ${yHeadC - 14} ${cx - 3} ${yHeadC - 11}`}
+        stroke={hairFill} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      <Path d={`M ${cx + 3} ${yHeadC - 11} Q ${cx + 8} ${yHeadC - 14} ${cx + 13} ${yHeadC - 11}`}
+        stroke={hairFill} strokeWidth="1.5" fill="none" strokeLinecap="round" />
+      {/* Eyes */}
+      <Ellipse cx={cx - 8} cy={yHeadC - 4} rx={3.5} ry={4.5} fill={isDark ? "#2A1A30" : "#3D2B1F"} />
+      <Ellipse cx={cx + 8} cy={yHeadC - 4} rx={3.5} ry={4.5} fill={isDark ? "#2A1A30" : "#3D2B1F"} />
+      {/* Eye shine */}
+      <Circle cx={cx - 6.5} cy={yHeadC - 5.5} r={1} fill="#FFFFFF" opacity="0.8" />
+      <Circle cx={cx + 9.5} cy={yHeadC - 5.5} r={1} fill="#FFFFFF" opacity="0.8" />
+      {/* Nose */}
+      <Path d={`M ${cx - 3} ${yHeadC + 4} Q ${cx} ${yHeadC + 10} ${cx + 3} ${yHeadC + 4}`}
+        stroke={skinSk} strokeWidth="1.2" fill="none" strokeLinecap="round" />
+      {/* Lips */}
+      <Path d={`M ${cx - 7} ${yHeadC + 15} Q ${cx} ${yHeadC + 20} ${cx + 7} ${yHeadC + 15}`}
+        stroke={skinSk} strokeWidth="1.8" fill="none" strokeLinecap="round" />
+      <Path d={`M ${cx - 7} ${yHeadC + 15} Q ${cx} ${yHeadC + 12} ${cx + 7} ${yHeadC + 15}`}
+        stroke={skinSk} strokeWidth="0.8" fill="none" strokeLinecap="round" />
 
-      {/* ② Bust — deeper red, bolder */}
-      <Line x1={cx - hBust} y1={yBust} x2={cx + hBust} y2={yBust} stroke={red} strokeWidth="2.8" />
-      <Circle cx={cx - hBust} cy={yBust} r={4.5} fill={red} />
-      <Circle cx={cx + hBust} cy={yBust} r={4.5} fill={red} />
-      {numCircle(circleX(hBust), yBust, "2", red)}
+      {/* ── NECK ── */}
+      <Path d={`M ${cx - hNeck} ${yNeckTop} L ${cx - hNeck + 2} ${yNeckBot} L ${cx + hNeck - 2} ${yNeckBot} L ${cx + hNeck} ${yNeckTop} Z`}
+        fill={skinFill} stroke={skinSk} strokeWidth="1" />
+
+      {/* ── ARMS (behind torso) ── */}
+      <Path d={leftArm}  fill={skinFill} stroke={skinSk} strokeWidth="1.2" />
+      <Path d={rightArm} fill={skinFill} stroke={skinSk} strokeWidth="1.2" />
+
+      {/* ── TORSO ── */}
+      <Path d={torso} fill={bodyFill} stroke={bodySk} strokeWidth="2" />
+
+      {/* Bust contour detail */}
+      <Path d={leftBustCurve}  stroke={bodySk} strokeWidth="1.2" fill="none" opacity="0.45" />
+      <Path d={rightBustCurve} stroke={bodySk} strokeWidth="1.2" fill="none" opacity="0.45" />
+
+      {/* Center front dashed line */}
+      <Line x1={cx} y1={yNeckBot} x2={cx} y2={yHem}
+        stroke={bodySk} strokeWidth="0.8" strokeDasharray="4,5" opacity="0.30" />
+
+      {/* ══════════════════════════════════════════
+           MEASUREMENT LINES
+      ══════════════════════════════════════════ */}
+
+      {/* ① Above Bust */}
+      <Line x1={cx - hAbove} y1={yAbove} x2={cx + hAbove} y2={yAbove} stroke={c1} strokeWidth="1.6" />
+      <Circle cx={cx - hAbove} cy={yAbove} r={3.5} fill={c1} />
+      <Circle cx={cx + hAbove} cy={yAbove} r={3.5} fill={c1} />
+      {numCircle(rCX, yAbove, "1", c1)}
+
+      {/* ② Bust (bolder) */}
+      <Line x1={cx - hBust} y1={yBust} x2={cx + hBust} y2={yBust} stroke={c2} strokeWidth="2.8" />
+      <Circle cx={cx - hBust} cy={yBust} r={4.5} fill={c2} />
+      <Circle cx={cx + hBust} cy={yBust} r={4.5} fill={c2} />
+      {numCircle(rCX, yBust, "2", c2)}
 
       {/* ③ Under Bust */}
-      <Line x1={cx - hUnder} y1={yUnder} x2={cx + hUnder} y2={yUnder} stroke={red} strokeWidth="1.8" />
-      <Circle cx={cx - hUnder} cy={yUnder} r={3.5} fill={red} />
-      <Circle cx={cx + hUnder} cy={yUnder} r={3.5} fill={red} />
-      {numCircle(circleX(hUnder), yUnder, "3", red)}
+      <Line x1={cx - hUnder} y1={yUnder} x2={cx + hUnder} y2={yUnder} stroke={c3} strokeWidth="1.6" />
+      <Circle cx={cx - hUnder} cy={yUnder} r={3.5} fill={c3} />
+      <Circle cx={cx + hUnder} cy={yUnder} r={3.5} fill={c3} />
+      {numCircle(rCX, yUnder, "3", c3)}
 
-      {/* ④ Waist — bold */}
-      <Line x1={cx - hWaist} y1={yWaist} x2={cx + hWaist} y2={yWaist} stroke={red} strokeWidth="2.4" />
-      <Circle cx={cx - hWaist} cy={yWaist} r={4} fill={red} />
-      <Circle cx={cx + hWaist} cy={yWaist} r={4} fill={red} />
-      {numCircle(circleX(hWaist), yWaist, "4", red)}
+      {/* ④ Waist */}
+      <Line x1={cx - hWaist} y1={yWaist} x2={cx + hWaist} y2={yWaist} stroke={c4} strokeWidth="2.4" />
+      <Circle cx={cx - hWaist} cy={yWaist} r={4} fill={c4} />
+      <Circle cx={cx + hWaist} cy={yWaist} r={4} fill={c4} />
+      {numCircle(rCX, yWaist, "4", c4)}
 
-      {/* ⑤ Hip — blue */}
-      <Line x1={cx - hHip} y1={yHip} x2={cx + hHip} y2={yHip} stroke={blue} strokeWidth="2.8" />
-      <Circle cx={cx - hHip} cy={yHip} r={4.5} fill={blue} />
-      <Circle cx={cx + hHip} cy={yHip} r={4.5} fill={blue} />
-      {numCircle(circleX(hHip), yHip, "5", blue)}
+      {/* ⑤ Hip */}
+      <Line x1={cx - hHip} y1={yHip} x2={cx + hHip} y2={yHip} stroke={c5} strokeWidth="2.8" />
+      <Circle cx={cx - hHip} cy={yHip} r={4.5} fill={c5} />
+      <Circle cx={cx + hHip} cy={yHip} r={4.5} fill={c5} />
+      {numCircle(rCX, yHip, "5", c5)}
 
-      {/* ⑥ Shoulder width — double-headed arrow above shoulders */}
-      <Line x1={cx - hShoulder} y1={yShoulder - 14} x2={cx + hShoulder} y2={yShoulder - 14}
-        stroke="#4A90D9" strokeWidth="1.8" />
-      <Line x1={cx - hShoulder} y1={yShoulder - 20} x2={cx - hShoulder} y2={yShoulder - 8}
-        stroke="#4A90D9" strokeWidth="1.8" />
-      <Line x1={cx + hShoulder} y1={yShoulder - 20} x2={cx + hShoulder} y2={yShoulder - 8}
-        stroke="#4A90D9" strokeWidth="1.8" />
-      {numCircle(cx, yShoulder - 14, "6", "#4A90D9")}
+      {/* ⑥ Shoulder Width — bracket above shoulders */}
+      <Line x1={cx - hShoulder} y1={yShoulder - 14} x2={cx + hShoulder} y2={yShoulder - 14} stroke={c6} strokeWidth="1.8" />
+      <Line x1={cx - hShoulder} y1={yShoulder - 20} x2={cx - hShoulder} y2={yShoulder - 8} stroke={c6} strokeWidth="1.8" />
+      <Line x1={cx + hShoulder} y1={yShoulder - 20} x2={cx + hShoulder} y2={yShoulder - 8} stroke={c6} strokeWidth="1.8" />
+      {numCircle(cx, yShoulder - 14, "6", c6)}
 
-      {/* ⑧ Blouse length — vertical bracket on far right */}
-      <Line x1={W - 22} y1={yNeck} x2={W - 22} y2={yHem} stroke="#E67E22" strokeWidth="1.8" />
-      <Line x1={W - 28} y1={yNeck} x2={W - 16} y2={yNeck} stroke="#E67E22" strokeWidth="1.8" />
-      <Line x1={W - 28} y1={yHem} x2={W - 16} y2={yHem} stroke="#E67E22" strokeWidth="1.8" />
-      {numCircle(W - 22, (yNeck + yHem) / 2, "8", "#E67E22")}
+      {/* ⑦ Armhole — dashed arc tracing the left armhole curve */}
+      <Path
+        d={`M ${cx - hShoulder} ${yShoulder} C ${cx - hShoulder - 14} ${yShoulder + 20}, ${cx - hAbove - 14} ${yAbove + 8}, ${cx - hAbove} ${yAbove}`}
+        stroke={c7} strokeWidth="2.2" fill="none" strokeDasharray="5,3" />
+      <Circle cx={cx - hShoulder} cy={yShoulder} r={3.5} fill={c7} />
+      <Circle cx={cx - hAbove} cy={yAbove} r={3.5} fill={c7} />
+      {numCircle(cx - hAbove - 26, (yShoulder + yAbove) / 2, "7", c7)}
+
+      {/* ⑧ Blouse Length — vertical bracket on far right */}
+      <Line x1={W - 18} y1={yNeckBot} x2={W - 18} y2={yHem} stroke={c8} strokeWidth="1.8" />
+      <Line x1={W - 24} y1={yNeckBot} x2={W - 12} y2={yNeckBot} stroke={c8} strokeWidth="1.8" />
+      <Line x1={W - 24} y1={yHem}    x2={W - 12} y2={yHem}    stroke={c8} strokeWidth="1.8" />
+      {numCircle(W - 18, (yNeckBot + yHem) / 2, "8", c8)}
     </Svg>
   );
 }
