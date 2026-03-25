@@ -331,7 +331,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
               <View style={styles.aiPreviewPlaceholder}>
                 <ActivityIndicator color={Colors.brand.gold} size="large" />
                 <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                  Creating your blouse design…{"\n"}This may take 15–30 seconds
+                  Creating your blouse design…{"\n"}This takes about 10–15 seconds
                 </Text>
               </View>
             ) : aiPreviewUri ? (
@@ -703,7 +703,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                   <View style={styles.aiPreviewPlaceholder}>
                     <ActivityIndicator color={Colors.brand.gold} size="large" />
                     <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                      Transforming your sketch into a blouse design…{"\n"}This may take 15–30 seconds
+                      Transforming your sketch into a blouse design…{"\n"}This takes about 10–15 seconds
                     </Text>
                   </View>
                 ) : aiSketchImageUri ? (
