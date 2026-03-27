@@ -1,0 +1,62 @@
+Replace my current "stick-figure" style measurement graphic with a set of clear, realistic saree blouse measurement diagrams.
+
+Goal: Older women should be able to understand each measurement at a glance. Use simple blouse silhouettes with one arrow and big text per diagram.
+
+Create a React component file (e.g. `BlouseMeasurementDiagrams.tsx`) that exports separate SVG diagrams for each key measurement:
+
+1) High Bust (Above Bust)
+- Front upper body of a woman wearing a fitted blouse.
+- Arrow around the chest just above the bust, straight and level.
+- Large label under the diagram: "High Bust – tape above the fullest part of the bust, level all around."
+
+2) Bust
+- Similar front view.
+- Arrow around the fullest part of the bust.
+- Label: "Bust – tape around the fullest part of the bust, level and comfortably snug."
+
+3) Underbust
+- Arrow around the ribcage directly under the bust.
+- Label: "Underbust – tape just under the bust, parallel to the floor."
+
+4) Bust Point to Bust Point (Nipple to Nipple)
+- Front blouse outline with two small dots marking bust points.
+- Horizontal arrow between dots.
+- Label: "Bust Point to Bust Point – distance between the two bust points."
+
+5) Shoulder Width
+- Front or back view of shoulders.
+- Arrow from one shoulder tip to the other.
+- Label: "Shoulder Width – from shoulder tip to shoulder tip, across the back."
+
+6) Blouse Length
+- Side or front view.
+- Vertical arrow from highest shoulder point down to desired blouse hem.
+- Label: "Blouse Length – from top of shoulder down to where you want the blouse to end."
+
+7) Sleeve Length
+- Arm diagram with blouse sleeve.
+- Arrow from shoulder seam to sleeve hem.
+- Label: "Sleeve Length – from shoulder seam to end of sleeve."
+
+8) Sleeve Round / Bicep
+- Arrow around upper arm where the sleeve will sit.
+- Label: "Sleeve Round – around the fullest part of your upper arm."
+
+9) Armhole
+- Front/side view with armhole curve highlighted.
+- Short curved arrow following the armhole.
+- Label: "Armhole – around shoulder where sleeve joins the blouse."
+
+10) Neck Circumference / Neck Depth
+- Simple neck outline.
+- Arrow around neck (for circumference) and vertical arrow down from base of neck (for depth).
+- Label: "Neck – around base of neck; depth from neck down for front/back neckline."
+
+Style guidelines:
+- Use simple blouse shapes, not abstract blocks.
+- Thick dark outlines, light background.
+- One arrow and one label per diagram (no tiny legend numbers).
+- Make fonts large and readable; labels under each SVG.
+- Export as a set of components, e.g. `<HighBustDiagram />`, `<BustDiagram />`, etc., plus a default component that renders them in a grid with titles.
+
+I will place this component inside my "How to Measure" section under the profile. Just give me the React + SVG code; do not change my existing measurement form logic.
