@@ -20,7 +20,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
-import { SvgXml } from "react-native-svg";
+import BlousePatternDiagram from "@/components/BlousePatternDiagram";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -1779,23 +1779,28 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 ))}
               </View>
 
-              {/* Sewing Pattern SVG */}
-              {patternSvg && (
-                <View style={{ gap: 10 }}>
-                  <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>📐 Sewing Pattern</Text>
-                  <View style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
-                    <ScrollView horizontal showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ padding: 12 }}>
-                      <SvgXml xml={patternSvg} />
-                    </ScrollView>
-                    <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border }}>
-                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
-                        Scroll to see all pieces · Seam allowance 1.5 cm included · Scale: 1cm = 4.5px
-                      </Text>
-                    </View>
+              {/* Sewing Pattern */}
+              <View style={{ gap: 10 }}>
+                <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>📐 Sewing Pattern</Text>
+                <View style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
+                  <ScrollView horizontal showsHorizontalScrollIndicator
+                    contentContainerStyle={{ padding: 12 }}>
+                    <BlousePatternDiagram
+                      bust={+bust || undefined}
+                      underBust={+underBust || undefined}
+                      blouseLength={+blouseLen || undefined}
+                      sleeveLength={+sleeveLen || undefined}
+                      unit={unit}
+                      width={1060}
+                    />
+                  </ScrollView>
+                  <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
+                      Scroll sideways to see all pieces · +1.5 cm seam allowance on all edges
+                    </Text>
                   </View>
                 </View>
-              )}
+              </View>
 
               {/* Sewing Instructions */}
               {instructions && (
