@@ -17,6 +17,7 @@ import {
   PanResponder,
   Dimensions,
   ActivityIndicator,
+  Modal,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
@@ -35,7 +36,7 @@ const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
-type Tab = "account" | "preferences" | "ideas" | "measurements" | "design";
+type Tab = "preferences" | "ideas" | "measurements" | "design";
 type SketchPath = { d: string; color: string; width: number };
 type SketchTool = "pen" | "eraser";
 
@@ -1859,11 +1860,11 @@ export default function ProfileScreen() {
   const bottomPad = isWeb ? 34 : 0;
   const { user, setUser } = useApp();
 
-  const [activeTab, setActiveTab] = useState<Tab>("account");
+  const [activeTab, setActiveTab] = useState<Tab>("preferences");
+  const [showAccountModal, setShowAccountModal] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState<UserRole>(user?.role ?? "customer");
-  const [editing, setEditing] = useState(!user);
 
   const { data: fitsCount } = useQuery({
     queryKey: ["blouse-fits-count", user?.id],
@@ -1889,19 +1890,18 @@ export default function ProfileScreen() {
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
     const userId = user?.id ?? `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     setUser({ id: userId, name: name.trim(), phone: phone.trim() || undefined, role });
-    setEditing(false);
+    setShowAccountModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleLogout = () => {
     Alert.alert("Sign Out", "Clear your profile from this device?", [
       { text: "Cancel", style: "cancel" },
-      { text: "Sign Out", style: "destructive", onPress: async () => { await setUser(null); setName(""); setPhone(""); setRole("customer"); setEditing(true); } },
+      { text: "Sign Out", style: "destructive", onPress: async () => { await setUser(null); setName(""); setPhone(""); setRole("customer"); setShowAccountModal(false); } },
     ]);
   };
 
   const TABS: { key: Tab; label: string; icon: string }[] = [
-    { key: "account", label: "Account", icon: "user" },
     { key: "preferences", label: "Styles", icon: "sliders" },
     { key: "ideas", label: "Ideas", icon: "image" },
     { key: "measurements", label: "Measures", icon: "bar-chart-2" },
@@ -1920,13 +1920,20 @@ export default function ProfileScreen() {
               ? <Text style={styles.avatarText}>{user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}</Text>
               : <Feather name="user" size={32} color="rgba(255,255,255,0.6)" />}
           </View>
-          {user && (
-            <TouchableOpacity style={styles.editBtn} onPress={() => { setActiveTab("account"); setEditing(!editing); }}>
-              <Feather name={editing ? "x" : "edit-2"} size={18} color="#fff" />
-            </TouchableOpacity>
-          )}
         </View>
-        <Text style={styles.headerName}>{user?.name ?? "Set Up Profile"}</Text>
+        <TouchableOpacity
+          onPress={() => user && setShowAccountModal(true)}
+          activeOpacity={user ? 0.7 : 1}
+          style={{ alignItems: "center", gap: 4 }}
+        >
+          <Text style={styles.headerName}>{user?.name ?? "Set Up Profile"}</Text>
+          {user && (
+            <View style={styles.editNameHint}>
+              <Feather name="edit-2" size={10} color="rgba(255,255,255,0.7)" />
+              <Text style={styles.editNameHintText}>tap to edit</Text>
+            </View>
+          )}
+        </TouchableOpacity>
         {user && (
           <View style={styles.roleBadge}>
             <MaterialCommunityIcons name={user.role === "tailor" ? "scissors-cutting" : "human-female"} size={14} color={Colors.brand.goldLight} />
@@ -1969,45 +1976,65 @@ export default function ProfileScreen() {
         </View>
       )}
 
-      {(!user || activeTab === "account") && (
+      {/* ── Create Profile (no user yet) ── */}
+      {!user && (
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 120 + bottomPad }}>
-          {(editing || !user) && (
-            <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.section, { paddingTop: 24 }]}>
-              <Text style={[styles.sectionTitle, { color: theme.text }]}>{user ? "Edit Profile" : "Create Profile"}</Text>
-              <View style={styles.formField}>
-                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
-                <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="Enter your full name" placeholderTextColor={theme.textMuted} autoCapitalize="words" testID="name-input" />
-              </View>
-              <View style={styles.formField}>
-                <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
-                <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={phone} onChangeText={setPhone} placeholder="+91 98765 43210" placeholderTextColor={theme.textMuted} keyboardType="phone-pad" testID="phone-input" />
-              </View>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 8 }]}>I am a…</Text>
-              <View style={styles.roleCards}>
-                {ROLES.map((r) => (
-                  <TouchableOpacity key={r.value} style={[styles.roleCard, { backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card, borderColor: role === r.value ? Colors.brand.primary : theme.border, borderWidth: role === r.value ? 2 : 1 }]} onPress={() => { setRole(r.value); Haptics.selectionAsync(); }} testID={`role-${r.value}`}>
-                    <MaterialCommunityIcons name={r.icon as any} size={24} color={role === r.value ? Colors.brand.primary : theme.textSecondary} />
-                    <View style={styles.roleCardText}>
-                      <Text style={[styles.roleCardTitle, { color: role === r.value ? Colors.brand.primary : theme.text }]}>{r.label}</Text>
-                      <Text style={[styles.roleCardDesc, { color: theme.textMuted }]}>{r.desc}</Text>
-                    </View>
-                    {role === r.value && <Feather name="check-circle" size={20} color={Colors.brand.primary} />}
-                  </TouchableOpacity>
-                ))}
-              </View>
-              <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]} onPress={handleSave} testID="save-profile-button">
-                <Feather name="check" size={20} color="#fff" />
-                <Text style={styles.primaryBtnText}>{user ? "Update Profile" : "Create Profile"}</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-          {user && !editing && (
-            <Animated.View entering={FadeInDown.delay(200).springify()} style={styles.section}>
-              <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Animated.View entering={FadeInDown.delay(200).springify()} style={[styles.section, { paddingTop: 24 }]}>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>Create Profile</Text>
+            <View style={styles.formField}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
+              <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="Enter your full name" placeholderTextColor={theme.textMuted} autoCapitalize="words" testID="name-input" />
+            </View>
+            <View style={styles.formField}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
+              <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={phone} onChangeText={setPhone} placeholder="+91 98765 43210" placeholderTextColor={theme.textMuted} keyboardType="phone-pad" testID="phone-input" />
+            </View>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 8 }]}>I am a…</Text>
+            <View style={styles.roleCards}>
+              {ROLES.map((r) => (
+                <TouchableOpacity key={r.value} style={[styles.roleCard, { backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card, borderColor: role === r.value ? Colors.brand.primary : theme.border, borderWidth: role === r.value ? 2 : 1 }]} onPress={() => { setRole(r.value); Haptics.selectionAsync(); }} testID={`role-${r.value}`}>
+                  <MaterialCommunityIcons name={r.icon as any} size={24} color={role === r.value ? Colors.brand.primary : theme.textSecondary} />
+                  <View style={styles.roleCardText}>
+                    <Text style={[styles.roleCardTitle, { color: role === r.value ? Colors.brand.primary : theme.text }]}>{r.label}</Text>
+                    <Text style={[styles.roleCardDesc, { color: theme.textMuted }]}>{r.desc}</Text>
+                  </View>
+                  {role === r.value && <Feather name="check-circle" size={20} color={Colors.brand.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]} onPress={handleSave} testID="save-profile-button">
+              <Feather name="check" size={20} color="#fff" />
+              <Text style={styles.primaryBtnText}>Create Profile</Text>
+            </TouchableOpacity>
+          </Animated.View>
+        </ScrollView>
+      )}
+
+      {/* ── Edit Profile Modal ── */}
+      <Modal
+        visible={showAccountModal}
+        animationType="slide"
+        presentationStyle="formSheet"
+        onRequestClose={() => setShowAccountModal(false)}
+      >
+        <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+          {/* Modal header */}
+          <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+            <TouchableOpacity onPress={() => setShowAccountModal(false)} style={styles.modalCloseBtn}>
+              <Feather name="x" size={20} color={theme.text} />
+            </TouchableOpacity>
+            <Text style={[styles.modalTitle, { color: theme.text }]}>My Profile</Text>
+            <View style={{ width: 36 }} />
+          </View>
+
+          <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.modalContent}>
+            {/* Info card */}
+            {user && (
+              <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border, marginBottom: 8 }]}>
                 {[
                   { icon: "user", label: "Name", value: user.name },
                   ...(user.phone ? [{ icon: "phone", label: "Phone", value: user.phone }] : []),
-                  { icon: "hash", label: "User ID", value: user.id.slice(0, 20) + "…" },
+                  { icon: "hash", label: "User ID", value: user.id.slice(0, 18) + "…" },
                 ].map((row, i) => (
                   <View key={row.label} style={[styles.infoRow, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border, paddingTop: 12, marginTop: 4 }]}>
                     <Feather name={row.icon as any} size={16} color={Colors.brand.gold} />
@@ -2016,14 +2043,44 @@ export default function ProfileScreen() {
                   </View>
                 ))}
               </View>
-              <TouchableOpacity style={[styles.logoutBtn, { borderColor: Colors.brand.primary + "50" }]} onPress={handleLogout}>
-                <Feather name="log-out" size={16} color={Colors.brand.primary} />
-                <Text style={[styles.logoutText, { color: Colors.brand.primary }]}>Sign Out</Text>
-              </TouchableOpacity>
-            </Animated.View>
-          )}
-        </ScrollView>
-      )}
+            )}
+
+            <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 8 }]}>Edit Details</Text>
+
+            <View style={styles.formField}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
+              <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="Enter your full name" placeholderTextColor={theme.textMuted} autoCapitalize="words" />
+            </View>
+            <View style={styles.formField}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
+              <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={phone} onChangeText={setPhone} placeholder="+91 98765 43210" placeholderTextColor={theme.textMuted} keyboardType="phone-pad" />
+            </View>
+            <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 8 }]}>I am a…</Text>
+            <View style={styles.roleCards}>
+              {ROLES.map((r) => (
+                <TouchableOpacity key={r.value} style={[styles.roleCard, { backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card, borderColor: role === r.value ? Colors.brand.primary : theme.border, borderWidth: role === r.value ? 2 : 1 }]} onPress={() => { setRole(r.value); Haptics.selectionAsync(); }}>
+                  <MaterialCommunityIcons name={r.icon as any} size={24} color={role === r.value ? Colors.brand.primary : theme.textSecondary} />
+                  <View style={styles.roleCardText}>
+                    <Text style={[styles.roleCardTitle, { color: role === r.value ? Colors.brand.primary : theme.text }]}>{r.label}</Text>
+                    <Text style={[styles.roleCardDesc, { color: theme.textMuted }]}>{r.desc}</Text>
+                  </View>
+                  {role === r.value && <Feather name="check-circle" size={20} color={Colors.brand.primary} />}
+                </TouchableOpacity>
+              ))}
+            </View>
+
+            <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]} onPress={handleSave}>
+              <Feather name="check" size={20} color="#fff" />
+              <Text style={styles.primaryBtnText}>Update Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity style={[styles.logoutBtn, { borderColor: "#CC333350", marginTop: 4 }]} onPress={handleLogout}>
+              <Feather name="log-out" size={16} color="#CC3333" />
+              <Text style={[styles.logoutText, { color: "#CC3333" }]}>Sign Out</Text>
+            </TouchableOpacity>
+          </ScrollView>
+        </View>
+      </Modal>
 
       {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
@@ -2039,8 +2096,14 @@ const styles = StyleSheet.create({
   avatarRow: { position: "relative", marginBottom: 4 },
   avatarContainer: { width: 76, height: 76, borderRadius: 38, backgroundColor: "rgba(255,255,255,0.2)", alignItems: "center", justifyContent: "center", borderWidth: 2, borderColor: "rgba(255,255,255,0.4)" },
   avatarText: { fontFamily: "Inter_700Bold", fontSize: 26, color: "#fff" },
-  editBtn: { position: "absolute", bottom: 0, right: -4, width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.gold, alignItems: "center", justifyContent: "center" },
   headerName: { fontFamily: "Inter_700Bold", fontSize: 22, color: "#fff", textAlign: "center" },
+  editNameHint: { flexDirection: "row", alignItems: "center", gap: 4 },
+  editNameHintText: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.65)" },
+  modalContainer: { flex: 1 },
+  modalHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingVertical: 16, borderBottomWidth: 1 },
+  modalCloseBtn: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  modalTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },
+  modalContent: { padding: 20, gap: 14, paddingBottom: 60 },
   roleBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
   roleBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.brand.goldLight },
   statsRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 16, paddingVertical: 10, paddingHorizontal: 24, marginTop: 4 },
