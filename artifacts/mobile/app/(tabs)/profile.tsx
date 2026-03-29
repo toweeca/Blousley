@@ -23,6 +23,7 @@ import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
 import RotationViewer from "@/components/RotationViewer";
+import BlouseViewer3D from "@/components/BlouseViewer3D";
 import {
   HighBustDiagram, BustDiagram, UnderBustDiagram, BustPointDiagram,
   ShoulderWidthDiagram, BlouseLengthDiagram, SleeveLengthDiagram,
@@ -199,6 +200,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [initialized, setInitialized] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
+  const [aiPreviewBackUri, setAiPreviewBackUri] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (prefs && !initialized) {
@@ -243,17 +245,27 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     }
     setAiGenerating(true);
     setAiPreviewUri(null);
+    setAiPreviewBackUri(null);
     try {
-      const r = await fetch(`${domain}/api/generate-blouse-image/style`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ neck, sleeve, back, fabric }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      const data = await r.json();
-      if (data.b64_json) setAiPreviewUri(`data:image/png;base64,${data.b64_json}`);
+      const payload = { neck, sleeve, back, fabric };
+      const [frontRes, backRes] = await Promise.all([
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, view: "front" }),
+        }),
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, view: "back" }),
+        }),
+      ]);
+      if (!frontRes.ok || !backRes.ok) throw new Error("Failed");
+      const [frontData, backData] = await Promise.all([frontRes.json(), backRes.json()]);
+      if (frontData.b64_json) setAiPreviewUri(`data:image/png;base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiPreviewBackUri(`data:image/png;base64,${backData.b64_json}`);
     } catch {
-      Alert.alert("Generation failed", "Could not generate image. Please try again.");
+      Alert.alert("Generation failed", "Could not generate 3D preview. Please try again.");
     } finally {
       setAiGenerating(false);
     }
@@ -350,24 +362,22 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
               <View style={styles.aiPreviewPlaceholder}>
                 <ActivityIndicator color={Colors.brand.gold} size="large" />
                 <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                  Creating your blouse design…{"\n"}This takes about 10–15 seconds
+                  Creating your 3D blouse preview…{"\n"}Generating front &amp; back views
                 </Text>
               </View>
-            ) : aiPreviewUri ? (
+            ) : aiPreviewUri && aiPreviewBackUri ? (
               <>
-                <RotationViewer
-                  images={[{ uri: aiPreviewUri }]}
+                <BlouseViewer3D
+                  frontUri={aiPreviewUri}
+                  backUri={aiPreviewBackUri}
                   width={SCREEN_WIDTH - 48}
                   height={SCREEN_WIDTH - 48}
-                  angleLabels={["AI Generated Preview"]}
-                  borderRadius={0}
-                  showControls={false}
                 />
                 <View style={styles.aiPreviewFooter}>
                   <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                    ✦ AI-generated preview · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
+                    ✦ 3D preview · drag to spin · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
                   </Text>
-                  <TouchableOpacity onPress={() => { setAiPreviewUri(null); }}>
+                  <TouchableOpacity onPress={() => { setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
                     <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
                   </TouchableOpacity>
                 </View>
@@ -530,6 +540,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [sketchBackground, setSketchBackground] = useState<string | null>(null);
   const [aiSketchGenerating, setAiSketchGenerating] = useState(false);
   const [aiSketchImageUri, setAiSketchImageUri] = useState<string | null>(null);
+  const [aiSketchBackUri, setAiSketchBackUri] = useState<string | null>(null);
 
   const generateAIFromSketch = async () => {
     if (sketchPaths.length === 0) {
@@ -539,21 +550,31 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     const colors = [...new Set(sketchPaths.map((p) => p.color))];
     setAiSketchGenerating(true);
     setAiSketchImageUri(null);
+    setAiSketchBackUri(null);
     try {
-      const r = await fetch(`${domain}/api/generate-blouse-image/sketch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: `a blouse design sketch with ${sketchPaths.length} strokes`,
-          colors,
-          strokes: sketchPaths.length,
+      const payload = {
+        description: `a blouse design sketch with ${sketchPaths.length} strokes`,
+        colors,
+        strokes: sketchPaths.length,
+      };
+      const [frontRes, backRes] = await Promise.all([
+        fetch(`${domain}/api/generate-blouse-image/sketch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, view: "front" }),
         }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      const data = await r.json();
-      if (data.b64_json) setAiSketchImageUri(`data:image/png;base64,${data.b64_json}`);
+        fetch(`${domain}/api/generate-blouse-image/sketch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, view: "back" }),
+        }),
+      ]);
+      if (!frontRes.ok || !backRes.ok) throw new Error("Failed");
+      const [frontData, backData] = await Promise.all([frontRes.json(), backRes.json()]);
+      if (frontData.b64_json) setAiSketchImageUri(`data:image/png;base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiSketchBackUri(`data:image/png;base64,${backData.b64_json}`);
     } catch {
-      Alert.alert("Generation failed", "Could not generate image. Please try again.");
+      Alert.alert("Generation failed", "Could not generate 3D preview. Please try again.");
     } finally {
       setAiSketchGenerating(false);
     }
@@ -821,24 +842,22 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                   <View style={styles.aiPreviewPlaceholder}>
                     <ActivityIndicator color={Colors.brand.gold} size="large" />
                     <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                      Transforming your sketch into a blouse design…{"\n"}This takes about 10–15 seconds
+                      Creating your 3D sketch design…{"\n"}Generating front &amp; back views
                     </Text>
                   </View>
-                ) : aiSketchImageUri ? (
+                ) : aiSketchImageUri && aiSketchBackUri ? (
                   <>
-                    <RotationViewer
-                      images={[{ uri: aiSketchImageUri }]}
+                    <BlouseViewer3D
+                      frontUri={aiSketchImageUri}
+                      backUri={aiSketchBackUri}
                       width={SCREEN_WIDTH - 48}
                       height={SCREEN_WIDTH - 48}
-                      angleLabels={["AI Sketch Preview"]}
-                      borderRadius={0}
-                      showControls={false}
                     />
                     <View style={styles.aiPreviewFooter}>
                       <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                        ✦ AI-generated from your {sketchPaths.length} stroke sketch
+                        ✦ 3D preview · drag to spin · from your {sketchPaths.length} stroke sketch
                       </Text>
-                      <TouchableOpacity onPress={() => setAiSketchImageUri(null)}>
+                      <TouchableOpacity onPress={() => { setAiSketchImageUri(null); setAiSketchBackUri(null); }}>
                         <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
                       </TouchableOpacity>
                     </View>

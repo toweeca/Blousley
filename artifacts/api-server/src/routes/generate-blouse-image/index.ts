@@ -9,6 +9,7 @@ function buildStylePrompt(opts: {
   back?: string;
   fabric?: string;
   color?: string;
+  view?: "front" | "back";
 }): string {
   const parts: string[] = [];
   if (opts.neck) parts.push(`${opts.neck} neckline`);
@@ -21,17 +22,33 @@ function buildStylePrompt(opts: {
 
   const colorHint = opts.color ? `Primary colour: ${opts.color}.` : "";
 
-  return `A beautifully designed Indian saree blouse (choli) with ${styleDesc}. ${colorHint}
+  if (opts.view === "back") {
+    const backDesc = opts.back ? `${opts.back.toLowerCase()} back design` : "traditional hook-and-eye back closure";
+    return `BACK VIEW of an Indian saree blouse (choli) with ${styleDesc}. ${colorHint}
+Showing the complete back of the blouse: ${backDesc}, back neckline cut, hook/button placket, fabric texture.
+The blouse back is displayed flat on a neutral cream background. Elegant traditional Indian embroidery on the back.
+Studio quality fashion illustration. Clean white/cream background. No model, only the back of the garment.
+High detail, professional fashion photography style, warm golden lighting. Symmetrical and beautifully finished.`;
+  }
+
+  return `FRONT VIEW of a beautifully designed Indian saree blouse (choli) with ${styleDesc}. ${colorHint}
 The blouse is displayed flat on a neutral cream background. Elegant traditional Indian embroidery details.
 Studio quality fashion illustration. Clean white/cream background. No model, just the garment.
 High detail, professional fashion photography style, warm golden lighting.`;
 }
 
-function buildSketchPrompt(description: string, colors: string[]): string {
+function buildSketchPrompt(description: string, colors: string[], view?: "front" | "back"): string {
   const colorHint = colors.length > 0 ? `Main colors used: ${colors.join(", ")}.` : "";
-  return `A professional Indian saree blouse (choli) design inspired by a hand-drawn sketch.
+  if (view === "back") {
+    return `BACK VIEW of a professional Indian saree blouse (choli) design inspired by a hand-drawn sketch.
 The sketch concept: ${description}. ${colorHint}
-Transform this sketch into a finished fashion illustration of the blouse.
+Transform into a finished fashion illustration showing the BACK of the blouse: back neckline, hooks, back design details.
+Displayed flat on neutral background. Elegant Indian craftsmanship with embroidery on the back.
+Studio quality. Clean background. High detail, professional fashion illustration style.`;
+  }
+  return `FRONT VIEW of a professional Indian saree blouse (choli) design inspired by a hand-drawn sketch.
+The sketch concept: ${description}. ${colorHint}
+Transform this sketch into a finished fashion illustration of the blouse front.
 Displayed flat on neutral background. Elegant traditional Indian craftsmanship with embroidery details.
 Studio quality. Clean background. High detail, professional fashion illustration style.`;
 }
@@ -48,12 +65,13 @@ async function generateFast(prompt: string): Promise<string> {
 
 router.post("/style", async (req, res) => {
   try {
-    const { neck, sleeve, back, fabric, color } = req.body as {
+    const { neck, sleeve, back, fabric, color, view } = req.body as {
       neck?: string;
       sleeve?: string;
       back?: string;
       fabric?: string;
       color?: string;
+      view?: "front" | "back";
     };
 
     const hasSelections = neck || sleeve || back || fabric;
@@ -62,7 +80,7 @@ router.post("/style", async (req, res) => {
       return;
     }
 
-    const prompt = buildStylePrompt({ neck, sleeve, back, fabric, color });
+    const prompt = buildStylePrompt({ neck, sleeve, back, fabric, color, view });
     const b64 = await generateFast(prompt);
     res.json({ b64_json: b64 });
   } catch (err) {
@@ -73,14 +91,15 @@ router.post("/style", async (req, res) => {
 
 router.post("/sketch", async (req, res) => {
   try {
-    const { description, colors, strokes } = req.body as {
+    const { description, colors, strokes, view } = req.body as {
       description?: string;
       colors?: string[];
       strokes?: number;
+      view?: "front" | "back";
     };
 
     const desc = description || `a blouse sketch with ${strokes ?? "several"} strokes`;
-    const prompt = buildSketchPrompt(desc, colors ?? []);
+    const prompt = buildSketchPrompt(desc, colors ?? [], view);
     const b64 = await generateFast(prompt);
     res.json({ b64_json: b64 });
   } catch (err) {
