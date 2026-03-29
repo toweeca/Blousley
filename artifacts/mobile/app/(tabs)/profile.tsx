@@ -22,6 +22,12 @@ import {
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
+import RotationViewer from "@/components/RotationViewer";
+import {
+  HighBustDiagram, BustDiagram, UnderBustDiagram, BustPointDiagram,
+  ShoulderWidthDiagram, BlouseLengthDiagram, SleeveLengthDiagram,
+  SleeveRoundDiagram, ArmholeDiagram, NeckDiagram,
+} from "@/components/BlouseMeasurementDiagrams";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -349,7 +355,14 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
               </View>
             ) : aiPreviewUri ? (
               <>
-                <Image source={{ uri: aiPreviewUri }} style={styles.aiPreviewImage} resizeMode="cover" />
+                <RotationViewer
+                  images={[{ uri: aiPreviewUri }]}
+                  width={SCREEN_WIDTH - 48}
+                  height={SCREEN_WIDTH - 48}
+                  angleLabels={["AI Generated Preview"]}
+                  borderRadius={0}
+                  showControls={false}
+                />
                 <View style={styles.aiPreviewFooter}>
                   <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
                     ✦ AI-generated preview · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
@@ -813,7 +826,14 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                   </View>
                 ) : aiSketchImageUri ? (
                   <>
-                    <Image source={{ uri: aiSketchImageUri }} style={styles.aiPreviewImage} resizeMode="cover" />
+                    <RotationViewer
+                      images={[{ uri: aiSketchImageUri }]}
+                      width={SCREEN_WIDTH - 48}
+                      height={SCREEN_WIDTH - 48}
+                      angleLabels={["AI Sketch Preview"]}
+                      borderRadius={0}
+                      showControls={false}
+                    />
                     <View style={styles.aiPreviewFooter}>
                       <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
                         ✦ AI-generated from your {sketchPaths.length} stroke sketch
@@ -1193,6 +1213,20 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [editing, setEditing] = useState(false);
   const [unit, setUnit] = useState<"cm" | "in">("cm");
   const [guideOpen, setGuideOpen] = useState(false);
+  const [diagramIdx, setDiagramIdx] = useState(0);
+
+  const MEASURE_DIAGRAMS = [
+    { label: "High Bust", Component: HighBustDiagram },
+    { label: "Bust", Component: BustDiagram },
+    { label: "Under Bust", Component: UnderBustDiagram },
+    { label: "Bust Point", Component: BustPointDiagram },
+    { label: "Shoulder Width", Component: ShoulderWidthDiagram },
+    { label: "Blouse Length", Component: BlouseLengthDiagram },
+    { label: "Sleeve Length", Component: SleeveLengthDiagram },
+    { label: "Sleeve Round", Component: SleeveRoundDiagram },
+    { label: "Armhole", Component: ArmholeDiagram },
+    { label: "Neck", Component: NeckDiagram },
+  ] as const;
   const [fields, setFields] = useState<Record<MeasureKey, string>>({
     aboveBust: "", bust: "", underBust: "",
     waist: "", hip: "",
@@ -1304,7 +1338,47 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
 
         {guideOpen && (
           <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <BodyDiagram theme={theme} />
+            {/* ── Measurement Diagram Carousel ── */}
+            {(() => {
+              const d = MEASURE_DIAGRAMS[diagramIdx];
+              const DiagramComp = d.Component;
+              return (
+                <View style={styles.diagCarousel}>
+                  <View style={styles.diagHeader}>
+                    <TouchableOpacity
+                      onPress={() => setDiagramIdx((i) => (i - 1 + MEASURE_DIAGRAMS.length) % MEASURE_DIAGRAMS.length)}
+                      style={[styles.diagNavBtn, { borderColor: Colors.brand.primary + "40" }]}
+                    >
+                      <Feather name="chevron-left" size={18} color={Colors.brand.primary} />
+                    </TouchableOpacity>
+                    <View style={{ flex: 1, alignItems: "center" }}>
+                      <Text style={[styles.diagTitle, { color: theme.text }]}>{d.label}</Text>
+                      <Text style={[styles.diagCounter, { color: theme.textMuted }]}>
+                        {diagramIdx + 1} of {MEASURE_DIAGRAMS.length}
+                      </Text>
+                    </View>
+                    <TouchableOpacity
+                      onPress={() => setDiagramIdx((i) => (i + 1) % MEASURE_DIAGRAMS.length)}
+                      style={[styles.diagNavBtn, { borderColor: Colors.brand.primary + "40" }]}
+                    >
+                      <Feather name="chevron-right" size={18} color={Colors.brand.primary} />
+                    </TouchableOpacity>
+                  </View>
+                  <DiagramComp />
+                  <View style={styles.diagDots}>
+                    {MEASURE_DIAGRAMS.map((_, i) => (
+                      <TouchableOpacity key={i} onPress={() => setDiagramIdx(i)}>
+                        <View style={[
+                          styles.diagDot,
+                          { backgroundColor: i === diagramIdx ? Colors.brand.primary : Colors.brand.primary + "30",
+                            width: i === diagramIdx ? 16 : 6 }
+                        ]} />
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              );
+            })()}
             <View style={[styles.guideTipBox, { backgroundColor: Colors.brand.primary + "08", borderColor: Colors.brand.primary + "25" }]}>
               <Text style={[styles.guideTipTitle, { color: Colors.brand.primary }]}>📏 Tips for accuracy</Text>
               <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Keep the tape level and snug — not tight.</Text>
@@ -2196,6 +2270,13 @@ const styles = StyleSheet.create({
   guideTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
   guideSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
   guideBody: { padding: 16, borderRadius: 16, borderWidth: 1, marginTop: 8, gap: 16, alignItems: "stretch" },
+  diagCarousel: { gap: 12, alignItems: "center" },
+  diagHeader: { flexDirection: "row", alignItems: "center", width: "100%", paddingHorizontal: 4 },
+  diagNavBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
+  diagTitle: { fontFamily: "Inter_700Bold", fontSize: 15, textAlign: "center" },
+  diagCounter: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center", marginTop: 2 },
+  diagDots: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 4 },
+  diagDot: { height: 6, borderRadius: 3 },
   guideTipBox: { width: "100%", padding: 14, borderRadius: 12, borderWidth: 1, gap: 6 },
   guideTipTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 4 },
   guideTipText: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18 },
