@@ -7,8 +7,30 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
 import { Platform, StyleSheet, View, useColorScheme } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
+import { useApp } from "@/context/AppContext";
+
+function useTotalUnread() {
+  const { user } = useApp();
+  const apiBase = (() => {
+    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    return d.startsWith("http") ? d : `https://${d}`;
+  })();
+  const { data } = useQuery<{ unreadCount: number }[]>({
+    queryKey: ["chat-conversations-badge", user?.id],
+    queryFn: async () => {
+      if (!user?.id) return [];
+      const r = await fetch(`${apiBase}/api/chat/conversations?userId=${user.id}`);
+      return r.json();
+    },
+    refetchInterval: 15000,
+    enabled: !!user?.id,
+    select: (data) => data,
+  });
+  return (data ?? []).reduce((s, c) => s + (c.unreadCount ?? 0), 0);
+}
 
 function NativeTabLayout() {
   return (
@@ -25,6 +47,10 @@ function NativeTabLayout() {
         <Icon sf={{ default: "scissors", selected: "scissors.fill" }} />
         <Label>Tailor</Label>
       </NativeTabs.Trigger>
+      <NativeTabs.Trigger name="chat">
+        <Icon sf={{ default: "message", selected: "message.fill" }} />
+        <Label>Messages</Label>
+      </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
         <Icon sf={{ default: "person", selected: "person.fill" }} />
         <Label>Profile</Label>
@@ -39,6 +65,7 @@ function ClassicTabLayout() {
   const isIOS = Platform.OS === "ios";
   const isWeb = Platform.OS === "web";
   const insets = useSafeAreaInsets();
+  const unread = useTotalUnread();
 
   const activeColor = Colors.brand.gold;
   const inactiveColor = isDark ? Colors.dark.tabIconDefault : Colors.light.tabIconDefault;
@@ -108,6 +135,19 @@ function ClassicTabLayout() {
               <SymbolView name="scissors" tintColor={color} size={24} />
             ) : (
               <MaterialCommunityIcons name="scissors-cutting" size={22} color={color} />
+            ),
+        }}
+      />
+      <Tabs.Screen
+        name="chat"
+        options={{
+          title: "Messages",
+          tabBarBadge: unread > 0 ? unread : undefined,
+          tabBarIcon: ({ color }) =>
+            isIOS ? (
+              <SymbolView name="message" tintColor={color} size={24} />
+            ) : (
+              <Feather name="message-circle" size={22} color={color} />
             ),
         }}
       />

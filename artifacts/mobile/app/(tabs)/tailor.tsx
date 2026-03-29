@@ -20,6 +20,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
+import ChatThread from "@/components/ChatThread";
 
 interface BlouseFit {
   id: number;
@@ -35,10 +36,12 @@ interface BlouseFit {
 function CustomerCard({
   fit,
   onAddNote,
+  onMessage,
   delay,
 }: {
   fit: BlouseFit;
   onAddNote: (fit: BlouseFit) => void;
+  onMessage: (fit: BlouseFit) => void;
   delay: number;
 }) {
   const colorScheme = useColorScheme();
@@ -112,16 +115,26 @@ function CustomerCard({
           </View>
         ) : null}
 
-        <TouchableOpacity
-          style={[styles.addNoteBtn, { borderColor: Colors.brand.primary + "50" }]}
-          onPress={() => onAddNote(fit)}
-          testID={`add-note-${fit.id}`}
-        >
-          <Feather name="edit-2" size={15} color={Colors.brand.primary} />
-          <Text style={[styles.addNoteText, { color: Colors.brand.primary }]}>
-            {fit.notes ? "Edit Note" : "Add Tailor Note"}
-          </Text>
-        </TouchableOpacity>
+        <View style={styles.cardActions}>
+          <TouchableOpacity
+            style={[styles.addNoteBtn, { borderColor: Colors.brand.primary + "50", flex: 1 }]}
+            onPress={() => onAddNote(fit)}
+            testID={`add-note-${fit.id}`}
+          >
+            <Feather name="edit-2" size={15} color={Colors.brand.primary} />
+            <Text style={[styles.addNoteText, { color: Colors.brand.primary }]}>
+              {fit.notes ? "Edit Note" : "Add Note"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.msgBtn, { backgroundColor: Colors.brand.primary }]}
+            onPress={() => onMessage(fit)}
+            testID={`message-customer-${fit.id}`}
+          >
+            <Feather name="message-circle" size={15} color="#fff" />
+            <Text style={styles.msgBtnText}>Message</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -150,6 +163,9 @@ export default function TailorScreen() {
   const [noteModalVisible, setNoteModalVisible] = useState(false);
   const [selectedFit, setSelectedFit] = useState<BlouseFit | null>(null);
   const [noteText, setNoteText] = useState("");
+  const [chatConvoId, setChatConvoId] = useState<number | null>(null);
+  const [chatPartnerName, setChatPartnerName] = useState("");
+  const [chatVisible, setChatVisible] = useState(false);
 
   const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["tailor-customers"],
@@ -192,6 +208,32 @@ export default function TailorScreen() {
     setNoteModalVisible(true);
   };
 
+  const apiBase = (() => {
+    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    return d.startsWith("http") ? d : `https://${d}`;
+  })();
+
+  const handleMessage = async (fit: BlouseFit) => {
+    if (!user?.id) return;
+    try {
+      const res = await fetch(`${apiBase}/api/chat/conversations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: fit.userId,
+          tailorId: user.id,
+          title: `Customer #${fit.userId.slice(-6)}`,
+        }),
+      });
+      const convo = await res.json();
+      setChatConvoId(convo.id);
+      setChatPartnerName(`Customer #${fit.userId.slice(-6)}`);
+      setChatVisible(true);
+    } catch {
+      Alert.alert("Error", "Could not open chat. Please try again.");
+    }
+  };
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
@@ -218,7 +260,12 @@ export default function TailorScreen() {
         data={fits ?? []}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item, index }) => (
-          <CustomerCard fit={item} onAddNote={handleAddNote} delay={index * 60} />
+          <CustomerCard
+            fit={item}
+            onAddNote={handleAddNote}
+            onMessage={handleMessage}
+            delay={index * 60}
+          />
         )}
         contentContainerStyle={[styles.list, { paddingBottom: 120 + bottomPad }]}
         scrollEnabled={!!(fits && fits.length > 0)}
@@ -248,6 +295,18 @@ export default function TailorScreen() {
           ) : null
         }
       />
+
+      {/* Chat Thread */}
+      {chatConvoId && user && (
+        <ChatThread
+          visible={chatVisible}
+          onClose={() => setChatVisible(false)}
+          conversationId={chatConvoId}
+          partnerName={chatPartnerName}
+          currentUserId={user.id}
+          apiBase={apiBase}
+        />
+      )}
 
       {/* Note Modal */}
       <Modal
@@ -463,6 +522,16 @@ const styles = StyleSheet.create({
     flex: 1,
     lineHeight: 20,
   },
+  cardActions: { flexDirection: "row", gap: 8, alignItems: "center" },
+  msgBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  msgBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13, color: "#fff" },
   addNoteBtn: {
     flexDirection: "row",
     alignItems: "center",

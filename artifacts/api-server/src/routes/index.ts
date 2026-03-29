@@ -6,6 +6,7 @@ import preferencesRouter from "./preferences";
 import ideasRouter from "./ideas";
 import measurementsRouter from "./measurements";
 import generateBlouseImageRouter from "./generate-blouse-image";
+import chatRouter from "./chat";
 
 const router: IRouter = Router();
 
@@ -16,5 +17,6 @@ router.use("/preferences", preferencesRouter);
 router.use("/ideas", ideasRouter);
 router.use("/measurements", measurementsRouter);
 router.use("/generate-blouse-image", generateBlouseImageRouter);
+router.use("/chat", chatRouter);
 
 export default router;

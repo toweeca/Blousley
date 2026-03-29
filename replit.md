@@ -91,6 +91,27 @@ Generated Zod schemas from the OpenAPI spec (e.g. `HealthCheckResponse`). Used b
 
 Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHealthCheck`, `healthCheck`).
 
+## Mobile App Features (`artifacts/mobile`)
+
+### Chat System
+- `app/(tabs)/chat.tsx` — Messages tab: lists all conversations for the current user, shows unread badge on tab icon, polls every 10s
+- `components/ChatThread.tsx` — Full-screen chat modal with bubble UI, date grouping, 5s polling, read receipts, animated send button
+- Tailors: "Message" button on each CustomerCard in the Tailor tab → creates/opens a conversation
+- Customers: see all conversations in the Messages tab; reply to tailor-initiated threads
+- API: `GET/POST /api/chat/conversations`, `GET/POST /api/chat/messages`, `PATCH /api/chat/messages/read`
+
+### 360° / Multi-Angle Rotation Viewer
+- `components/RotationViewer.tsx` — Drag-to-rotate image viewer using PanResponder
+- Accepts an array of images (any ImageSourcePropType/uri); drag left/right to rotate through frames
+- Auto-rotate mode (play/pause), prev/next controls, frame counter, angle labels, dot indicators
+- Momentum physics on release; shows "Drag to rotate" hint until first interaction
+- Integrated on home screen carousel (3 blouse styles as drag-to-rotate angles)
+- Single-image fallback: shows "Single angle" badge
+
+### DB Schema
+- `conversations`: id, title, customerId, tailorId, lastMessageAt, createdAt
+- `messages`: id, conversationId, senderId, role, content, isRead, createdAt
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.
