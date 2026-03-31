@@ -104,6 +104,12 @@ function BlouseCarousel() {
         }}
         snapToInterval={SCREEN_WIDTH - 48 + 12}
         decelerationRate="fast"
+        getItemLayout={(_, index) => ({
+          length: SCREEN_WIDTH - 48,
+          offset: index * (SCREEN_WIDTH - 48 + 12),
+          index,
+        })}
+        onScrollToIndexFailed={() => {}}
         contentContainerStyle={{ gap: 12 }}
         renderItem={({ item }) => (
           <View style={styles.carouselCard}>
