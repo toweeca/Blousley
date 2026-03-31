@@ -22,6 +22,7 @@ import {
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
+import BlouseBeginnerPattern from "@/components/BlouseBeginnerPattern";
 import RotationViewer from "@/components/RotationViewer";
 import BlouseViewer3D from "@/components/BlouseViewer3D";
 import {
@@ -1644,7 +1645,10 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [patternSvg, setPatternSvg] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [showTechnicalPattern, setShowTechnicalPattern] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [aiDesignUri, setAiDesignUri] = useState<string | null>(null);
+  const [aiDesignBackUri, setAiDesignBackUri] = useState<string | null>(null);
 
   const { data: savedDesign } = useQuery({
     queryKey: ["blouse-design", user.id],
@@ -1686,28 +1690,49 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const generate = async () => {
     if (!validateMeasures()) return;
     setGenerating(true);
+    setAiDesignUri(null);
+    setAiDesignBackUri(null);
     setStep(2);
     try {
-      const resp = await fetch(`${API_BASE}/api/blouse/design`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          measurements: {
-            bust: +bust, underBust: +underBust,
-            bustPointSpacing: +bustPt || (unit === "cm" ? 18 : 7),
-            blouseLength: +blouseLen,
-            sleeveLength: +sleeveLen || 0,
-            unit,
-          },
-          styles: { neckline, sleeve, back, fabricColor },
+      const stylePayload = { neck: neckline, sleeve, back, color: fabricColor };
+      const [designResp, frontResp, backResp] = await Promise.all([
+        fetch(`${API_BASE}/api/blouse/design`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            measurements: {
+              bust: +bust, underBust: +underBust,
+              bustPointSpacing: +bustPt || (unit === "cm" ? 18 : 7),
+              blouseLength: +blouseLen,
+              sleeveLength: +sleeveLen || 0,
+              unit,
+            },
+            styles: { neckline, sleeve, back, fabricColor },
+          }),
         }),
-      });
-      if (!resp.ok) throw new Error("API error");
-      const data = await resp.json();
-      setAiIdeas(data.aiIdeas);
-      setPatternSvg(data.patternSvg);
-      setInstructions(data.instructions);
+        fetch(`${API_BASE}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...stylePayload, view: "front" }),
+        }),
+        fetch(`${API_BASE}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...stylePayload, view: "back" }),
+        }),
+      ]);
+      if (!designResp.ok) throw new Error("API error");
+      const [designData, frontData, backData] = await Promise.all([
+        designResp.json(),
+        frontResp.ok ? frontResp.json() : Promise.resolve({}),
+        backResp.ok ? backResp.json() : Promise.resolve({}),
+      ]);
+      setAiIdeas(designData.aiIdeas);
+      setPatternSvg(designData.patternSvg);
+      setInstructions(designData.instructions);
+      if (frontData.b64_json) setAiDesignUri(`data:image/png;base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiDesignBackUri(`data:image/png;base64,${backData.b64_json}`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert("Error", "Could not generate design. Please try again.");
@@ -1845,58 +1870,116 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
           {generating && (
             <View style={{ alignItems: "center", gap: 14, padding: 32 }}>
               <ActivityIndicator size="large" color={Colors.brand.primary} />
-              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: theme.textSecondary, textAlign: "center" }}>
-                Calculating pattern pieces and generating AI ideas…
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: theme.text, textAlign: "center" }}>
+                Creating your blouse…
+              </Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, textAlign: "center" }}>
+                Generating 3D preview, pattern pieces &amp; AI styling ideas all at once
               </Text>
             </View>
           )}
 
           {!generating && aiIdeas && (
             <>
-              {/* AI Ideas */}
+              {/* ── 3D AI Preview ──────────────────────────────────── */}
+              {aiDesignUri && aiDesignBackUri ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✦ Your AI Blouse Preview</Text>
+                  <View style={{ backgroundColor: theme.card, borderColor: Colors.brand.gold + "50", borderWidth: 1, borderRadius: 18, overflow: "hidden" }}>
+                    <BlouseViewer3D
+                      frontUri={aiDesignUri}
+                      backUri={aiDesignBackUri}
+                      width={SCREEN_WIDTH - 40}
+                      height={SCREEN_WIDTH - 40}
+                    />
+                    <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border, gap: 4 }}>
+                      <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.gold, textAlign: "center" }}>
+                        ✦ Drag to rotate · Pinch to zoom · See front &amp; back
+                      </Text>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
+                        {neckline} neckline · {sleeve} sleeves · {back} back
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, padding: 20, alignItems: "center", gap: 8 }]}>
+                  <Text style={{ fontSize: 22 }}>✦</Text>
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: theme.textMuted, textAlign: "center" }}>
+                    3D preview could not be generated this time. Your pattern is ready below.
+                  </Text>
+                </View>
+              )}
+
+              {/* ── AI Design Ideas ────────────────────────────────── */}
               <View style={{ gap: 10 }}>
                 <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✨ AI Design Ideas</Text>
                 {aiIdeas.map((idea, i) => (
-                  <View key={i} style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1,
-                    borderRadius: 16, padding: 16, gap: 6 }]}>
+                  <View key={i} style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, padding: 16, gap: 6 }]}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.primary + "20",
-                        alignItems: "center", justifyContent: "center" }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.primary + "20", alignItems: "center", justifyContent: "center" }}>
                         <Text style={{ fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.brand.primary }}>{i + 1}</Text>
                       </View>
                       <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: theme.text, flex: 1 }}>{idea.title}</Text>
                     </View>
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, lineHeight: 19 }}>
-                      {idea.description}
-                    </Text>
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, lineHeight: 19 }}>{idea.description}</Text>
                   </View>
                 ))}
               </View>
 
-              {/* Sewing Pattern */}
+              {/* ── Beginner Pattern Guide ─────────────────────────── */}
               <View style={{ gap: 10 }}>
-                <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>📐 Sewing Pattern</Text>
-                <View style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator
-                    contentContainerStyle={{ padding: 12 }}>
-                    <BlousePatternDiagram
-                      bust={+bust || undefined}
-                      underBust={+underBust || undefined}
-                      blouseLength={+blouseLen || undefined}
-                      sleeveLength={+sleeveLen || undefined}
-                      unit={unit}
-                      width={1060}
-                    />
-                  </ScrollView>
-                  <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
-                      Scroll sideways to see all pieces · +1.5 cm seam allowance on all edges
-                    </Text>
-                  </View>
-                </View>
+                <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✂️ Pattern Guide</Text>
+                <BlouseBeginnerPattern
+                  bust={+bust || 86}
+                  underBust={+underBust || 72}
+                  blouseLength={+blouseLen || 15}
+                  sleeveLength={+sleeveLen || 0}
+                  neckline={neckline}
+                  sleeve={sleeve}
+                  back={back}
+                  unit={unit}
+                  theme={theme}
+                />
               </View>
 
-              {/* Sewing Instructions */}
+              {/* ── Technical Pattern (collapsible) ───────────────── */}
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={() => setShowTechnicalPattern(!showTechnicalPattern)}
+                >
+                  <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "15" }]}>
+                    <Feather name="grid" size={18} color={Colors.brand.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.guideTitle, { color: theme.text }]}>Technical Pattern (Advanced)</Text>
+                    <Text style={[styles.guideSub, { color: theme.textMuted }]}>Full-scale pattern pieces with exact dimensions</Text>
+                  </View>
+                  <Feather name={showTechnicalPattern ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+                {showTechnicalPattern && (
+                  <Animated.View entering={FadeInDown.springify()} style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ padding: 12 }}>
+                      <BlousePatternDiagram
+                        bust={+bust || undefined}
+                        underBust={+underBust || undefined}
+                        blouseLength={+blouseLen || undefined}
+                        sleeveLength={+sleeveLen || undefined}
+                        unit={unit}
+                        width={1060}
+                      />
+                    </ScrollView>
+                    <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
+                        Scroll sideways to see all pieces · +1.5 cm seam allowance on all edges
+                      </Text>
+                    </View>
+                  </Animated.View>
+                )}
+              </View>
+
+              {/* ── Sewing Instructions ────────────────────────────── */}
               {instructions && (
                 <View style={{ gap: 8 }}>
                   <TouchableOpacity
@@ -1922,7 +2005,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 </View>
               )}
 
-              {/* Action buttons */}
+              {/* ── Action buttons ─────────────────────────────────── */}
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
                   onPress={() => { setStep(1); Haptics.selectionAsync(); }}>
