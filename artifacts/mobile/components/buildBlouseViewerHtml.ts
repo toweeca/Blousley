@@ -174,16 +174,15 @@ camera.position.set(0, 0.06, 3.8);
 var renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
 renderer.setSize(W, H);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
-renderer.physicallyCorrectLights = true;
-renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.3;
+// NOTE: physicallyCorrectLights intentionally disabled — it requires lux-scale intensities
+// which would make our normalised lights invisible (black scene).
 
 // ── Lighting ──────────────────────────────────────────────────────────
-scene.add(new THREE.AmbientLight(0xfff8f0, 0.9));
-var kl = new THREE.DirectionalLight(0xffd090, 1.6); kl.position.set(2, 4, 5); scene.add(kl);
-var rl = new THREE.DirectionalLight(0x8B2252, 0.55); rl.position.set(-3, 0.5, -2.5); scene.add(rl);
-var fl = new THREE.DirectionalLight(0xffffff, 0.35); fl.position.set(0, -2, 3); scene.add(fl);
-var tl = new THREE.DirectionalLight(0xfff0d0, 0.5); tl.position.set(0, 5, 1); scene.add(tl);
+scene.add(new THREE.AmbientLight(0xfff8f0, 0.65));
+var kl = new THREE.DirectionalLight(0xffd090, 1.1); kl.position.set(2, 4, 5); scene.add(kl);
+var rl = new THREE.DirectionalLight(0x8B2252, 0.40); rl.position.set(-3, 0.5, -2.5); scene.add(rl);
+var fl = new THREE.DirectionalLight(0xffffff, 0.28); fl.position.set(0, -2, 3); scene.add(fl);
+var tl = new THREE.DirectionalLight(0xfff0d0, 0.45); tl.position.set(0, 5, 1); scene.add(tl);
 
 // ── Procedural normal maps ────────────────────────────────────────────
 var normalCache = {};
@@ -264,6 +263,18 @@ function buildMat(fab, hexColor, mapTex, isBack) {
     shader.uniforms.u_speed = { value: fab.waveSpeed };
     shader.uniforms.u_freq  = { value: fab.waveFreq };
     shader.uniforms.u_curve = { value: fab.curve * (isBack ? -1.0 : 1.0) };
+
+    // MUST declare uniforms in GLSL source — Three.js only passes values;
+    // the shader won't compile (→ black mesh) unless the declarations exist.
+    var decls = [
+      'uniform float u_time;',
+      'uniform float u_amp;',
+      'uniform float u_speed;',
+      'uniform float u_freq;',
+      'uniform float u_curve;'
+    ].join('\\n') + '\\n';
+    shader.vertexShader = decls + shader.vertexShader;
+
     shader.vertexShader = shader.vertexShader.replace(
       '#include <begin_vertex>',
       [

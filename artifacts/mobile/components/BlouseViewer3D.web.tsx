@@ -51,7 +51,6 @@ const BlouseViewer3D: React.FC<BlouseViewer3DProps> = ({
         src={blobUrl}
         style={{ width, height, border: "none", display: "block" } as React.CSSProperties}
         title="3D Blouse Preview"
-        sandbox="allow-scripts allow-same-origin"
       />
     </View>
   );
