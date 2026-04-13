@@ -1939,6 +1939,8 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                   sleeve={sleeve}
                   back={back}
                   unit={unit}
+                  fabricKey={fabric || "Silk"}
+                  fabricColor={fabricColor}
                   theme={theme}
                 />
               </View>

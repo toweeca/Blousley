@@ -27,6 +27,8 @@ interface Props {
   sleeve?: string;
   back?: string;
   unit: "cm" | "in";
+  fabricKey?: string;
+  fabricColor?: string;
   theme: {
     text: string; textSecondary: string; textMuted: string;
     card: string; border: string; background: string;
@@ -97,6 +99,205 @@ function DimLine({
   );
 }
 
+// ── Fabric SVG pattern ─────────────────────────────────────────────────────
+// Returns a <Defs> block with a pattern that looks like the chosen fabric.
+// The selected fabricColor becomes the base fill; texture lines are layered on top.
+function FabricPatternDef({ id, fabricKey = "silk", fabricColor = "#FAF5EE" }: {
+  id: string; fabricKey?: string; fabricColor?: string;
+}) {
+  const key = fabricKey.toLowerCase();
+  const col = fabricColor || "#FAF5EE";
+
+  // Silk — smooth 45° sheen diagonals
+  if (key === "silk") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="20" height="20" patternUnits="userSpaceOnUse">
+        <Rect width="20" height="20" fill={col} />
+        <Line x1="0" y1="20" x2="20" y2="0" stroke="rgba(255,255,255,0.38)" strokeWidth="2" />
+        <Line x1="-6" y1="20" x2="14" y2="0" stroke="rgba(255,255,255,0.14)" strokeWidth="0.8" />
+        <Line x1="6" y1="20" x2="26" y2="0" stroke="rgba(255,255,255,0.14)" strokeWidth="0.8" />
+        <Line x1="0" y1="20" x2="20" y2="0" stroke="rgba(0,0,0,0.07)" strokeWidth="0.4" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Georgette — cross-hatch crinkle, matte
+  if (key === "georgette") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="8" height="8" patternUnits="userSpaceOnUse">
+        <Rect width="8" height="8" fill={col} />
+        <Line x1="0" y1="0" x2="8" y2="8" stroke="rgba(255,255,255,0.18)" strokeWidth="0.6" />
+        <Line x1="8" y1="0" x2="0" y2="8" stroke="rgba(0,0,0,0.12)" strokeWidth="0.5" />
+        <Line x1="4" y1="0" x2="0" y2="4" stroke="rgba(255,255,255,0.09)" strokeWidth="0.4" />
+        <Line x1="8" y1="4" x2="4" y2="8" stroke="rgba(0,0,0,0.07)" strokeWidth="0.3" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Chiffon — very fine warp/weft grid, lighter opacity (transparent look)
+  if (key === "chiffon") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="6" height="6" patternUnits="userSpaceOnUse">
+        <Rect width="6" height="6" fill={col} opacity="0.55" />
+        <Line x1="0" y1="0" x2="0" y2="6" stroke="rgba(255,255,255,0.30)" strokeWidth="0.5" />
+        <Line x1="3" y1="0" x2="3" y2="6" stroke="rgba(255,255,255,0.15)" strokeWidth="0.3" />
+        <Line x1="0" y1="0" x2="6" y2="0" stroke="rgba(255,255,255,0.30)" strokeWidth="0.5" />
+        <Line x1="0" y1="3" x2="6" y2="3" stroke="rgba(255,255,255,0.15)" strokeWidth="0.3" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Cotton — plain-weave checkerboard, crisp & matte
+  if (key === "cotton") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+        <Rect width="10" height="10" fill={col} />
+        <Rect x="0" y="0" width="5" height="5" fill="rgba(0,0,0,0.04)" />
+        <Rect x="5" y="5" width="5" height="5" fill="rgba(0,0,0,0.04)" />
+        <Line x1="0" y1="0" x2="10" y2="0" stroke="rgba(0,0,0,0.10)" strokeWidth="0.6" />
+        <Line x1="0" y1="5" x2="10" y2="5" stroke="rgba(0,0,0,0.07)" strokeWidth="0.4" />
+        <Line x1="0" y1="0" x2="0" y2="10" stroke="rgba(0,0,0,0.10)" strokeWidth="0.6" />
+        <Line x1="5" y1="0" x2="5" y2="10" stroke="rgba(0,0,0,0.07)" strokeWidth="0.4" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Velvet — vertical nap stripes, rich depth
+  if (key === "velvet") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="4" height="20" patternUnits="userSpaceOnUse">
+        <Rect width="4" height="20" fill={col} />
+        <Line x1="0" y1="0" x2="0" y2="20" stroke="rgba(255,255,255,0.20)" strokeWidth="1.2" />
+        <Line x1="2" y1="0" x2="2" y2="20" stroke="rgba(0,0,0,0.12)" strokeWidth="0.6" />
+        <Line x1="0" y1="6" x2="4" y2="6" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+        <Line x1="0" y1="13" x2="4" y2="13" stroke="rgba(255,255,255,0.06)" strokeWidth="0.3" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Brocade — repeating diamond with gold thread highlights
+  if (key === "brocade") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="24" height="24" patternUnits="userSpaceOnUse">
+        <Rect width="24" height="24" fill={col} />
+        <Line x1="0" y1="0" x2="24" y2="24" stroke="rgba(201,169,110,0.30)" strokeWidth="0.7" />
+        <Line x1="24" y1="0" x2="0" y2="24" stroke="rgba(201,169,110,0.30)" strokeWidth="0.7" />
+        <Path d="M 12 2 L 22 12 L 12 22 L 2 12 Z" fill="none" stroke="rgba(201,169,110,0.55)" strokeWidth="1.1" />
+        <Circle cx="12" cy="12" r="1.8" fill="rgba(201,169,110,0.75)" />
+        <Circle cx="0" cy="0" r="1.2" fill="rgba(201,169,110,0.45)" />
+        <Circle cx="24" cy="0" r="1.2" fill="rgba(201,169,110,0.45)" />
+        <Circle cx="0" cy="24" r="1.2" fill="rgba(201,169,110,0.45)" />
+        <Circle cx="24" cy="24" r="1.2" fill="rgba(201,169,110,0.45)" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Net — large open mesh
+  if (key === "net") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="10" height="10" patternUnits="userSpaceOnUse">
+        <Rect width="10" height="10" fill="rgba(255,255,255,0.08)" />
+        <Line x1="0" y1="0" x2="10" y2="0" stroke={col} strokeWidth="1.6" />
+        <Line x1="0" y1="0" x2="0" y2="10" stroke={col} strokeWidth="1.6" />
+        <Line x1="10" y1="0" x2="10" y2="10" stroke={col} strokeWidth="1.6" />
+        <Line x1="0" y1="10" x2="10" y2="10" stroke={col} strokeWidth="1.6" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Linen — coarser irregular weave
+  if (key === "linen") return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
+        <Rect width="12" height="12" fill={col} />
+        <Line x1="0" y1="4" x2="12" y2="4" stroke="rgba(0,0,0,0.11)" strokeWidth="1.3" />
+        <Line x1="0" y1="8" x2="12" y2="8" stroke="rgba(0,0,0,0.07)" strokeWidth="0.6" />
+        <Line x1="4" y1="0" x2="4" y2="12" stroke="rgba(0,0,0,0.11)" strokeWidth="1.3" />
+        <Line x1="8" y1="0" x2="8" y2="12" stroke="rgba(0,0,0,0.07)" strokeWidth="0.6" />
+        <Rect x="4" y="4" width="4" height="4" fill="rgba(0,0,0,0.04)" />
+      </SvgPattern>
+    </Defs>
+  );
+
+  // Default — simple diagonal (any unknown fabric)
+  return (
+    <Defs>
+      <SvgPattern id={id} x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
+        <Rect width="16" height="16" fill={col} />
+        <Line x1="0" y1="16" x2="16" y2="0" stroke="rgba(255,255,255,0.25)" strokeWidth="1" />
+      </SvgPattern>
+    </Defs>
+  );
+}
+
+// ── Cutting layer setup banner ─────────────────────────────────────────────
+function CuttingLayerSetup({ fabricKey = "silk", fabricColor = "#FAF5EE", theme }: {
+  fabricKey?: string; fabricColor?: string; theme: Props["theme"];
+}) {
+  const isTransparent = ["chiffon", "net"].includes(fabricKey.toLowerCase());
+  const hasStripes = ["cotton", "linen"].includes(fabricKey.toLowerCase());
+  const isDirectional = ["velvet"].includes(fabricKey.toLowerCase());
+
+  return (
+    <View style={[cls.wrap, { backgroundColor: theme.card, borderColor: "#C9A96E44" }]}>
+      <Text style={[cls.heading, { color: theme.text }]}>🧵 Cutting Setup</Text>
+      <Text style={[cls.intro, { color: theme.textSecondary }]}>
+        Lay fabric in a single layer before cutting. This allows you to check the print direction, match stripes, and ensure accuracy.
+      </Text>
+
+      {/* Layer stack diagram */}
+      <View style={cls.stack}>
+        <View style={[cls.layer, { backgroundColor: fabricColor + "55", borderColor: fabricColor }]}>
+          <Text style={[cls.layerIcon]}>⬆️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[cls.layerTitle, { color: theme.text }]}>Main Fabric — Wrong side facing UP</Text>
+            <Text style={[cls.layerSub, { color: theme.textMuted }]}>The dull / inside face faces the ceiling. Pattern piece sits on top of this face.</Text>
+          </View>
+        </View>
+        <View style={cls.stackArrow}><Text style={{ color: theme.textMuted, fontSize: 11 }}>▼ beneath</Text></View>
+        <View style={[cls.layer, { backgroundColor: "#F5F0E855", borderColor: "#C8B99088" }]}>
+          <Text style={[cls.layerIcon]}>⬇️</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={[cls.layerTitle, { color: theme.text }]}>Lining — Right side facing DOWN</Text>
+            <Text style={[cls.layerSub, { color: theme.textMuted }]}>Place lining underneath if cutting both layers together. Smooth flat — no bubbles.</Text>
+          </View>
+        </View>
+      </View>
+
+      {/* Warning */}
+      <View style={cls.warning}>
+        <Text style={cls.warningIcon}>⚠️</Text>
+        <Text style={[cls.warningText, { color: "#7A3000" }]}>
+          Do NOT let fabric shift before marking. Pin or weight pattern pieces firmly at corners and centre before drawing cutting lines.
+        </Text>
+      </View>
+
+      {/* Fabric-specific notes */}
+      {isTransparent && (
+        <View style={cls.tip}>
+          <Text style={[cls.tipText, { color: theme.textSecondary }]}>
+            💡 <Text style={{ fontFamily: "Inter_600SemiBold" }}>{fabricKey}</Text> is sheer — cut on a flat light-coloured surface so the cutting lines are clearly visible through the fabric.
+          </Text>
+        </View>
+      )}
+      {hasStripes && (
+        <View style={cls.tip}>
+          <Text style={[cls.tipText, { color: theme.textSecondary }]}>
+            💡 Align stripes or checks along the grain arrow on each piece. Match stripe position at side seams and shoulder seams before pinning.
+          </Text>
+        </View>
+      )}
+      {isDirectional && (
+        <View style={cls.tip}>
+          <Text style={[cls.tipText, { color: theme.textSecondary }]}>
+            💡 <Text style={{ fontFamily: "Inter_600SemiBold" }}>Velvet</Text> has a nap direction — all pieces must be cut in the same direction (follow the grain arrow downward on every piece) or colour will look different on each panel.
+          </Text>
+        </View>
+      )}
+    </View>
+  );
+}
+
 // ── Piece Card wrapper ─────────────────────────────────────────────────────
 function PieceCard({
   title, cutQty, step, stepColor, stepLabel, children, svgH, theme, steps,
@@ -157,8 +358,9 @@ function PieceCard({
 }
 
 // ── Front Bodice ───────────────────────────────────────────────────────────
-function FrontBodicePiece({ bust, blouseLength, neckline = "Round", unit, theme }: {
-  bust: number; blouseLength: number; neckline?: string; unit: "cm" | "in"; theme: Props["theme"];
+function FrontBodicePiece({ bust, blouseLength, neckline = "Round", unit, fabricKey, fabricColor, theme }: {
+  bust: number; blouseLength: number; neckline?: string; unit: "cm" | "in";
+  fabricKey?: string; fabricColor?: string; theme: Props["theme"];
 }) {
   const seamAllowance = unit === "cm" ? 1.5 : 0.625;
   const pieceW_cm = bust / 4 + (unit === "cm" ? 2 : 0.75);
@@ -219,12 +421,7 @@ function FrontBodicePiece({ bust, blouseLength, neckline = "Round", unit, theme 
       svgH={svgH} theme={theme} steps={steps}
     >
       <Svg width={svgW} height={svgH}>
-        <Defs>
-          <SvgPattern id="fp" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
-            <Rect width="16" height="16" fill={FABRIC} />
-            <Line x1="0" y1="16" x2="16" y2="0" stroke="#E0CEB4" strokeWidth="0.8" opacity="0.5" />
-          </SvgPattern>
-        </Defs>
+        <FabricPatternDef id="fp" fabricKey={fabricKey} fabricColor={fabricColor} />
         {/* Fabric fill + seam area */}
         <Path d={cutPath} fill="url(#fp)" />
         <Path d={cutPath} fill={SEAM_ALPHA} />
@@ -259,8 +456,9 @@ function FrontBodicePiece({ bust, blouseLength, neckline = "Round", unit, theme 
 }
 
 // ── Back Bodice ────────────────────────────────────────────────────────────
-function BackBodicePiece({ bust, blouseLength, back = "Hook", unit, theme }: {
-  bust: number; blouseLength: number; back?: string; unit: "cm" | "in"; theme: Props["theme"];
+function BackBodicePiece({ bust, blouseLength, back = "Hook", unit, fabricKey, fabricColor, theme }: {
+  bust: number; blouseLength: number; back?: string; unit: "cm" | "in";
+  fabricKey?: string; fabricColor?: string; theme: Props["theme"];
 }) {
   const seamAllowance = unit === "cm" ? 1.5 : 0.625;
   const pieceW_cm = bust / 4 + (unit === "cm" ? 1.5 : 0.6);
@@ -309,12 +507,7 @@ function BackBodicePiece({ bust, blouseLength, back = "Hook", unit, theme }: {
       svgH={svgH} theme={theme} steps={steps}
     >
       <Svg width={svgW} height={svgH}>
-        <Defs>
-          <SvgPattern id="bp" x="0" y="0" width="16" height="16" patternUnits="userSpaceOnUse">
-            <Rect width="16" height="16" fill={FABRIC} />
-            <Line x1="0" y1="0" x2="16" y2="16" stroke="#E0CEB4" strokeWidth="0.8" opacity="0.5" />
-          </SvgPattern>
-        </Defs>
+        <FabricPatternDef id="bp" fabricKey={fabricKey} fabricColor={fabricColor} />
         <Path d={cutPath} fill="url(#bp)" />
         <Path d={cutPath} fill={SEAM_ALPHA} />
         <Path d={cutPath} fill="none" stroke={CUT} strokeWidth={2} strokeDasharray="9,5" />
@@ -353,8 +546,9 @@ function BackBodicePiece({ bust, blouseLength, back = "Hook", unit, theme }: {
 }
 
 // ── Sleeve Piece ───────────────────────────────────────────────────────────
-function SleevePiece({ bust, sleeveLength, sleeve = "Elbow Length", unit, theme }: {
-  bust: number; sleeveLength: number; sleeve?: string; unit: "cm" | "in"; theme: Props["theme"];
+function SleevePiece({ bust, sleeveLength, sleeve = "Elbow Length", unit, fabricKey, fabricColor, theme }: {
+  bust: number; sleeveLength: number; sleeve?: string; unit: "cm" | "in";
+  fabricKey?: string; fabricColor?: string; theme: Props["theme"];
 }) {
   const seamAllowance = unit === "cm" ? 1.5 : 0.625;
   const sleeveCapH_cm = unit === "cm" ? 6 : 2.4;
@@ -392,12 +586,7 @@ function SleevePiece({ bust, sleeveLength, sleeve = "Elbow Length", unit, theme 
       svgH={svgH} theme={theme} steps={steps}
     >
       <Svg width={svgW} height={svgH}>
-        <Defs>
-          <SvgPattern id="sp" x="0" y="0" width="12" height="12" patternUnits="userSpaceOnUse">
-            <Rect width="12" height="12" fill={FABRIC} />
-            <Line x1="0" y1="6" x2="12" y2="6" stroke="#E0CEB4" strokeWidth="0.7" opacity="0.4" />
-          </SvgPattern>
-        </Defs>
+        <FabricPatternDef id="sp" fabricKey={fabricKey} fabricColor={fabricColor} />
         <Path d={cutPath} fill="url(#sp)" />
         <Path d={cutPath} fill={SEAM_ALPHA} />
         <Path d={cutPath} fill="none" stroke={CUT} strokeWidth={2} strokeDasharray="9,5" />
@@ -459,8 +648,10 @@ function AssemblyGuide({ hasSleeve, back, theme }: { hasSleeve: boolean; back?: 
 }
 
 // ── Main Export ────────────────────────────────────────────────────────────
-export default function BlouseBeginnerPattern({ bust, underBust, blouseLength, sleeveLength, neckline, sleeve, back, unit, theme }: Props) {
+export default function BlouseBeginnerPattern({ bust, underBust, blouseLength, sleeveLength, neckline, sleeve, back, unit, fabricKey = "silk", fabricColor, theme }: Props) {
   const hasSleeve = sleeve !== "Sleeveless" && sleeveLength > 0;
+  const fk = fabricKey || "silk";
+  const fc = fabricColor || "#8B2252";
 
   return (
     <View style={{ gap: 14 }}>
@@ -468,7 +659,7 @@ export default function BlouseBeginnerPattern({ bust, underBust, blouseLength, s
       <View style={[lb.banner, { backgroundColor: theme.card, borderColor: theme.border }]}>
         <Text style={[lb.bannerTitle, { color: theme.text }]}>📐 Beginner Pattern Guide</Text>
         <Text style={[lb.bannerSub, { color: theme.textMuted }]}>
-          Each piece below shows exactly where to cut ✂️ and where to sew 📌. Seam allowance of {unit === "cm" ? "1.5 cm" : '⅝"'} is already included.
+          Each piece below shows exactly where to cut ✂️ and where to sew 📌. Seam allowance of {unit === "cm" ? "1.5 cm" : '⅝"'} is already included. Pattern pieces are shown in your selected fabric colour and texture.
         </Text>
         <View style={lb.row}>
           {[
@@ -485,9 +676,12 @@ export default function BlouseBeginnerPattern({ bust, underBust, blouseLength, s
         </View>
       </View>
 
-      <FrontBodicePiece bust={bust} blouseLength={blouseLength} neckline={neckline} unit={unit} theme={theme} />
-      <BackBodicePiece bust={bust} blouseLength={blouseLength} back={back} unit={unit} theme={theme} />
-      {hasSleeve && <SleevePiece bust={bust} sleeveLength={sleeveLength} sleeve={sleeve} unit={unit} theme={theme} />}
+      {/* Cutting setup — single layer, wrong side up, lining beneath */}
+      <CuttingLayerSetup fabricKey={fk} fabricColor={fc} theme={theme} />
+
+      <FrontBodicePiece bust={bust} blouseLength={blouseLength} neckline={neckline} unit={unit} fabricKey={fk} fabricColor={fc} theme={theme} />
+      <BackBodicePiece bust={bust} blouseLength={blouseLength} back={back} unit={unit} fabricKey={fk} fabricColor={fc} theme={theme} />
+      {hasSleeve && <SleevePiece bust={bust} sleeveLength={sleeveLength} sleeve={sleeve} unit={unit} fabricKey={fk} fabricColor={fc} theme={theme} />}
       <AssemblyGuide hasSleeve={hasSleeve} back={back} theme={theme} />
     </View>
   );
@@ -537,4 +731,27 @@ const lb = StyleSheet.create({
   chip: { flexDirection: "row", alignItems: "center", gap: 5 },
   chipDot: { width: 8, height: 8, borderRadius: 4 },
   chipLabel: { fontFamily: "Inter_400Regular", fontSize: 10 },
+});
+
+const cls = StyleSheet.create({
+  wrap: { borderRadius: 16, borderWidth: 1.5, padding: 16, gap: 12 },
+  heading: { fontFamily: "Inter_700Bold", fontSize: 15 },
+  intro: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18 },
+  stack: { gap: 0 },
+  layer: {
+    flexDirection: "row", alignItems: "flex-start", gap: 10,
+    borderWidth: 1.5, borderRadius: 10, padding: 10,
+  },
+  layerIcon: { fontSize: 20, marginTop: 1 },
+  layerTitle: { fontFamily: "Inter_700Bold", fontSize: 12, marginBottom: 2 },
+  layerSub: { fontFamily: "Inter_400Regular", fontSize: 11, lineHeight: 16 },
+  stackArrow: { alignItems: "center", paddingVertical: 4 },
+  warning: {
+    flexDirection: "row", alignItems: "flex-start", gap: 8,
+    backgroundColor: "#FFF3CD", borderRadius: 10, padding: 10,
+  },
+  warningIcon: { fontSize: 16, marginTop: 1 },
+  warningText: { fontFamily: "Inter_600SemiBold", fontSize: 12, lineHeight: 17, flex: 1 },
+  tip: { backgroundColor: "rgba(0,0,0,0.04)", borderRadius: 8, padding: 10 },
+  tipText: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 17 },
 });
