@@ -1636,6 +1636,8 @@ function DesignMeasureRow({ label, value, onChange, hint, unit, theme, accentCol
 
 function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
   const [step, setStep] = useState(0);
+  const [measEditing, setMeasEditing] = useState(true);
+  const [guideOpen, setGuideOpen] = useState(false);
   const [unit, setUnit] = useState<"cm" | "in">("cm");
   const [bust, setBust] = useState("");
   const [underBust, setUnderBust] = useState("");
@@ -1670,7 +1672,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       const m = savedDesign.measurements ?? {};
       const s = savedDesign.styles ?? {};
       if (m.unit) setUnit(m.unit);
-      if (m.bust) setBust(String(m.bust));
+      if (m.bust) { setBust(String(m.bust)); setMeasEditing(false); }
       if (m.underBust) setUnderBust(String(m.underBust));
       if (m.bustPointSpacing) setBustPt(String(m.bustPointSpacing));
       if (m.blouseLength) setBlouseLen(String(m.blouseLength));
@@ -1789,152 +1791,184 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       </View>
 
       {/* ── STEP 0: MEASUREMENTS ────────────────────────────────── */}
-      {step === 0 && (
-        <Animated.View entering={FadeInDown.springify()} style={{ gap: 14 }}>
+      {step === 0 && (() => {
+        const DM_FIELDS = [
+          { key: "bust",       icon: "A", label: "Bust",            color: "#8B2252", val: bust,       set: setBust,       hint: unit === "cm" ? "e.g. 86" : "e.g. 34",  desc: "Fullest part of bust, horizontal" },
+          { key: "underBust",  icon: "B", label: "Under Bust",      color: "#2471A3", val: underBust,  set: setUnderBust,  hint: unit === "cm" ? "e.g. 72" : "e.g. 28",  desc: "Just below the bust, breathe normally" },
+          { key: "bustPt",     icon: "C", label: "Bust Point–Pt",   color: "#E67E22", val: bustPt,     set: setBustPt,     hint: unit === "cm" ? "e.g. 18" : "e.g. 7",   desc: "Nipple to nipple, straight across" },
+          { key: "blouseLen",  icon: "D", label: "Blouse Length",   color: "#27AE60", val: blouseLen,  set: setBlouseLen,  hint: unit === "cm" ? "e.g. 15" : "e.g. 6",   desc: "Shoulder tip down to desired hem" },
+          { key: "sleeveLen",  icon: "E", label: "Sleeve Length",   color: "#8E44AD", val: sleeveLen,  set: setSleeveLen,  hint: unit === "cm" ? "e.g. 20" : "e.g. 8",   desc: "Shoulder tip to desired sleeve end (0 if sleeveless)" },
+        ];
+        return (
+          <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
 
-          {/* Header + unit toggle */}
-          <View style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
-              <Feather name="maximize-2" size={18} color={Colors.brand.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.guideTitle, { color: theme.text }]}>Measurements & How to Measure</Text>
-              <Text style={[styles.guideSub, { color: theme.textMuted }]}>Use a soft tape — snug but not tight</Text>
-            </View>
-            <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              {(["cm", "in"] as const).map((u) => (
-                <TouchableOpacity key={u} style={[styles.unitBtn, { backgroundColor: unit === u ? Colors.brand.primary : "transparent" }]}
-                  onPress={() => setUnit(u)}>
-                  <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>{u}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+            {/* ── How to Measure (collapsible) ── */}
+            <TouchableOpacity
+              style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => { setGuideOpen(!guideOpen); Haptics.selectionAsync(); }}
+            >
+              <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
+                <Feather name="info" size={18} color={Colors.brand.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.guideTitle, { color: theme.text }]}>How to Measure</Text>
+                <Text style={[styles.guideSub, { color: theme.textMuted }]}>Tap to {guideOpen ? "hide" : "view"} diagram & placement guide</Text>
+              </View>
+              <Feather name={guideOpen ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
 
-          {/* ── Visual Body Diagram ── */}
-          <View style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border,
-            flexDirection: "column", alignItems: "stretch", gap: 12, padding: 14 }]}>
-            <Text style={{ fontFamily: "Inter_700Bold", fontSize: 13, color: theme.text }}>
-              Where to Measure
-            </Text>
-            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
-              {/* Body SVG diagram */}
-              <Svg width={130} height={260} viewBox="0 0 130 260">
-                {/* ── Torso silhouette ── */}
-                {/* Head */}
-                <Circle cx={65} cy={22} r={16} fill="none" stroke={Colors.brand.primary} strokeWidth={1.5} />
-                {/* Neck */}
-                <Line x1={58} y1={37} x2={58} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
-                <Line x1={72} y1={37} x2={72} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
-                {/* Shoulder line */}
-                <Path d="M 58 48 Q 38 50 30 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                <Path d="M 72 48 Q 92 50 100 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                {/* Left arm stub */}
-                <Path d="M 30 62 L 14 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                {/* Right arm stub */}
-                <Path d="M 100 62 L 116 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                {/* Left side torso */}
-                <Path d="M 30 62 C 24 75 22 88 28 100 C 26 112 28 128 32 140 C 36 152 40 158 44 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                {/* Right side torso */}
-                <Path d="M 100 62 C 106 75 108 88 102 100 C 104 112 102 128 98 140 C 94 152 90 158 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                {/* Bottom hem */}
-                <Path d="M 44 162 Q 65 168 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+            {guideOpen && (
+              <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border, gap: 14 }]}>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+                  <Svg width={120} height={240} viewBox="0 0 130 260">
+                    <Circle cx={65} cy={22} r={16} fill="none" stroke={Colors.brand.primary} strokeWidth={1.5} />
+                    <Line x1={58} y1={37} x2={58} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
+                    <Line x1={72} y1={37} x2={72} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
+                    <Path d="M 58 48 Q 38 50 30 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Path d="M 72 48 Q 92 50 100 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Path d="M 30 62 L 14 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Path d="M 100 62 L 116 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Path d="M 30 62 C 24 75 22 88 28 100 C 26 112 28 128 32 140 C 36 152 40 158 44 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Path d="M 100 62 C 106 75 108 88 102 100 C 104 112 102 128 98 140 C 94 152 90 158 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Path d="M 44 162 Q 65 168 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                    <Line x1={24} y1={88} x2={106} y2={88} stroke="#8B2252" strokeWidth={1.5} strokeDasharray="4,2" />
+                    <Circle cx={44} cy={88} r={3} fill="#8B2252" />
+                    <Circle cx={86} cy={88} r={3} fill="#8B2252" />
+                    <SvgText x={112} y={92} fontSize={10} fill="#8B2252" fontWeight="bold">A</SvgText>
+                    <Line x1={24} y1={102} x2={106} y2={102} stroke="#2471A3" strokeWidth={1.5} strokeDasharray="4,2" />
+                    <SvgText x={112} y={106} fontSize={10} fill="#2471A3" fontWeight="bold">B</SvgText>
+                    <Line x1={44} y1={81} x2={86} y2={81} stroke="#E67E22" strokeWidth={1} strokeDasharray="2,2" />
+                    <Polygon points="44,81 49,78 49,84" fill="#E67E22" />
+                    <Polygon points="86,81 81,78 81,84" fill="#E67E22" />
+                    <SvgText x={55} y={78} fontSize={8} fill="#E67E22" fontWeight="bold">C</SvgText>
+                    <Line x1={10} y1={62} x2={10} y2={162} stroke="#27AE60" strokeWidth={1.5} />
+                    <Polygon points="10,62 7,68 13,68" fill="#27AE60" />
+                    <Polygon points="10,162 7,156 13,156" fill="#27AE60" />
+                    <SvgText x={2} y={115} fontSize={10} fill="#27AE60" fontWeight="bold">D</SvgText>
+                    <Line x1={100} y1={62} x2={120} y2={112} stroke="#8E44AD" strokeWidth={1.5} strokeDasharray="4,2" />
+                    <Polygon points="120,112 113,110 117,104" fill="#8E44AD" />
+                    <SvgText x={117} y={82} fontSize={10} fill="#8E44AD" fontWeight="bold">E</SvgText>
+                  </Svg>
+                  <View style={{ flex: 1, gap: 8 }}>
+                    {DM_FIELDS.map((f) => (
+                      <View key={f.key} style={{ flexDirection: "row", gap: 6, alignItems: "flex-start" }}>
+                        <View style={[styles.guideFieldDot, { backgroundColor: f.color + "20" }]}>
+                          <Text style={[styles.guideFieldDotText, { color: f.color, fontSize: 11, fontFamily: "Inter_700Bold" }]}>{f.icon}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: theme.text }}>{f.label}</Text>
+                          <Text style={{ fontFamily: "Inter_400Regular", fontSize: 10, color: theme.textMuted, lineHeight: 15 }}>{f.desc}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                </View>
+                <View style={[styles.guideTipBox, { backgroundColor: Colors.brand.primary + "08", borderColor: Colors.brand.primary + "25" }]}>
+                  <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Keep tape level and snug — not tight</Text>
+                  <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Wear a well-fitted bra, stand straight, arms relaxed</Text>
+                  <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Have someone help you for back measurements</Text>
+                </View>
+              </Animated.View>
+            )}
 
-                {/* ── A: Bust line ── */}
-                <Line x1={24} y1={88} x2={106} y2={88} stroke="#8B2252" strokeWidth={1.5} strokeDasharray="4,2" />
-                {/* Bust point dots */}
-                <Circle cx={44} cy={88} r={3} fill="#8B2252" />
-                <Circle cx={86} cy={88} r={3} fill="#8B2252" />
-                <SvgText x={112} y={92} fontSize={10} fill="#8B2252" fontWeight="bold">A</SvgText>
+            {/* ── VIEW MODE: Cube grid ── */}
+            {!measEditing && (
+              <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
+                <View style={styles.savedMeasureHeader}>
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>My Measurements</Text>
+                    <Text style={[styles.savedDate, { color: theme.textMuted }]}>Saved in {unit.toUpperCase()}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.editMeasureBtn, { borderColor: Colors.brand.primary + "50" }]}
+                    onPress={() => setMeasEditing(true)}
+                  >
+                    <Feather name="edit-2" size={14} color={Colors.brand.primary} />
+                    <Text style={[styles.editMeasureBtnText, { color: Colors.brand.primary }]}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
 
-                {/* ── B: Under bust line ── */}
-                <Line x1={24} y1={102} x2={106} y2={102} stroke="#2471A3" strokeWidth={1.5} strokeDasharray="4,2" />
-                <SvgText x={112} y={106} fontSize={10} fill="#2471A3" fontWeight="bold">B</SvgText>
-
-                {/* ── C: Bust point-to-point ── */}
-                <Line x1={44} y1={81} x2={86} y2={81} stroke="#E67E22" strokeWidth={1} strokeDasharray="2,2" />
-                <Polygon points="44,81 49,78 49,84" fill="#E67E22" />
-                <Polygon points="86,81 81,78 81,84" fill="#E67E22" />
-                <SvgText x={55} y={78} fontSize={8} fill="#E67E22" fontWeight="bold">C</SvgText>
-
-                {/* ── D: Blouse length ── */}
-                <Line x1={10} y1={62} x2={10} y2={162} stroke="#27AE60" strokeWidth={1.5} />
-                <Polygon points="10,62 7,68 13,68" fill="#27AE60" />
-                <Polygon points="10,162 7,156 13,156" fill="#27AE60" />
-                <SvgText x={2} y={115} fontSize={10} fill="#27AE60" fontWeight="bold">D</SvgText>
-
-                {/* ── E: Sleeve length ── */}
-                <Line x1={100} y1={62} x2={120} y2={112} stroke="#8E44AD" strokeWidth={1.5} strokeDasharray="4,2" />
-                <Polygon points="120,112 113,110 117,104" fill="#8E44AD" />
-                <SvgText x={117} y={82} fontSize={10} fill="#8E44AD" fontWeight="bold">E</SvgText>
-              </Svg>
-
-              {/* Legend column */}
-              <View style={{ flex: 1, gap: 10 }}>
-                {[
-                  { key: "A", color: "#8B2252", label: "Bust", tip: "Fullest part of your bust. Keep tape horizontal." },
-                  { key: "B", color: "#2471A3", label: "Under Bust", tip: "Just below the bust. Breathe normally." },
-                  { key: "C", color: "#E67E22", label: "Bust Point–Point", tip: "Nipple to nipple, straight across." },
-                  { key: "D", color: "#27AE60", label: "Blouse Length", tip: "Shoulder tip straight down to desired hem." },
-                  { key: "E", color: "#8E44AD", label: "Sleeve Length", tip: "Shoulder tip to desired sleeve end." },
-                ].map((item) => (
-                  <View key={item.key} style={{ flexDirection: "row", gap: 6, alignItems: "flex-start" }}>
-                    <View style={{ width: 20, height: 20, borderRadius: 10,
-                      backgroundColor: item.color + "20", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
-                      <Text style={{ fontFamily: "Inter_700Bold", fontSize: 10, color: item.color }}>{item.key}</Text>
+                <View style={[styles.measureGrid, { borderColor: theme.border }]}>
+                  {DM_FIELDS.map((f, i) => (
+                    <View
+                      key={f.key}
+                      style={[
+                        styles.measureCell,
+                        { borderColor: theme.border },
+                        i % 2 === 0 && i !== 4 ? { borderRightWidth: 1 } : {},
+                        i < 4 ? { borderBottomWidth: 1 } : {},
+                        i === 4 ? { width: "100%" } : {},
+                      ]}
+                    >
+                      <View style={[styles.measureCellDot, { backgroundColor: f.color + "20" }]}>
+                        <Text style={[styles.measureCellDotText, { color: f.color, fontFamily: "Inter_700Bold" }]}>{f.icon}</Text>
+                      </View>
+                      <Text style={[styles.measureCellLabel, { color: theme.textSecondary }]}>{f.label}</Text>
+                      <Text style={[styles.measureCellValue, { color: f.val ? theme.text : theme.textMuted }]}>
+                        {f.val ? `${Number(f.val).toFixed(1)} ${unit}` : "—"}
+                      </Text>
                     </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: theme.text }}>{item.label}</Text>
-                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, lineHeight: 16 }}>{item.tip}</Text>
-                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            )}
+
+            {/* ── EDIT MODE: Form inputs ── */}
+            {measEditing && (
+              <Animated.View entering={FadeInDown.springify()} style={{ gap: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>
+                    Enter measurements
+                  </Text>
+                  <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    {(["cm", "in"] as const).map((u) => (
+                      <TouchableOpacity key={u} style={[styles.unitBtn, { backgroundColor: unit === u ? Colors.brand.primary : "transparent" }]}
+                        onPress={() => setUnit(u)}>
+                        <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>{u}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {DM_FIELDS.map((f) => (
+                  <View key={f.key}>
+                    <DesignMeasureRow
+                      label={`${f.icon} — ${f.label}`}
+                      value={f.val}
+                      onChange={f.set}
+                      hint={f.hint}
+                      unit={unit}
+                      theme={theme}
+                      accentColor={f.color}
+                    />
+                    {errors[f.key] && <Text style={styles.errorText}>{errors[f.key]}</Text>}
                   </View>
                 ))}
-              </View>
-            </View>
 
-            {/* Tips row */}
-            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
-              {[
-                { icon: "check", text: "Stand straight, arms relaxed" },
-                { icon: "check", text: "Wear a well-fitted bra" },
-                { icon: "check", text: "Tape snug, not tight" },
-              ].map((t) => (
-                <View key={t.text} style={{ flexDirection: "row", alignItems: "center", gap: 4,
-                  backgroundColor: Colors.brand.primary + "10", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
-                  <Feather name="check" size={11} color={Colors.brand.primary} />
-                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textSecondary }}>{t.text}</Text>
-                </View>
-              ))}
-            </View>
-          </View>
+                {bust && underBust && blouseLen && (
+                  <TouchableOpacity
+                    style={[styles.logoutBtn, { borderColor: Colors.brand.primary + "50", flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" }]}
+                    onPress={() => { setMeasEditing(false); Haptics.selectionAsync(); }}
+                  >
+                    <Feather name="check" size={15} color={Colors.brand.primary} />
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.brand.primary }}>Done — show summary</Text>
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
+            )}
 
-          {/* ── Input Fields ── */}
-          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textMuted, marginTop: 4 }}>
-            Enter your measurements ({unit})
-          </Text>
+            {/* ── Next button ── */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
+              onPress={() => { if (validateMeasures()) { setMeasEditing(false); setStep(1); Haptics.selectionAsync(); } }}
+            >
+              <Text style={styles.primaryBtnText}>Next: Choose Styles</Text>
+              <Feather name="arrow-right" size={18} color="#fff" />
+            </TouchableOpacity>
 
-          {[
-            { lbl: "A — Bust (fullest point)", val: bust, set: setBust, hint: unit === "cm" ? "e.g. 86" : "e.g. 34", key: "bust", accent: "#8B2252" },
-            { lbl: "B — Under Bust (below bust)", val: underBust, set: setUnderBust, hint: unit === "cm" ? "e.g. 72" : "e.g. 28", key: "underBust", accent: "#2471A3" },
-            { lbl: "C — Bust Point-to-Point", val: bustPt, set: setBustPt, hint: unit === "cm" ? "e.g. 18" : "e.g. 7", key: "bustPt", accent: "#E67E22" },
-            { lbl: "D — Blouse Length", val: blouseLen, set: setBlouseLen, hint: unit === "cm" ? "e.g. 15" : "e.g. 6", key: "blouseLen", accent: "#27AE60" },
-            { lbl: "E — Sleeve Length (0 = sleeveless)", val: sleeveLen, set: setSleeveLen, hint: unit === "cm" ? "e.g. 20" : "e.g. 8", key: "sleeveLen", accent: "#8E44AD" },
-          ].map(({ lbl, val, set, hint, key, accent }) => (
-            <View key={key}>
-              <DesignMeasureRow label={lbl} value={val} onChange={set} hint={hint} unit={unit} theme={theme} accentColor={accent} />
-              {errors[key] && <Text style={styles.errorText}>{errors[key]}</Text>}
-            </View>
-          ))}
-
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
-            onPress={() => { if (validateMeasures()) { setStep(1); Haptics.selectionAsync(); } }}
-          >
-            <Text style={styles.primaryBtnText}>Next: Choose Styles</Text>
-            <Feather name="arrow-right" size={18} color="#fff" />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+          </Animated.View>
+        );
+      })()}
 
       {/* ── STEP 1: STYLES ──────────────────────────────────────── */}
       {step === 1 && (
