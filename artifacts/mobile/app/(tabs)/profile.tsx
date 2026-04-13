@@ -21,7 +21,7 @@ import {
   Modal,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
+import Svg, { Path, Circle, Ellipse, Line, Polygon, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
 import BlouseBeginnerPattern from "@/components/BlouseBeginnerPattern";
 import RotationViewer from "@/components/RotationViewer";
@@ -1610,22 +1610,26 @@ function ChipRow({ label, options, value, onSelect, color, theme }: {
   );
 }
 
-function DesignMeasureRow({ label, value, onChange, hint, unit, theme }: {
+function DesignMeasureRow({ label, value, onChange, hint, unit, theme, accentColor }: {
   label: string; value: string; onChange: (v: string) => void;
-  hint: string; unit: string; theme: typeof Colors.light;
+  hint: string; unit: string; theme: typeof Colors.light; accentColor?: string;
 }) {
+  const accent = accentColor ?? Colors.brand.primary;
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: theme.text }}>{label}</Text>
+        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.text }}>{label}</Text>
         <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted }}>{unit}</Text>
       </View>
-      <TextInput
-        style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 12,
-          paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text }}
-        value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={hint}
-        placeholderTextColor={theme.textMuted}
-      />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 0 }}>
+        <View style={{ width: 4, alignSelf: "stretch", borderRadius: 4, backgroundColor: accent, marginRight: 10 }} />
+        <TextInput
+          style={{ flex: 1, backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 12,
+            paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text }}
+          value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={hint}
+          placeholderTextColor={theme.textMuted}
+        />
+      </View>
     </View>
   );
 }
@@ -1786,14 +1790,16 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
 
       {/* ── STEP 0: MEASUREMENTS ────────────────────────────────── */}
       {step === 0 && (
-        <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
+        <Animated.View entering={FadeInDown.springify()} style={{ gap: 14 }}>
+
+          {/* Header + unit toggle */}
           <View style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}>
             <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
-              <Feather name="ruler" size={18} color={Colors.brand.primary} />
+              <Feather name="maximize-2" size={18} color={Colors.brand.primary} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={[styles.guideTitle, { color: theme.text }]}>Your Measurements</Text>
-              <Text style={[styles.guideSub, { color: theme.textMuted }]}>Measure snugly with a tape, not tight</Text>
+              <Text style={[styles.guideTitle, { color: theme.text }]}>Measurements & How to Measure</Text>
+              <Text style={[styles.guideSub, { color: theme.textMuted }]}>Use a soft tape — snug but not tight</Text>
             </View>
             <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
               {(["cm", "in"] as const).map((u) => (
@@ -1805,15 +1811,117 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
             </View>
           </View>
 
+          {/* ── Visual Body Diagram ── */}
+          <View style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border,
+            flexDirection: "column", alignItems: "stretch", gap: 12, padding: 14 }]}>
+            <Text style={{ fontFamily: "Inter_700Bold", fontSize: 13, color: theme.text }}>
+              Where to Measure
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+              {/* Body SVG diagram */}
+              <Svg width={130} height={260} viewBox="0 0 130 260">
+                {/* ── Torso silhouette ── */}
+                {/* Head */}
+                <Circle cx={65} cy={22} r={16} fill="none" stroke={Colors.brand.primary} strokeWidth={1.5} />
+                {/* Neck */}
+                <Line x1={58} y1={37} x2={58} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
+                <Line x1={72} y1={37} x2={72} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
+                {/* Shoulder line */}
+                <Path d="M 58 48 Q 38 50 30 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                <Path d="M 72 48 Q 92 50 100 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                {/* Left arm stub */}
+                <Path d="M 30 62 L 14 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                {/* Right arm stub */}
+                <Path d="M 100 62 L 116 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                {/* Left side torso */}
+                <Path d="M 30 62 C 24 75 22 88 28 100 C 26 112 28 128 32 140 C 36 152 40 158 44 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                {/* Right side torso */}
+                <Path d="M 100 62 C 106 75 108 88 102 100 C 104 112 102 128 98 140 C 94 152 90 158 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+                {/* Bottom hem */}
+                <Path d="M 44 162 Q 65 168 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
+
+                {/* ── A: Bust line ── */}
+                <Line x1={24} y1={88} x2={106} y2={88} stroke="#8B2252" strokeWidth={1.5} strokeDasharray="4,2" />
+                {/* Bust point dots */}
+                <Circle cx={44} cy={88} r={3} fill="#8B2252" />
+                <Circle cx={86} cy={88} r={3} fill="#8B2252" />
+                <SvgText x={112} y={92} fontSize={10} fill="#8B2252" fontWeight="bold">A</SvgText>
+
+                {/* ── B: Under bust line ── */}
+                <Line x1={24} y1={102} x2={106} y2={102} stroke="#2471A3" strokeWidth={1.5} strokeDasharray="4,2" />
+                <SvgText x={112} y={106} fontSize={10} fill="#2471A3" fontWeight="bold">B</SvgText>
+
+                {/* ── C: Bust point-to-point ── */}
+                <Line x1={44} y1={81} x2={86} y2={81} stroke="#E67E22" strokeWidth={1} strokeDasharray="2,2" />
+                <Polygon points="44,81 49,78 49,84" fill="#E67E22" />
+                <Polygon points="86,81 81,78 81,84" fill="#E67E22" />
+                <SvgText x={55} y={78} fontSize={8} fill="#E67E22" fontWeight="bold">C</SvgText>
+
+                {/* ── D: Blouse length ── */}
+                <Line x1={10} y1={62} x2={10} y2={162} stroke="#27AE60" strokeWidth={1.5} />
+                <Polygon points="10,62 7,68 13,68" fill="#27AE60" />
+                <Polygon points="10,162 7,156 13,156" fill="#27AE60" />
+                <SvgText x={2} y={115} fontSize={10} fill="#27AE60" fontWeight="bold">D</SvgText>
+
+                {/* ── E: Sleeve length ── */}
+                <Line x1={100} y1={62} x2={120} y2={112} stroke="#8E44AD" strokeWidth={1.5} strokeDasharray="4,2" />
+                <Polygon points="120,112 113,110 117,104" fill="#8E44AD" />
+                <SvgText x={117} y={82} fontSize={10} fill="#8E44AD" fontWeight="bold">E</SvgText>
+              </Svg>
+
+              {/* Legend column */}
+              <View style={{ flex: 1, gap: 10 }}>
+                {[
+                  { key: "A", color: "#8B2252", label: "Bust", tip: "Fullest part of your bust. Keep tape horizontal." },
+                  { key: "B", color: "#2471A3", label: "Under Bust", tip: "Just below the bust. Breathe normally." },
+                  { key: "C", color: "#E67E22", label: "Bust Point–Point", tip: "Nipple to nipple, straight across." },
+                  { key: "D", color: "#27AE60", label: "Blouse Length", tip: "Shoulder tip straight down to desired hem." },
+                  { key: "E", color: "#8E44AD", label: "Sleeve Length", tip: "Shoulder tip to desired sleeve end." },
+                ].map((item) => (
+                  <View key={item.key} style={{ flexDirection: "row", gap: 6, alignItems: "flex-start" }}>
+                    <View style={{ width: 20, height: 20, borderRadius: 10,
+                      backgroundColor: item.color + "20", alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                      <Text style={{ fontFamily: "Inter_700Bold", fontSize: 10, color: item.color }}>{item.key}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: theme.text }}>{item.label}</Text>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, lineHeight: 16 }}>{item.tip}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            {/* Tips row */}
+            <View style={{ flexDirection: "row", gap: 8, flexWrap: "wrap" }}>
+              {[
+                { icon: "check", text: "Stand straight, arms relaxed" },
+                { icon: "check", text: "Wear a well-fitted bra" },
+                { icon: "check", text: "Tape snug, not tight" },
+              ].map((t) => (
+                <View key={t.text} style={{ flexDirection: "row", alignItems: "center", gap: 4,
+                  backgroundColor: Colors.brand.primary + "10", borderRadius: 20, paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Feather name="check" size={11} color={Colors.brand.primary} />
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textSecondary }}>{t.text}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+
+          {/* ── Input Fields ── */}
+          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textMuted, marginTop: 4 }}>
+            Enter your measurements ({unit})
+          </Text>
+
           {[
-            { lbl: "Bust (fullest point)", val: bust, set: setBust, hint: unit === "cm" ? "e.g. 86" : "e.g. 34", key: "bust" },
-            { lbl: "Under Bust (below bust)", val: underBust, set: setUnderBust, hint: unit === "cm" ? "e.g. 72" : "e.g. 28", key: "underBust" },
-            { lbl: "Bust Point-to-Point (nipple spacing)", val: bustPt, set: setBustPt, hint: unit === "cm" ? "e.g. 18" : "e.g. 7", key: "bustPt" },
-            { lbl: "Blouse Length", val: blouseLen, set: setBlouseLen, hint: unit === "cm" ? "e.g. 15" : "e.g. 6", key: "blouseLen" },
-            { lbl: "Sleeve Length (0 if sleeveless)", val: sleeveLen, set: setSleeveLen, hint: unit === "cm" ? "e.g. 20" : "e.g. 8", key: "sleeveLen" },
-          ].map(({ lbl, val, set, hint, key }) => (
+            { lbl: "A — Bust (fullest point)", val: bust, set: setBust, hint: unit === "cm" ? "e.g. 86" : "e.g. 34", key: "bust", accent: "#8B2252" },
+            { lbl: "B — Under Bust (below bust)", val: underBust, set: setUnderBust, hint: unit === "cm" ? "e.g. 72" : "e.g. 28", key: "underBust", accent: "#2471A3" },
+            { lbl: "C — Bust Point-to-Point", val: bustPt, set: setBustPt, hint: unit === "cm" ? "e.g. 18" : "e.g. 7", key: "bustPt", accent: "#E67E22" },
+            { lbl: "D — Blouse Length", val: blouseLen, set: setBlouseLen, hint: unit === "cm" ? "e.g. 15" : "e.g. 6", key: "blouseLen", accent: "#27AE60" },
+            { lbl: "E — Sleeve Length (0 = sleeveless)", val: sleeveLen, set: setSleeveLen, hint: unit === "cm" ? "e.g. 20" : "e.g. 8", key: "sleeveLen", accent: "#8E44AD" },
+          ].map(({ lbl, val, set, hint, key, accent }) => (
             <View key={key}>
-              <DesignMeasureRow label={lbl} value={val} onChange={set} hint={hint} unit={unit} theme={theme} />
+              <DesignMeasureRow label={lbl} value={val} onChange={set} hint={hint} unit={unit} theme={theme} accentColor={accent} />
               {errors[key] && <Text style={styles.errorText}>{errors[key]}</Text>}
             </View>
           ))}

@@ -357,17 +357,17 @@ export default function SewingGuideScreen() {
   const params = useLocalSearchParams<{ fabric?: string }>();
   const fabricKey = (params.fabric ?? "Silk") as FabricKey;
 
-  const [activeTab, setActiveTab] = useState<GuideTab>("legend");
+  const [activeTab, setActiveTab] = useState<GuideTab>("layout");
   const [mode, setMode] = useState<Mode>("beginner");
   const [expandedLegend, setExpandedLegend] = useState<string | null>(null);
   const [expandedStep, setExpandedStep] = useState<number | null>(null);
   const [expandedGloss, setExpandedGloss] = useState<string | null>(null);
 
   const TABS: { key: GuideTab; label: string; icon: string }[] = [
-    { key: "legend", label: "Symbols", icon: "book" },
     { key: "layout", label: "Layout", icon: "grid" },
     { key: "steps", label: "Steps", icon: "list" },
     { key: "glossary", label: "Glossary", icon: "type" },
+    { key: "legend", label: "Symbols", icon: "book" },
   ];
 
   const steps = mode === "beginner" ? STEPS_BEGINNER : STEPS_DETAILED;
