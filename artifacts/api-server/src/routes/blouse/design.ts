@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, blouseDesignsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { openai } from "@workspace/integrations-openai-ai-server";
+import { ai } from "@workspace/integrations-gemini-ai";
 
 const router: IRouter = Router();
 
@@ -317,12 +317,12 @@ Give exactly 3 creative blouse design suggestions as a JSON array. Each must hav
 Respond ONLY with a valid JSON array like: [{"title":"...","description":"..."},...]`;
 
   try {
-    const resp = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      max_completion_tokens: 600,
-      messages: [{ role: "user", content: prompt }],
+    const resp = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: [{ role: "user", parts: [{ text: prompt }] }],
+      config: { maxOutputTokens: 600 },
     });
-    const raw = resp.choices[0]?.message?.content ?? "[]";
+    const raw = resp.text ?? "[]";
     const match = raw.match(/\[[\s\S]*\]/);
     const ideas = JSON.parse(match ? match[0] : "[]");
     if (Array.isArray(ideas)) return ideas.slice(0, 3);
