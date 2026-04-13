@@ -45,7 +45,7 @@ const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
-type Tab = "preferences" | "ideas" | "measurements" | "design";
+type Tab = "preferences" | "ideas" | "design";
 type SketchPath = { d: string; color: string; width: number };
 type SketchTool = "pen" | "eraser";
 
@@ -2207,8 +2207,7 @@ export default function ProfileScreen() {
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: "preferences", label: "Styles", icon: "sliders" },
     { key: "ideas", label: "Ideas", icon: "image" },
-    { key: "measurements", label: "Measures", icon: "bar-chart-2" },
-    { key: "design", label: "Design", icon: "scissors" },
+    { key: "design", label: "Fit & Design", icon: "scissors" },
   ];
 
   return (
@@ -2387,7 +2386,6 @@ export default function ProfileScreen() {
 
       {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
-      {user && activeTab === "measurements" && <MeasurementsTab theme={theme} user={user} />}
       {user && activeTab === "design" && <BlouseDesignTab theme={theme} user={user} />}
     </View>
   );
