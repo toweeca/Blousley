@@ -1580,6 +1580,7 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
 const D_NECK = ["Sweetheart", "Boat Neck", "Deep V", "Round", "Halter", "Square"];
 const D_SLEEVE = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Puff Sleeve"];
 const D_BACK = ["Hook", "Tie Back", "Mid Back", "High Back", "Deep Back", "Open Back"];
+const D_FABRIC = ["Silk", "Georgette", "Chiffon", "Cotton", "Velvet", "Brocade", "Net", "Linen"];
 
 function ChipRow({ label, options, value, onSelect, color, theme }: {
   label: string; options: string[]; value: string;
@@ -1639,6 +1640,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [neckline, setNeckline] = useState("Round");
   const [sleeve, setSleeve] = useState("Elbow Length");
   const [back, setBack] = useState("Hook");
+  const [fabric, setFabric] = useState("Silk");
   const [fabricColor, setFabricColor] = useState(Colors.brand.primary);
   const [generating, setGenerating] = useState(false);
   const [aiIdeas, setAiIdeas] = useState<{ title: string; description: string }[] | null>(null);
@@ -1671,6 +1673,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       if (s.neckline) setNeckline(s.neckline);
       if (s.sleeve) setSleeve(s.sleeve);
       if (s.back) setBack(s.back);
+      if (s.fabric) setFabric(s.fabric);
       if (s.fabricColor) setFabricColor(s.fabricColor);
       if (savedDesign.aiIdeas) setAiIdeas(savedDesign.aiIdeas);
       if (savedDesign.patternSvg) setPatternSvg(savedDesign.patternSvg);
@@ -1708,7 +1711,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
               sleeveLength: +sleeveLen || 0,
               unit,
             },
-            styles: { neckline, sleeve, back, fabricColor },
+            styles: { neckline, sleeve, back, fabric, fabricColor },
           }),
         }),
         fetch(`${API_BASE}/api/generate-blouse-image/style`, {
@@ -1830,6 +1833,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
           <ChipRow label="Neckline" options={D_NECK} value={neckline} onSelect={setNeckline} color={Colors.brand.primary} theme={theme} />
           <ChipRow label="Sleeve Style" options={D_SLEEVE} value={sleeve} onSelect={setSleeve} color="#2471A3" theme={theme} />
           <ChipRow label="Back Design" options={D_BACK} value={back} onSelect={setBack} color="#8E44AD" theme={theme} />
+          <ChipRow label="Fabric Type" options={D_FABRIC} value={fabric} onSelect={setFabric} color="#C9A96E" theme={theme} />
 
           <View style={{ gap: 8 }}>
             <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>Fabric / Main Color</Text>
