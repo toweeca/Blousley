@@ -1638,6 +1638,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [step, setStep] = useState(0);
   const [measEditing, setMeasEditing] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
+  const [designDiagIdx, setDesignDiagIdx] = useState(0);
   const [unit, setUnit] = useState<"cm" | "in">("cm");
   const [bust, setBust] = useState("");
   const [underBust, setUnderBust] = useState("");
@@ -1817,59 +1818,96 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
               <Feather name={guideOpen ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
             </TouchableOpacity>
 
-            {guideOpen && (
-              <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border, gap: 14 }]}>
-                <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                  <Svg width={120} height={240} viewBox="0 0 130 260">
-                    <Circle cx={65} cy={22} r={16} fill="none" stroke={Colors.brand.primary} strokeWidth={1.5} />
-                    <Line x1={58} y1={37} x2={58} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
-                    <Line x1={72} y1={37} x2={72} y2={48} stroke={Colors.brand.primary} strokeWidth={1.5} />
-                    <Path d="M 58 48 Q 38 50 30 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Path d="M 72 48 Q 92 50 100 62" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Path d="M 30 62 L 14 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Path d="M 100 62 L 116 90" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Path d="M 30 62 C 24 75 22 88 28 100 C 26 112 28 128 32 140 C 36 152 40 158 44 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Path d="M 100 62 C 106 75 108 88 102 100 C 104 112 102 128 98 140 C 94 152 90 158 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Path d="M 44 162 Q 65 168 86 162" stroke={Colors.brand.primary} strokeWidth={1.5} fill="none" />
-                    <Line x1={24} y1={88} x2={106} y2={88} stroke="#8B2252" strokeWidth={1.5} strokeDasharray="4,2" />
-                    <Circle cx={44} cy={88} r={3} fill="#8B2252" />
-                    <Circle cx={86} cy={88} r={3} fill="#8B2252" />
-                    <SvgText x={112} y={92} fontSize={10} fill="#8B2252" fontWeight="bold">A</SvgText>
-                    <Line x1={24} y1={102} x2={106} y2={102} stroke="#2471A3" strokeWidth={1.5} strokeDasharray="4,2" />
-                    <SvgText x={112} y={106} fontSize={10} fill="#2471A3" fontWeight="bold">B</SvgText>
-                    <Line x1={44} y1={81} x2={86} y2={81} stroke="#E67E22" strokeWidth={1} strokeDasharray="2,2" />
-                    <Polygon points="44,81 49,78 49,84" fill="#E67E22" />
-                    <Polygon points="86,81 81,78 81,84" fill="#E67E22" />
-                    <SvgText x={55} y={78} fontSize={8} fill="#E67E22" fontWeight="bold">C</SvgText>
-                    <Line x1={10} y1={62} x2={10} y2={162} stroke="#27AE60" strokeWidth={1.5} />
-                    <Polygon points="10,62 7,68 13,68" fill="#27AE60" />
-                    <Polygon points="10,162 7,156 13,156" fill="#27AE60" />
-                    <SvgText x={2} y={115} fontSize={10} fill="#27AE60" fontWeight="bold">D</SvgText>
-                    <Line x1={100} y1={62} x2={120} y2={112} stroke="#8E44AD" strokeWidth={1.5} strokeDasharray="4,2" />
-                    <Polygon points="120,112 113,110 117,104" fill="#8E44AD" />
-                    <SvgText x={117} y={82} fontSize={10} fill="#8E44AD" fontWeight="bold">E</SvgText>
-                  </Svg>
-                  <View style={{ flex: 1, gap: 8 }}>
+            {guideOpen && (() => {
+              const DESIGN_DIAGRAMS = [
+                { label: "Bust",                 Component: BustDiagram,         key: "bust",      color: "#8B2252", desc: "Fullest part of your bust, tape level and snug all around." },
+                { label: "Under Bust",           Component: UnderBustDiagram,    key: "underBust", color: "#2471A3", desc: "Just below the bust, parallel to the floor. Breathe normally." },
+                { label: "Bust Point to Point",  Component: BustPointDiagram,    key: "bustPt",    color: "#E67E22", desc: "Distance from nipple to nipple, measured straight across." },
+                { label: "Blouse Length",        Component: BlouseLengthDiagram, key: "blouseLen", color: "#27AE60", desc: "Top of shoulder straight down to where you want the hem." },
+                { label: "Sleeve Length",        Component: SleeveLengthDiagram, key: "sleeveLen", color: "#8E44AD", desc: "Shoulder seam to desired sleeve end. Enter 0 for sleeveless." },
+              ] as const;
+              const d = DESIGN_DIAGRAMS[designDiagIdx];
+              const DiagramComp = d.Component;
+              return (
+                <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  {/* ── Carousel ── */}
+                  <View style={styles.diagCarousel}>
+                    <View style={styles.diagHeader}>
+                      <TouchableOpacity
+                        onPress={() => { setDesignDiagIdx((i) => (i - 1 + DESIGN_DIAGRAMS.length) % DESIGN_DIAGRAMS.length); Haptics.selectionAsync(); }}
+                        style={[styles.diagNavBtn, { borderColor: Colors.brand.primary + "40" }]}
+                      >
+                        <Feather name="chevron-left" size={18} color={Colors.brand.primary} />
+                      </TouchableOpacity>
+                      <View style={{ flex: 1, alignItems: "center" }}>
+                        <Text style={[styles.diagTitle, { color: theme.text }]}>{d.label}</Text>
+                        <Text style={[styles.diagCounter, { color: theme.textMuted }]}>
+                          {designDiagIdx + 1} of {DESIGN_DIAGRAMS.length}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => { setDesignDiagIdx((i) => (i + 1) % DESIGN_DIAGRAMS.length); Haptics.selectionAsync(); }}
+                        style={[styles.diagNavBtn, { borderColor: Colors.brand.primary + "40" }]}
+                      >
+                        <Feather name="chevron-right" size={18} color={Colors.brand.primary} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <DiagramComp />
+
+                    {/* Caption box */}
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start",
+                      backgroundColor: d.color + "10", borderRadius: 10, padding: 10, width: "100%" }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: d.color + "22",
+                        alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                        <Text style={{ fontFamily: "Inter_700Bold", fontSize: 11, color: d.color }}>
+                          {"ABCDE"[designDiagIdx]}
+                        </Text>
+                      </View>
+                      <Text style={{ flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, color: theme.textSecondary, lineHeight: 18 }}>
+                        {d.desc}
+                      </Text>
+                    </View>
+
+                    {/* Dot indicators */}
+                    <View style={styles.diagDots}>
+                      {DESIGN_DIAGRAMS.map((dd, i) => (
+                        <TouchableOpacity key={dd.key} onPress={() => setDesignDiagIdx(i)}>
+                          <View style={[
+                            styles.diagDot,
+                            { backgroundColor: i === designDiagIdx ? d.color : Colors.brand.primary + "30",
+                              width: i === designDiagIdx ? 16 : 6 }
+                          ]} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Field overview list */}
+                  <View style={{ gap: 8, marginTop: 4 }}>
                     {DM_FIELDS.map((f) => (
-                      <View key={f.key} style={{ flexDirection: "row", gap: 6, alignItems: "flex-start" }}>
+                      <View key={f.key} style={styles.guideFieldRow}>
                         <View style={[styles.guideFieldDot, { backgroundColor: f.color + "20" }]}>
-                          <Text style={[styles.guideFieldDotText, { color: f.color, fontSize: 11, fontFamily: "Inter_700Bold" }]}>{f.icon}</Text>
+                          <Text style={[styles.guideFieldDotText, { color: f.color, fontFamily: "Inter_700Bold", fontSize: 11 }]}>{f.icon}</Text>
                         </View>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: theme.text }}>{f.label}</Text>
-                          <Text style={{ fontFamily: "Inter_400Regular", fontSize: 10, color: theme.textMuted, lineHeight: 15 }}>{f.desc}</Text>
+                          <Text style={[styles.guideFieldLabel, { color: theme.text }]}>{f.label}</Text>
+                          <Text style={[styles.guideFieldDesc, { color: theme.textSecondary }]}>{f.desc}</Text>
                         </View>
                       </View>
                     ))}
                   </View>
-                </View>
-                <View style={[styles.guideTipBox, { backgroundColor: Colors.brand.primary + "08", borderColor: Colors.brand.primary + "25" }]}>
-                  <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Keep tape level and snug — not tight</Text>
-                  <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Wear a well-fitted bra, stand straight, arms relaxed</Text>
-                  <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Have someone help you for back measurements</Text>
-                </View>
-              </Animated.View>
-            )}
+
+                  {/* Tips */}
+                  <View style={[styles.guideTipBox, { backgroundColor: Colors.brand.primary + "08", borderColor: Colors.brand.primary + "25" }]}>
+                    <Text style={[styles.guideTipTitle, { color: Colors.brand.primary }]}>📏 Tips for accuracy</Text>
+                    <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Keep the tape level and snug — not tight.</Text>
+                    <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Wear a well-fitted bra, stand straight, arms relaxed.</Text>
+                    <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Have someone help you for back and shoulder measurements.</Text>
+                  </View>
+                </Animated.View>
+              );
+            })()}
 
             {/* ── VIEW MODE: Cube grid ── */}
             {!measEditing && (
