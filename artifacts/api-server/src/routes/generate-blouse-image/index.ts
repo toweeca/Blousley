@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { generateImage } from "@workspace/integrations-gemini-ai/image";
+import { openai } from "@workspace/integrations-openai-ai-server/image";
 
 const router: IRouter = Router();
 
@@ -53,6 +53,16 @@ Displayed flat on neutral background. Elegant traditional Indian craftsmanship w
 Studio quality. Clean background. High detail, professional fashion illustration style.`;
 }
 
+async function generateFast(prompt: string): Promise<string> {
+  const response = await openai.images.generate({
+    model: "gpt-image-1",
+    prompt,
+    size: "1024x1024",
+    quality: "low" as any,
+  });
+  return response.data[0]?.b64_json ?? "";
+}
+
 router.post("/style", async (req, res) => {
   try {
     const { neck, sleeve, back, fabric, color, view } = req.body as {
@@ -71,8 +81,8 @@ router.post("/style", async (req, res) => {
     }
 
     const prompt = buildStylePrompt({ neck, sleeve, back, fabric, color, view });
-    const { b64_json } = await generateImage(prompt);
-    res.json({ b64_json });
+    const b64 = await generateFast(prompt);
+    res.json({ b64_json: b64 });
   } catch (err) {
     console.error("POST /generate-blouse-image/style error:", err);
     res.status(500).json({ error: "Image generation failed" });
@@ -90,8 +100,8 @@ router.post("/sketch", async (req, res) => {
 
     const desc = description || `a blouse sketch with ${strokes ?? "several"} strokes`;
     const prompt = buildSketchPrompt(desc, colors ?? [], view);
-    const { b64_json } = await generateImage(prompt);
-    res.json({ b64_json });
+    const b64 = await generateFast(prompt);
+    res.json({ b64_json: b64 });
   } catch (err) {
     console.error("POST /generate-blouse-image/sketch error:", err);
     res.status(500).json({ error: "Image generation failed" });
