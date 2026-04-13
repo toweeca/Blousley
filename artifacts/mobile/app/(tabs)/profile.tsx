@@ -31,6 +31,7 @@ import {
   ShoulderWidthDiagram, BlouseLengthDiagram, SleeveLengthDiagram,
   SleeveRoundDiagram, ArmholeDiagram, NeckDiagram,
 } from "@/components/BlouseMeasurementDiagrams";
+import PatternGuideTab from "@/components/PatternGuideTab";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -45,7 +46,7 @@ const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
-type Tab = "preferences" | "ideas" | "design";
+type Tab = "preferences" | "ideas" | "pattern" | "design";
 type SketchPath = { d: string; color: string; width: number };
 type SketchTool = "pen" | "eraser";
 
@@ -2279,6 +2280,7 @@ export default function ProfileScreen() {
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: "preferences", label: "Styles", icon: "sliders" },
     { key: "ideas", label: "Ideas", icon: "image" },
+    { key: "pattern", label: "Guide", icon: "book-open" },
     { key: "design", label: "Fit & Design", icon: "scissors" },
   ];
 
@@ -2458,6 +2460,7 @@ export default function ProfileScreen() {
 
       {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
+      {user && activeTab === "pattern" && <PatternGuideTab theme={theme} />}
       {user && activeTab === "design" && <BlouseDesignTab theme={theme} user={user} />}
     </View>
   );
