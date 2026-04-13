@@ -17,4 +17,25 @@ router.get("/customers", async (req, res) => {
   }
 });
 
+router.post("/fits", async (req, res) => {
+  try {
+    const { userId, imageUrl, measurements, stylePrefs, notes, aiAnalysis } = req.body;
+    if (!userId) return res.status(400).json({ error: "userId is required" });
+
+    const [fit] = await db.insert(blouseFitsTable).values({
+      userId,
+      imageUrl: imageUrl ?? null,
+      measurements: measurements ?? null,
+      stylePrefs: stylePrefs ?? null,
+      aiAnalysis: aiAnalysis ?? null,
+      notes: notes ?? null,
+    }).returning();
+
+    res.json(fit);
+  } catch (error) {
+    console.error("Error adding fit:", error);
+    res.status(500).json({ error: "Failed to add fit" });
+  }
+});
+
 export default router;

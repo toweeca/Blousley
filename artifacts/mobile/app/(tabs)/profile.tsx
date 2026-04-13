@@ -1,6 +1,9 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState, useRef } from "react";
@@ -45,6 +48,70 @@ const CANVAS_W = SCREEN_WIDTH - 48;
 const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
+
+async function saveImageUtil(uri: string, label = "blouse") {
+  try {
+    if (Platform.OS === "web") {
+      const a = document.createElement("a");
+      a.href = uri;
+      a.download = `blousify-${label}-${Date.now()}.png`;
+      a.click();
+      Alert.alert("Downloaded!", "Image saved to your downloads folder.");
+      return;
+    }
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Allow access to photos to save images.");
+      return;
+    }
+    let localUri = uri;
+    if (uri.startsWith("data:")) {
+      const b64 = uri.split(",")[1];
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.png`;
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      localUri = path;
+    } else if (uri.startsWith("http")) {
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.png`;
+      const { uri: downloaded } = await FileSystem.downloadAsync(uri, path);
+      localUri = downloaded;
+    }
+    await MediaLibrary.saveToLibraryAsync(localUri);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Saved! ✓", "Image saved to your photo library.");
+  } catch (e) {
+    console.error("Save error:", e);
+    try {
+      const available = await Sharing.isAvailableAsync();
+      if (available) await Sharing.shareAsync(uri);
+    } catch {
+      Alert.alert("Error", "Could not save the image.");
+    }
+  }
+}
+
+async function shareImageUtil(uri: string) {
+  try {
+    if (Platform.OS === "web") {
+      if (navigator.share) {
+        await navigator.share({ title: "My Blousify Design", url: uri.startsWith("data:") ? window.location.href : uri });
+      } else {
+        await saveImageUtil(uri, "share");
+      }
+      return;
+    }
+    let localUri = uri;
+    if (uri.startsWith("data:")) {
+      const b64 = uri.split(",")[1];
+      const path = `${FileSystem.cacheDirectory}blousify-share-${Date.now()}.png`;
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      localUri = path;
+    }
+    const available = await Sharing.isAvailableAsync();
+    if (available) await Sharing.shareAsync(localUri, { mimeType: "image/png", dialogTitle: "Share my blouse design" });
+  } catch {
+    Alert.alert("Error", "Could not share the image.");
+  }
+}
 
 type Tab = "preferences" | "ideas" | "pattern" | "design";
 type SketchPath = { d: string; color: string; width: number };
@@ -544,6 +611,25 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [aiSketchGenerating, setAiSketchGenerating] = useState(false);
   const [aiSketchImageUri, setAiSketchImageUri] = useState<string | null>(null);
   const [aiSketchBackUri, setAiSketchBackUri] = useState<string | null>(null);
+  const [addedIdeaIds, setAddedIdeaIds] = useState<Set<number>>(new Set());
+
+  const addIdeaToFitsMutation = useMutation({
+    mutationFn: async ({ ideaId, imageUrl }: { ideaId: number; imageUrl: string }) => {
+      const r = await fetch(`${API_BASE}/api/tailor/fits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, imageUrl, notes: "Saved from Ideas gallery" }),
+      });
+      if (!r.ok) throw new Error("Failed to add fit");
+      return ideaId;
+    },
+    onSuccess: (ideaId) => {
+      setAddedIdeaIds((prev) => new Set(prev).add(ideaId));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Added to Fits! ✓", "This idea is now visible to your tailor.");
+    },
+    onError: () => Alert.alert("Error", "Could not add to fits. Try again."),
+  });
 
   const generateAIFromSketch = async () => {
     if (sketchPaths.length === 0) {
@@ -964,7 +1050,42 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 </Text>
               </View>
             </View>
-            <View style={[styles.ideaCardActions, { borderTopColor: theme.border }]}>
+            <View style={[styles.ideaCardActions, { borderTopColor: theme.border, flexWrap: "wrap" }]}>
+              {/* Add to Fits — shown if idea has an image */}
+              {idea.imageUrl && (
+                <TouchableOpacity
+                  style={[styles.ideaActionBtn, {
+                    backgroundColor: addedIdeaIds.has(idea.id) ? Colors.brand.gold + "20" : Colors.brand.gold + "10",
+                    borderWidth: 1,
+                    borderColor: Colors.brand.gold + "50",
+                  }]}
+                  onPress={() => {
+                    if (!addedIdeaIds.has(idea.id)) {
+                      addIdeaToFitsMutation.mutate({ ideaId: idea.id, imageUrl: idea.imageUrl! });
+                    }
+                  }}
+                  disabled={addIdeaToFitsMutation.isPending}
+                >
+                  <Feather name={addedIdeaIds.has(idea.id) ? "check-circle" : "plus-circle"} size={14}
+                    color={Colors.brand.gold} />
+                  <Text style={[styles.ideaActionText, { color: Colors.brand.gold }]}>
+                    {addedIdeaIds.has(idea.id) ? "In Fits" : "Add to Fits"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Save image to gallery */}
+              {idea.imageUrl && (
+                <TouchableOpacity
+                  style={[styles.ideaActionBtn, { backgroundColor: Colors.brand.primary + "10" }]}
+                  onPress={() => saveImageUtil(idea.imageUrl!, "idea")}
+                >
+                  <Feather name="download" size={14} color={Colors.brand.primary} />
+                  <Text style={[styles.ideaActionText, { color: Colors.brand.primary }]}>Save</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Share with tailor */}
               <TouchableOpacity
                 style={[styles.ideaActionBtn, { backgroundColor: idea.sharedWithTailors ? Colors.brand.primary + "15" : theme.background }]}
                 onPress={() => toggleShareMutation.mutate({ id: idea.id, val: !idea.sharedWithTailors })}
@@ -1660,6 +1781,35 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [aiDesignUri, setAiDesignUri] = useState<string | null>(null);
   const [aiDesignBackUri, setAiDesignBackUri] = useState<string | null>(null);
+  const [fitAdded, setFitAdded] = useState(false);
+
+  const addToFitsMutation = useMutation({
+    mutationFn: async (imageUrl: string) => {
+      const r = await fetch(`${API_BASE}/api/tailor/fits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          imageUrl,
+          measurements: { bust: +bust || undefined, underBust: +underBust || undefined },
+          stylePrefs: { neckline, sleeves: sleeve, back, fabric },
+          notes: `AI-generated design — ${neckline} neckline, ${sleeve} sleeves, ${back} back`,
+          aiAnalysis: `Fabric: ${fabric}. Blouse length: ${blouseLen} ${unit}. Sleeve length: ${sleeveLen} ${unit}.`,
+        }),
+      });
+      if (!r.ok) throw new Error("Failed to add fit");
+      return r.json();
+    },
+    onSuccess: () => {
+      setFitAdded(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Added to Fits! ✓", "This design is now visible to your tailor under Customer Fits.");
+    },
+    onError: () => Alert.alert("Error", "Could not add to fits. Try again."),
+  });
+
+  const saveImageToGallery = (uri: string, label = "blouse") => saveImageUtil(uri, label);
+  const shareImage = (uri: string) => shareImageUtil(uri);
 
   const { data: savedDesign } = useQuery({
     queryKey: ["blouse-design", user.id],
@@ -2205,15 +2355,82 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 </View>
               )}
 
-              {/* ── Action buttons ─────────────────────────────────── */}
+              {/* ── Save / Share / Add to Fits ─────────────────────── */}
+              {aiDesignUri && (
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: theme.textMuted, textAlign: "center", letterSpacing: 0.5 }}>
+                    WHAT WOULD YOU LIKE TO DO WITH THIS DESIGN?
+                  </Text>
+
+                  {/* Add to Fits — prominent gold CTA */}
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, {
+                      backgroundColor: fitAdded ? Colors.brand.gold + "30" : Colors.brand.gold,
+                      borderWidth: 1.5,
+                      borderColor: Colors.brand.gold,
+                    }]}
+                    onPress={() => {
+                      if (!fitAdded && !addToFitsMutation.isPending) {
+                        addToFitsMutation.mutate(aiDesignUri);
+                      }
+                      Haptics.selectionAsync();
+                    }}
+                    disabled={addToFitsMutation.isPending}
+                  >
+                    {addToFitsMutation.isPending ? (
+                      <ActivityIndicator size="small" color={Colors.brand.primaryDark} />
+                    ) : (
+                      <>
+                        <Feather name={fitAdded ? "check-circle" : "plus-circle"} size={18}
+                          color={fitAdded ? Colors.brand.gold : Colors.brand.primaryDark} />
+                        <Text style={[styles.primaryBtnText, { color: fitAdded ? Colors.brand.gold : Colors.brand.primaryDark }]}>
+                          {fitAdded ? "Added to Tailor Fits ✓" : "Add to Tailor Fits"}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Save + Share row */}
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.logoutBtn, { flex: 1, borderColor: Colors.brand.primary + "60",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                      onPress={() => saveImageToGallery(aiDesignUri, "front")}
+                    >
+                      <Feather name="download" size={15} color={Colors.brand.primary} />
+                      <Text style={[styles.logoutText, { color: Colors.brand.primary }]}>Save Front</Text>
+                    </TouchableOpacity>
+                    {aiDesignBackUri && (
+                      <TouchableOpacity
+                        style={[styles.logoutBtn, { flex: 1, borderColor: Colors.brand.primary + "60",
+                          flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                        onPress={() => saveImageToGallery(aiDesignBackUri, "back")}
+                      >
+                        <Feather name="download" size={15} color={Colors.brand.primary} />
+                        <Text style={[styles.logoutText, { color: Colors.brand.primary }]}>Save Back</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.logoutBtn, { flex: 1, borderColor: Colors.brand.gold + "60",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                      onPress={() => shareImage(aiDesignUri)}
+                    >
+                      <Feather name="share-2" size={15} color={Colors.brand.gold} />
+                      <Text style={[styles.logoutText, { color: Colors.brand.gold }]}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* ── Edit / Regenerate ───────────────────────────────── */}
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
                   onPress={() => { setStep(1); Haptics.selectionAsync(); }}>
                   <Feather name="edit-2" size={15} color={theme.textSecondary} />
-                  <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Edit</Text>
+                  <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Edit Style</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.primaryBtn, { flex: 2, backgroundColor: Colors.brand.primary }]}
-                  onPress={generate}>
+                  onPress={() => { setFitAdded(false); generate(); }}>
                   <Feather name="refresh-cw" size={16} color="#fff" />
                   <Text style={styles.primaryBtnText}>Regenerate</Text>
                 </TouchableOpacity>
