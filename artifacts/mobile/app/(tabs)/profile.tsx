@@ -2,6 +2,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState, useRef } from "react";
 import {
   View,
@@ -1933,7 +1934,19 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
 
               {/* ── Beginner Pattern Guide ─────────────────────────── */}
               <View style={{ gap: 10 }}>
-                <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✂️ Pattern Guide</Text>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✂️ Pattern Guide</Text>
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: "/sewing-guide", params: { fabric } })}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5,
+                      backgroundColor: Colors.brand.gold + "18", borderRadius: 20,
+                      paddingHorizontal: 12, paddingVertical: 5,
+                      borderWidth: 1, borderColor: Colors.brand.gold + "40" }}
+                  >
+                    <Feather name="book-open" size={13} color={Colors.brand.gold} />
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.gold }}>Full Guide</Text>
+                  </TouchableOpacity>
+                </View>
                 <BlouseBeginnerPattern
                   bust={+bust || 86}
                   underBust={+underBust || 72}
