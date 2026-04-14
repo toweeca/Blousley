@@ -104,6 +104,7 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0D0508;font-family:
   <div id="hint">Drag to rotate \u00b7 Pinch to zoom</div>
   <div id="fabric-label">Silk \u00b7 High sheen, fluid drape</div>
 </div>
+<div id="flat-view" style="display:none;position:absolute;top:0;left:0;right:0;bottom:96px;background:#0D0508;overflow:hidden;"></div>
 
 <div id="panel">
   <div id="fab-row">
@@ -371,6 +372,33 @@ function onTexReady() {
 }
 
 window.setImages = function(fUri, bUri) {
+  var isSvg = (fUri && fUri.indexOf('image/svg+xml') !== -1);
+  if (isSvg) {
+    // SVG illustrations: show as clean 2D side-by-side preview
+    var canvas = document.getElementById('c');
+    var overlay = document.getElementById('overlay');
+    var flatView = document.getElementById('flat-view');
+    canvas.style.display = 'none';
+    overlay.style.display = 'none';
+    flatView.style.display = 'block';
+    flatView.innerHTML =
+      '<div style="display:flex;height:100%;gap:0;">'
+      + '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 6px 12px 12px;gap:8px;">'
+      +   '<div style="background:rgba(201,169,110,0.08);border:1px solid rgba(201,169,110,0.2);border-radius:12px;padding:8px;width:100%;">'
+      +     '<img src="'+fUri+'" style="width:100%;height:auto;border-radius:8px;display:block;" />'
+      +   '</div>'
+      +   '<span style="color:rgba(201,169,110,0.7);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">FRONT VIEW</span>'
+      + '</div>'
+      + '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 12px 12px 6px;gap:8px;">'
+      +   '<div style="background:rgba(201,169,110,0.08);border:1px solid rgba(201,169,110,0.2);border-radius:12px;padding:8px;width:100%;">'
+      +     '<img src="'+bUri+'" style="width:100%;height:auto;border-radius:8px;display:block;" />'
+      +   '</div>'
+      +   '<span style="color:rgba(201,169,110,0.7);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">BACK VIEW</span>'
+      + '</div>'
+      + '</div>';
+    return;
+  }
+  // Raster images: load as 3D texture (existing behaviour)
   texLoaded = 0;
   var loader = new THREE.TextureLoader();
   loader.load(fUri, function(tex) {
