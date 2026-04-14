@@ -332,8 +332,8 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       ]);
       if (!frontRes.ok || !backRes.ok) throw new Error("Failed");
       const [frontData, backData] = await Promise.all([frontRes.json(), backRes.json()]);
-      if (frontData.b64_json) setAiPreviewUri(`data:image/png;base64,${frontData.b64_json}`);
-      if (backData.b64_json) setAiPreviewBackUri(`data:image/png;base64,${backData.b64_json}`);
+      if (frontData.b64_json) setAiPreviewUri(`data:${frontData.mimeType ?? "image/png"};base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiPreviewBackUri(`data:${backData.mimeType ?? "image/png"};base64,${backData.b64_json}`);
     } catch {
       Alert.alert("Generation failed", "Could not generate 3D preview. Please try again.");
     } finally {
@@ -660,8 +660,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
       ]);
       if (!frontRes.ok || !backRes.ok) throw new Error("Failed");
       const [frontData, backData] = await Promise.all([frontRes.json(), backRes.json()]);
-      if (frontData.b64_json) setAiSketchImageUri(`data:image/png;base64,${frontData.b64_json}`);
-      if (backData.b64_json) setAiSketchBackUri(`data:image/png;base64,${backData.b64_json}`);
+      if (frontData.b64_json) setAiSketchImageUri(`data:${frontData.mimeType ?? "image/png"};base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiSketchBackUri(`data:${backData.mimeType ?? "image/png"};base64,${backData.b64_json}`);
     } catch {
       Alert.alert("Generation failed", "Could not generate 3D preview. Please try again.");
     } finally {
@@ -1893,8 +1893,8 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       setAiIdeas(designData.aiIdeas);
       setPatternSvg(designData.patternSvg);
       setInstructions(designData.instructions);
-      if (frontData.b64_json) setAiDesignUri(`data:image/png;base64,${frontData.b64_json}`);
-      if (backData.b64_json) setAiDesignBackUri(`data:image/png;base64,${backData.b64_json}`);
+      if (frontData.b64_json) setAiDesignUri(`data:${frontData.mimeType ?? "image/png"};base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiDesignBackUri(`data:${backData.mimeType ?? "image/png"};base64,${backData.b64_json}`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert("Error", "Could not generate design. Please try again.");
