@@ -371,47 +371,38 @@ function onTexReady() {
   }
 }
 
-window.setImages = function(fUri, bUri) {
-  var isSvg = (fUri && fUri.indexOf('image/svg+xml') !== -1);
+function loadTex(uri, isBack, done) {
+  if (!uri) { done(null); return; }
+  var isSvg = uri.indexOf('image/svg+xml') !== -1;
   if (isSvg) {
-    // SVG illustrations: show as clean 2D side-by-side preview
-    var canvas = document.getElementById('c');
-    var overlay = document.getElementById('overlay');
-    var flatView = document.getElementById('flat-view');
-    canvas.style.display = 'none';
-    overlay.style.display = 'none';
-    flatView.style.display = 'block';
-    flatView.innerHTML =
-      '<div style="display:flex;height:100%;gap:0;">'
-      + '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 6px 12px 12px;gap:8px;">'
-      +   '<div style="background:rgba(201,169,110,0.08);border:1px solid rgba(201,169,110,0.2);border-radius:12px;padding:8px;width:100%;">'
-      +     '<img src="'+fUri+'" style="width:100%;height:auto;border-radius:8px;display:block;" />'
-      +   '</div>'
-      +   '<span style="color:rgba(201,169,110,0.7);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">FRONT VIEW</span>'
-      + '</div>'
-      + '<div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:12px 12px 12px 6px;gap:8px;">'
-      +   '<div style="background:rgba(201,169,110,0.08);border:1px solid rgba(201,169,110,0.2);border-radius:12px;padding:8px;width:100%;">'
-      +     '<img src="'+bUri+'" style="width:100%;height:auto;border-radius:8px;display:block;" />'
-      +   '</div>'
-      +   '<span style="color:rgba(201,169,110,0.7);font-size:9px;font-weight:700;letter-spacing:2px;text-transform:uppercase;">BACK VIEW</span>'
-      + '</div>'
-      + '</div>';
-    return;
+    // Rasterise SVG → canvas → CanvasTexture so WebGL can use it
+    var img = new Image();
+    img.onload = function() {
+      var cnv = document.createElement('canvas');
+      cnv.width = 1024; cnv.height = 1024;
+      var ctx = cnv.getContext('2d');
+      ctx.drawImage(img, 0, 0, 1024, 1024);
+      var tex = new THREE.CanvasTexture(cnv);
+      tex.encoding = THREE.sRGBEncoding;
+      if (isBack) { tex.repeat.set(-1,1); tex.offset.set(1,0); }
+      done(tex);
+    };
+    img.onerror = function() { done(null); };
+    img.src = uri;
+  } else {
+    var loader = new THREE.TextureLoader();
+    loader.load(uri, function(tex) {
+      tex.encoding = THREE.sRGBEncoding;
+      if (isBack) { tex.repeat.set(-1,1); tex.offset.set(1,0); }
+      done(tex);
+    }, undefined, function() { done(null); });
   }
-  // Raster images: load as 3D texture (existing behaviour)
+}
+
+window.setImages = function(fUri, bUri) {
   texLoaded = 0;
-  var loader = new THREE.TextureLoader();
-  loader.load(fUri, function(tex) {
-    frontTex = tex;
-    frontTex.encoding = THREE.sRGBEncoding;
-    onTexReady();
-  }, undefined, function(){ frontTex = null; onTexReady(); });
-  loader.load(bUri, function(tex) {
-    tex.repeat.set(-1,1); tex.offset.set(1,0);
-    tex.encoding = THREE.sRGBEncoding;
-    backTex = tex;
-    onTexReady();
-  }, undefined, function(){ backTex = null; onTexReady(); });
+  loadTex(fUri, false, function(tex) { frontTex = tex; onTexReady(); });
+  loadTex(bUri, true,  function(tex) { backTex  = tex; onTexReady(); });
 };
 
 // ── postMessage to host ───────────────────────────────────────────────

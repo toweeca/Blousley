@@ -445,7 +445,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
                 />
                 <View style={styles.aiPreviewFooter}>
                   <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                    ✦ Illustration preview · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
+                    ✦ 3D preview · drag to spin · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
                   </Text>
                   <TouchableOpacity onPress={() => { setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
                     <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
@@ -944,7 +944,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                     />
                     <View style={styles.aiPreviewFooter}>
                       <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                        ✦ Illustration preview · from your {sketchPaths.length} stroke sketch
+                        ✦ 3D preview · drag to spin · from your {sketchPaths.length} stroke sketch
                       </Text>
                       <TouchableOpacity onPress={() => { setAiSketchImageUri(null); setAiSketchBackUri(null); }}>
                         <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
@@ -2230,7 +2230,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                     />
                     <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border, gap: 4 }}>
                       <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.gold, textAlign: "center" }}>
-                        ✦ Front &amp; back illustration · matches your selections
+                        ✦ Drag to rotate · Pinch to zoom · See front &amp; back
                       </Text>
                       <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
                         {neckline} neckline · {sleeve} sleeves · {back} back

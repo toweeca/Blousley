@@ -64,16 +64,16 @@ function generateBlouseSVG(opts: {
   const sleeve = opts.sleeve ?? "Short";
   const back = opts.back ?? "Hook";
 
-  // ── Shoulder & body geometry ────────────────────────────────────────────
-  const shTop = 105;
-  const shBot = 400;
-  const shL = cx - 96;
-  const shR = cx + 96;
-  const hipL = cx - 118;
-  const hipR = cx + 118;
+  // ── Shoulder & body geometry — fills most of canvas ─────────────────────
+  const shTop = 30;
+  const shBot = 470;
+  const shL = cx - 120;
+  const shR = cx + 120;
+  const hipL = cx - 148;
+  const hipR = cx + 148;
 
   // Armhole dip from top
-  const ahDepth = 48;
+  const ahDepth = 56;
 
   // ── Neckline shapes ─────────────────────────────────────────────────────
   const necklines: Record<string, { path: string; clip: string }> = {
@@ -250,49 +250,29 @@ function generateBlouseSVG(opts: {
     L ${hipR} ${shBot}
     C ${hipR + 4} ${shBot - 60} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop}`;
 
-  // ── Title & style label ──────────────────────────────────────────────────
-  const title = isBack ? "BACK VIEW" : "FRONT VIEW";
-  const subtitle = [opts.neck, opts.sleeve, opts.back, opts.fabric]
-    .filter(Boolean)
-    .slice(0, 3)
-    .join(" · ") || "Traditional Saree Blouse";
+  // Dark viewer bg colour — matches the 3D WebView background exactly
+  const viewerBg = "#0D0508";
 
-  // ── Assemble SVG ─────────────────────────────────────────────────────────
+  // ── Assemble SVG — clean garment on dark bg, no text, no borders ─────────
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${bgTop}"/>
-      <stop offset="100%" stop-color="${bgBot}"/>
+      <stop offset="0%" stop-color="${viewerBg}"/>
+      <stop offset="100%" stop-color="${viewerBg}"/>
     </linearGradient>
     <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="${light}"/>
-      <stop offset="40%" stop-color="${primary}"/>
+      <stop offset="35%" stop-color="${primary}"/>
       <stop offset="100%" stop-color="${dark}"/>
     </linearGradient>
-    <linearGradient id="shadow" x1="0" y1="0" x2="1" y2="0">
-      <stop offset="0%" stop-color="rgba(0,0,0,0.18)"/>
-      <stop offset="100%" stop-color="rgba(0,0,0,0)"/>
-    </linearGradient>
     <filter id="drop" x="-20%" y="-10%" width="140%" height="130%">
-      <feDropShadow dx="0" dy="6" stdDeviation="10" flood-color="rgba(0,0,0,0.22)"/>
+      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="rgba(0,0,0,0.55)"/>
     </filter>
     ${fabricTexture()}
   </defs>
 
-  <!-- Background -->
-  <rect width="${W}" height="${H}" fill="url(#bg)"/>
-  <rect x="20" y="20" width="${W - 40}" height="${H - 40}" rx="12" fill="white" opacity="0.55"/>
-
-  <!-- Decorative corners -->
-  <path d="M32 32 L68 32 L32 68 Z" fill="${gold}" opacity="0.22"/>
-  <path d="M${W - 32} 32 L${W - 68} 32 L${W - 32} 68 Z" fill="${gold}" opacity="0.22"/>
-  <path d="M32 ${H - 32} L68 ${H - 32} L32 ${H - 68} Z" fill="${gold}" opacity="0.22"/>
-  <path d="M${W - 32} ${H - 32} L${W - 68} ${H - 32} L${W - 32} ${H - 68} Z" fill="${gold}" opacity="0.22"/>
-
-  <!-- Header -->
-  <text x="${cx}" y="48" font-family="Georgia,serif" font-size="10" letter-spacing="3" fill="${goldDark}" text-anchor="middle" font-style="italic">BLOUSIFY</text>
-  <text x="${cx}" y="66" font-family="Georgia,serif" font-size="13" letter-spacing="2" fill="${dark}" text-anchor="middle">${title}</text>
-  <line x1="${cx - 60}" y1="74" x2="${cx + 60}" y2="74" stroke="${gold}" stroke-width="0.8"/>
+  <!-- Dark background -->
+  <rect width="${W}" height="${H}" fill="${viewerBg}"/>
 
   <!-- Sleeves (behind body) -->
   ${sleeve_left(sleeve)}
@@ -300,45 +280,59 @@ function generateBlouseSVG(opts: {
 
   <!-- Main blouse body -->
   <path d="${bodyPath} Z" fill="url(#body)" filter="url(#drop)"/>
-  <path d="${bodyPath} Z" fill="url(#silk)" opacity="0.9"/>
+  <path d="${bodyPath} Z" fill="url(#silk)" opacity="0.85"/>
 
   <!-- Side shading -->
-  <path d="M ${hipL} ${shBot} C ${hipL + 4} ${shBot - 60} ${shL - 4} ${shTop + ahDepth} ${shL} ${shTop} L ${shL + 28} ${shTop} C ${shL + 20} ${shTop + ahDepth} ${hipL + 32} ${shBot - 60} ${hipL + 28} ${shBot} Z" fill="${dark}" opacity="0.2"/>
-  <path d="M ${hipR} ${shBot} C ${hipR + 4} ${shBot - 60} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop} L ${shR - 28} ${shTop} C ${shR - 20} ${shTop + ahDepth} ${hipR - 32} ${shBot - 60} ${hipR - 28} ${shBot} Z" fill="${dark}" opacity="0.2"/>
+  <path d="M ${hipL} ${shBot} C ${hipL + 4} ${shBot - 70} ${shL - 4} ${shTop + ahDepth} ${shL} ${shTop} L ${shL + 32} ${shTop} C ${shL + 24} ${shTop + ahDepth} ${hipL + 36} ${shBot - 70} ${hipL + 32} ${shBot} Z" fill="${dark}" opacity="0.25"/>
+  <path d="M ${hipR} ${shBot} C ${hipR + 4} ${shBot - 70} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop} L ${shR - 32} ${shTop} C ${shR - 24} ${shTop + ahDepth} ${hipR - 36} ${shBot - 70} ${hipR - 32} ${shBot} Z" fill="${dark}" opacity="0.25"/>
 
-  <!-- Neckline cutout (white = hole) -->
+  <!-- Neckline cutout — dark bg shows through as "hole" -->
   ${isBack
-    ? `<path d="${backNkPath} L ${shR} ${shTop} L ${shL} ${shTop} Z" fill="url(#bg)"/>
-       <path d="${backNkPath}" fill="none" stroke="${dark}" stroke-width="1.8"/>`
-    : `<path d="${nk.clip}" fill="url(#bg)"/>
-       <path d="${nk.path}" fill="none" stroke="${dark}" stroke-width="1.8"/>`
+    ? `<path d="${backNkPath} L ${shR} ${shTop} L ${shL} ${shTop} Z" fill="${viewerBg}"/>
+       <path d="${backNkPath}" fill="none" stroke="${dark}" stroke-width="2"/>`
+    : `<path d="${nk.clip}" fill="${viewerBg}"/>
+       <path d="${nk.path}" fill="none" stroke="${dark}" stroke-width="2"/>`
   }
 
-  <!-- Embroidery decorations -->
+  <!-- Gold embroidery -->
   ${neckBorder()}
   ${hemBorder(shBot, hipL, hipR)}
 
-  <!-- Back-specific details -->
+  <!-- Back details -->
   ${isBack ? `
-    <!-- Hook & eye closures -->
     ${hooks}
-    <!-- Mirror motifs if applicable -->
     ${mirrorMotifs()}
-    <!-- Centre back seam line -->
-    <line x1="${cx}" y1="${shTop + 22}" x2="${cx}" y2="${shBot - 14}" stroke="${goldDark}" stroke-width="0.8" stroke-dasharray="4,3" opacity="0.5"/>
+    <line x1="${cx}" y1="${shTop + 22}" x2="${cx}" y2="${shBot - 14}" stroke="${goldDark}" stroke-width="1" stroke-dasharray="5,4" opacity="0.55"/>
   ` : `
-    <!-- Front center fold line (subtle) -->
-    <line x1="${cx}" y1="${shTop + 55}" x2="${cx}" y2="${shBot - 14}" stroke="${goldDark}" stroke-width="0.7" stroke-dasharray="5,4" opacity="0.35"/>
+    <line x1="${cx}" y1="${shTop + 60}" x2="${cx}" y2="${shBot - 14}" stroke="${goldDark}" stroke-width="0.8" stroke-dasharray="6,5" opacity="0.3"/>
   `}
 
   <!-- Body outline -->
-  <path d="${bodyPath} Z" fill="none" stroke="${dark}" stroke-width="2"/>
-
-  <!-- Footer label -->
-  <line x1="${cx - 80}" y1="${H - 58}" x2="${cx + 80}" y2="${H - 58}" stroke="${gold}" stroke-width="0.8"/>
-  <text x="${cx}" y="${H - 44}" font-family="Georgia,serif" font-size="9.5" fill="${dark}" text-anchor="middle" opacity="0.75">${subtitle}</text>
-  <text x="${cx}" y="${H - 30}" font-family="Georgia,serif" font-size="8" fill="${goldDark}" text-anchor="middle" letter-spacing="1">✦ SAREE BLOUSE DESIGN ✦</text>
+  <path d="${bodyPath} Z" fill="none" stroke="${dark}" stroke-width="2.2"/>
 </svg>`;
+}
+
+// ─── AI image generation (with SVG fallback) ────────────────────────────────
+
+async function generateBlousePhoto(prompt: string): Promise<{ b64_json: string; mimeType: string }> {
+  const apiKey = process.env.OPENAI_API_KEY;
+  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
+  const resp = await fetch("https://api.openai.com/v1/images/generations", {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024" }),
+  });
+  if (!resp.ok) {
+    const text = await resp.text();
+    throw new Error(`OpenAI images API ${resp.status}: ${text}`);
+  }
+  const json = await resp.json() as { data?: Array<{ b64_json?: string }> };
+  const b64 = json.data?.[0]?.b64_json ?? "";
+  if (!b64) throw new Error("No image returned");
+  return { b64_json: b64, mimeType: "image/png" };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -360,9 +354,25 @@ router.post("/style", async (req, res) => {
       return;
     }
 
-    const svg = generateBlouseSVG({ neck, sleeve, back, fabric, color, view });
-    const b64 = Buffer.from(svg).toString("base64");
-    res.json({ b64_json: b64, mimeType: "image/svg+xml" });
+    const isBack = view === "back";
+    const colorDesc = color ? `in ${color}` : "in rich maroon";
+    const fabricDesc = fabric ?? "silk";
+    const neckDesc = neck ?? "round";
+    const sleeveDesc = sleeve ?? "short";
+    const backDesc = back ?? "hook closure";
+
+    const prompt = isBack
+      ? `Professional studio fashion photography, ${backDesc} back of a traditional South Indian saree blouse, ${colorDesc} ${fabricDesc} fabric, intricate gold zari border embroidery along hem and edges, displayed flat on a clean white background, soft studio lighting, highly detailed, photorealistic, no mannequin, no model, isolated garment`
+      : `Professional studio fashion photography, ${neckDesc} neckline saree blouse with ${sleeveDesc} sleeves, traditional South Indian style, ${colorDesc} ${fabricDesc} fabric, intricate gold zari border embroidery along neckline and hem, displayed flat on a clean white background, soft studio lighting, highly detailed, photorealistic, no mannequin, no model, isolated garment`;
+
+    try {
+      const result = await generateBlousePhoto(prompt);
+      res.json(result);
+    } catch {
+      const svg = generateBlouseSVG({ neck, sleeve, back, fabric, color, view });
+      const b64 = Buffer.from(svg).toString("base64");
+      res.json({ b64_json: b64, mimeType: "image/svg+xml" });
+    }
   } catch (err) {
     console.error("POST /generate-blouse-image/style error:", err);
     res.status(500).json({ error: "Image generation failed" });
@@ -377,9 +387,22 @@ router.post("/sketch", async (req, res) => {
       view?: "front" | "back";
     };
 
-    const svg = generateBlouseSVG({ sketchColors: colors, description, view });
-    const b64 = Buffer.from(svg).toString("base64");
-    res.json({ b64_json: b64, mimeType: "image/svg+xml" });
+    const isBack = view === "back";
+    const colorDesc = colors?.[0] ? `in ${colors[0]}` : "in rich maroon";
+    const styleDesc = description ?? "traditional style";
+
+    const prompt = isBack
+      ? `Professional studio fashion photography, back view of a traditional South Indian saree blouse based on this design: ${styleDesc}, ${colorDesc} fabric, gold zari embroidery details, displayed flat on a clean white background, soft studio lighting, photorealistic, no mannequin`
+      : `Professional studio fashion photography, front view of a traditional South Indian saree blouse based on this design: ${styleDesc}, ${colorDesc} fabric, gold zari embroidery details, displayed flat on a clean white background, soft studio lighting, photorealistic, no mannequin`;
+
+    try {
+      const result = await generateBlousePhoto(prompt);
+      res.json(result);
+    } catch {
+      const svg = generateBlouseSVG({ sketchColors: colors, description, view });
+      const b64 = Buffer.from(svg).toString("base64");
+      res.json({ b64_json: b64, mimeType: "image/svg+xml" });
+    }
   } catch (err) {
     console.error("POST /generate-blouse-image/sketch error:", err);
     res.status(500).json({ error: "Image generation failed" });
