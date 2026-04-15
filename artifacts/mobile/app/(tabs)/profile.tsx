@@ -49,16 +49,39 @@ const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
+function isSvgUri(uri: string) {
+  return uri.startsWith("data:image/svg") || uri.endsWith(".svg");
+}
+
 async function saveImageUtil(uri: string, label = "blouse") {
   try {
+    const isSvg = isSvgUri(uri);
+    const ext = isSvg ? "svg" : "png";
+    const mimeType = isSvg ? "image/svg+xml" : "image/png";
+
     if (Platform.OS === "web") {
       const a = document.createElement("a");
       a.href = uri;
-      a.download = `blousify-${label}-${Date.now()}.png`;
+      a.download = `blousify-${label}-${Date.now()}.${ext}`;
       a.click();
-      Alert.alert("Downloaded!", "Image saved to your downloads folder.");
+      Alert.alert("Downloaded!", `Design saved as .${ext} to your downloads folder.`);
       return;
     }
+
+    // On mobile: SVGs can't be stored in the photo library — share as file instead
+    if (isSvg) {
+      const b64 = uri.split(",")[1];
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.svg`;
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      const available = await Sharing.isAvailableAsync();
+      if (available) {
+        await Sharing.shareAsync(path, { mimeType, dialogTitle: "Save or share your Blousify design" });
+      } else {
+        Alert.alert("Sharing not available", "Please use a device that supports file sharing.");
+      }
+      return;
+    }
+
     const { status } = await MediaLibrary.requestPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission needed", "Allow access to photos to save images.");
@@ -91,6 +114,10 @@ async function saveImageUtil(uri: string, label = "blouse") {
 
 async function shareImageUtil(uri: string) {
   try {
+    const isSvg = isSvgUri(uri);
+    const ext = isSvg ? "svg" : "png";
+    const mimeType = isSvg ? "image/svg+xml" : "image/png";
+
     if (Platform.OS === "web") {
       if (navigator.share) {
         await navigator.share({ title: "My Blousify Design", url: uri.startsWith("data:") ? window.location.href : uri });
@@ -99,15 +126,11 @@ async function shareImageUtil(uri: string) {
       }
       return;
     }
-    let localUri = uri;
-    if (uri.startsWith("data:")) {
-      const b64 = uri.split(",")[1];
-      const path = `${FileSystem.cacheDirectory}blousify-share-${Date.now()}.png`;
-      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
-      localUri = path;
-    }
+    const b64 = uri.split(",")[1];
+    const path = `${FileSystem.cacheDirectory}blousify-share-${Date.now()}.${ext}`;
+    await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
     const available = await Sharing.isAvailableAsync();
-    if (available) await Sharing.shareAsync(localUri, { mimeType: "image/png", dialogTitle: "Share my blouse design" });
+    if (available) await Sharing.shareAsync(path, { mimeType, dialogTitle: "Share my Blousify design" });
   } catch {
     Alert.alert("Error", "Could not share the image.");
   }
@@ -449,6 +472,29 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
                   </Text>
                   <TouchableOpacity onPress={() => { setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
                     <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+                  <TouchableOpacity
+                    style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                    onPress={() => saveImageUtil(aiPreviewUri, "styles-front")}
+                  >
+                    <Feather name="download" size={13} color={Colors.brand.primary} />
+                    <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Front</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                    onPress={() => saveImageUtil(aiPreviewBackUri, "styles-back")}
+                  >
+                    <Feather name="download" size={13} color={Colors.brand.primary} />
+                    <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Back</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[styles.dlBtn, { borderColor: Colors.brand.gold + "60", flex: 1.5 }]}
+                    onPress={() => shareImageUtil(aiPreviewUri)}
+                  >
+                    <Feather name="share-2" size={13} color={Colors.brand.gold} />
+                    <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share Design</Text>
                   </TouchableOpacity>
                 </View>
               </>
@@ -948,6 +994,29 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                       </Text>
                       <TouchableOpacity onPress={() => { setAiSketchImageUri(null); setAiSketchBackUri(null); }}>
                         <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+                      <TouchableOpacity
+                        style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                        onPress={() => saveImageUtil(aiSketchImageUri, "ideas-front")}
+                      >
+                        <Feather name="download" size={13} color={Colors.brand.primary} />
+                        <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Front</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                        onPress={() => saveImageUtil(aiSketchBackUri, "ideas-back")}
+                      >
+                        <Feather name="download" size={13} color={Colors.brand.primary} />
+                        <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.dlBtn, { borderColor: Colors.brand.gold + "60", flex: 1.5 }]}
+                        onPress={() => shareImageUtil(aiSketchImageUri)}
+                      >
+                        <Feather name="share-2" size={13} color={Colors.brand.gold} />
+                        <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share Design</Text>
                       </TouchableOpacity>
                     </View>
                   </>
@@ -2833,6 +2902,8 @@ const styles = StyleSheet.create({
   aiGenBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, backgroundColor: "transparent" },
   aiGenBtnIcon: { fontSize: 16, color: Colors.brand.gold },
   aiGenBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  dlBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5 },
+  dlBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   aiPreviewCard: { borderRadius: 20, borderWidth: 1, overflow: "hidden" },
   aiPreviewPlaceholder: { padding: 40, alignItems: "center", gap: 14 },
   aiPreviewLoadingText: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 20 },
