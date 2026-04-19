@@ -250,7 +250,7 @@ export default function HomeScreen() {
             entering={FadeInDown.delay(450).springify()}
             style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
           >
-            Explore traditional Tamil and modern neckline designs
+            Explore traditional South Asian and modern neckline designs
           </Animated.Text>
 
           <View style={styles.stylesGrid}>
