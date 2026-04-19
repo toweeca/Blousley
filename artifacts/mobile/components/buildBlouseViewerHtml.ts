@@ -163,8 +163,8 @@ var viewLabel = document.getElementById('view-label');
 var fabricLabel = document.getElementById('fabric-label');
 var hintEl = document.getElementById('hint');
 
-var W = window.innerWidth;
-var H = window.innerHeight - 96; // leave room for panel
+var W = Math.max(window.innerWidth  || document.documentElement.clientWidth  || 320, 100);
+var H = Math.max((window.innerHeight || document.documentElement.clientHeight || 420) - 96, 100);
 
 var scene = new THREE.Scene();
 scene.background = new THREE.Color(0x0D0508);
@@ -175,6 +175,21 @@ camera.position.set(0, 0.06, 3.8);
 var renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
 renderer.setSize(W, H);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+
+// Retry resize — WebView may report 0 initially
+function doResize() {
+  var w = Math.max(window.innerWidth  || document.documentElement.clientWidth  || 0, 0);
+  var h = Math.max((window.innerHeight || document.documentElement.clientHeight || 0) - 96, 0);
+  if (w > 0 && h > 0 && (w !== W || h !== H)) {
+    W = w; H = h;
+    camera.aspect = W / H;
+    camera.updateProjectionMatrix();
+    renderer.setSize(W, H);
+  }
+}
+window.addEventListener('resize', doResize);
+setTimeout(doResize, 80);
+setTimeout(doResize, 400);
 // NOTE: physicallyCorrectLights intentionally disabled — it requires lux-scale intensities
 // which would make our normalised lights invisible (black scene).
 
@@ -371,6 +386,207 @@ function onTexReady() {
   }
 }
 
+// ── Draw blouse design on a canvas — no SVG/API needed ──────────────────
+function drawBlouseCanvas(p, isBack) {
+  var SZ = 512;
+  var cnv = document.createElement('canvas');
+  cnv.width = cnv.height = SZ;
+  var ctx = cnv.getContext('2d');
+
+  var neck   = p.neck   || 'Round';
+  var sleeve = p.sleeve || 'Short';
+  var bk     = p.back   || 'Hook';
+  var hex    = p.color  || curColor || '#8B2252';
+  var bg     = '#0D0508';
+
+  // Derive shaded colours from the chosen hex
+  var col = new THREE.Color(hex);
+  var pHex = '#' + col.getHexString();
+  var lHex = '#' + col.clone().multiplyScalar(1.38).clamp().getHexString();
+  var dHex = '#' + col.clone().multiplyScalar(0.52).getHexString();
+  var gold = '#C9A96E';
+
+  // Geometry (fits 512×512 with margin for sleeves)
+  var cx = SZ / 2;
+  var shT = 35, shB = 465;
+  var shL = cx - 148, shR = cx + 148;
+  var hpL = cx - 182, hpR = cx + 182;
+  var ahD = 65;
+
+  // ── Background ──────────────────────────────────────────────────────
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, SZ, SZ);
+
+  // ── Body path helper ────────────────────────────────────────────────
+  function bodyPath() {
+    ctx.beginPath();
+    ctx.moveTo(shL, shT);
+    ctx.bezierCurveTo(shL - 4, shT + ahD, hpL + 4, shB - 70, hpL, shB);
+    ctx.lineTo(hpR, shB);
+    ctx.bezierCurveTo(hpR + 4, shB - 70, shR + 4, shT + ahD, shR, shT);
+    ctx.closePath();
+  }
+
+  // ── Sleeves (drawn behind body) ─────────────────────────────────────
+  if (sleeve !== 'None' && sleeve !== 'Sleeveless') {
+    var sLen = sleeve === 'Short' ? 55 : sleeve === 'Elbow' ? 100 : sleeve === '3/4' ? 135 : sleeve === 'Long' ? 180 : 55;
+    ctx.fillStyle = dHex;
+    [[shL, -1], [shR, 1]].forEach(function(pair) {
+      var tx = pair[0], dir = pair[1];
+      ctx.beginPath();
+      if (sleeve === 'Cap') {
+        ctx.ellipse(tx + dir * 18, shT + ahD + 4, 20, 14, dir * 0.3, 0, Math.PI * 2);
+      } else if (sleeve === 'Puff') {
+        ctx.ellipse(tx + dir * 22, shT + ahD + 10, 24, 20, 0, 0, Math.PI * 2);
+      } else {
+        ctx.moveTo(tx, shT + ahD - 4);
+        ctx.bezierCurveTo(tx + dir * 28, shT + ahD - 14, tx + dir * 44, shT + ahD + sLen - 30, tx + dir * 20, shT + ahD + sLen);
+        ctx.lineTo(tx + dir * 5, shT + ahD + sLen);
+        ctx.lineTo(tx, shT + ahD + 22);
+        ctx.closePath();
+      }
+      ctx.fill();
+      ctx.strokeStyle = dHex; ctx.lineWidth = 1.5; ctx.stroke();
+    });
+  }
+
+  // ── Body fill ───────────────────────────────────────────────────────
+  var grd = ctx.createLinearGradient(shL, shT, shR, shB);
+  grd.addColorStop(0, lHex);
+  grd.addColorStop(0.38, pHex);
+  grd.addColorStop(1, dHex);
+  bodyPath();
+  ctx.fillStyle = grd;
+  ctx.fill();
+
+  // Side shading
+  ctx.save();
+  bodyPath();
+  ctx.clip();
+  [[shL, -10, 65, 0, 0.24], [shR - 60, 0, 70, 0.24, 0]].forEach(function(r) {
+    var lg = ctx.createLinearGradient(r[0], 0, r[0] + r[2], 0);
+    lg.addColorStop(r[3], 'rgba(0,0,0,' + r[4] + ')');
+    lg.addColorStop(r[4] === 0 ? 1 : 0, 'rgba(0,0,0,0)');
+    ctx.fillStyle = lg;
+    ctx.fillRect(r[0], shT, r[2], shB - shT);
+  });
+  ctx.restore();
+
+  // ── Neckline cutout ─────────────────────────────────────────────────
+  function neckPath() {
+    ctx.beginPath();
+    if (neck === 'V') {
+      ctx.moveTo(shL, shT); ctx.lineTo(shL + 28, shT + 16); ctx.lineTo(cx, shT + 75); ctx.lineTo(shR - 28, shT + 16); ctx.lineTo(shR, shT); ctx.closePath();
+    } else if (neck === 'Deep V') {
+      ctx.moveTo(shL, shT); ctx.lineTo(shL + 22, shT + 14); ctx.lineTo(cx, shT + 105); ctx.lineTo(shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.closePath();
+    } else if (neck === 'Sweetheart') {
+      ctx.moveTo(shL, shT + 8);
+      ctx.bezierCurveTo(shL + 10, shT + 20, shL + 40, shT + 52, cx - 8, shT + 52);
+      ctx.bezierCurveTo(cx + 8, shT + 52, shR - 40, shT + 52, shR - 10, shT + 20);
+      ctx.lineTo(shR, shT + 8); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (neck === 'Boat Neck') {
+      ctx.moveTo(shL - 4, shT + 8); ctx.quadraticCurveTo(cx, shT + 28, shR + 4, shT + 8); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (neck === 'Square') {
+      ctx.rect(shL + 26, shT, shR - shL - 52, 50);
+    } else if (neck === 'Halter') {
+      ctx.moveTo(shL + 14, shT - 4); ctx.lineTo(cx - 18, shT + 30); ctx.quadraticCurveTo(cx, shT + 40, cx + 18, shT + 30); ctx.lineTo(shR - 14, shT - 4); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (neck === 'Off-Shoulder') {
+      ctx.moveTo(shL - 24, shT + 24); ctx.quadraticCurveTo(cx, shT + 52, shR + 24, shT + 24); ctx.lineTo(shR, shT - 10); ctx.lineTo(shL, shT - 10); ctx.closePath();
+    } else {
+      // Round (default)
+      ctx.moveTo(shL, shT);
+      ctx.bezierCurveTo(shL + 20, shT + 12, cx - 38, shT + 48, cx, shT + 50);
+      ctx.bezierCurveTo(cx + 38, shT + 48, shR - 20, shT + 12, shR, shT);
+      ctx.closePath();
+    }
+  }
+
+  function backNeckPath() {
+    ctx.beginPath();
+    if (bk === 'Deep Back') {
+      ctx.moveTo(shL + 22, shT + 14); ctx.bezierCurveTo(shL + 30, shT + 80, cx - 40, shT + 130, cx, shT + 135); ctx.bezierCurveTo(cx + 40, shT + 130, shR - 30, shT + 80, shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (bk === 'Open Back') {
+      ctx.moveTo(shL + 22, shT + 14); ctx.bezierCurveTo(shL + 30, shT + 100, cx - 40, shT + 160, cx, shT + 165); ctx.bezierCurveTo(cx + 40, shT + 160, shR - 30, shT + 100, shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (bk === 'Tie Back') {
+      ctx.moveTo(shL + 22, shT + 14); ctx.bezierCurveTo(shL + 30, shT + 90, cx - 40, shT + 145, cx, shT + 150); ctx.bezierCurveTo(cx + 40, shT + 145, shR - 30, shT + 90, shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (bk === 'Mid Back') {
+      ctx.moveTo(shL + 18, shT + 10); ctx.bezierCurveTo(shL + 28, shT + 55, cx - 36, shT + 88, cx, shT + 90); ctx.bezierCurveTo(cx + 36, shT + 88, shR - 28, shT + 55, shR - 18, shT + 10); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else {
+      // Hook / High Back (shallow cutout)
+      ctx.moveTo(shL, shT); ctx.bezierCurveTo(shL + 18, shT + 10, cx - 30, shT + 22, cx, shT + 22); ctx.bezierCurveTo(cx + 30, shT + 22, shR - 18, shT + 10, shR, shT); ctx.closePath();
+    }
+  }
+
+  // Cut out neckline
+  ctx.save();
+  bodyPath();
+  ctx.clip();
+  if (isBack) { backNeckPath(); } else { neckPath(); }
+  ctx.fillStyle = bg;
+  ctx.fill();
+  ctx.restore();
+
+  // ── Neckline embroidery stroke ───────────────────────────────────────
+  ctx.save();
+  ctx.strokeStyle = gold;
+  ctx.lineWidth = 2.2;
+  ctx.setLineDash([4, 3]);
+  if (isBack) { backNeckPath(); } else { neckPath(); }
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.restore();
+
+  // ── Back-specific details ────────────────────────────────────────────
+  if (isBack) {
+    // Hook closures along centre
+    for (var i = 0; i < 7; i++) {
+      var hy = shT + 30 + i * 30;
+      ctx.beginPath(); ctx.arc(cx, hy, 3, 0, Math.PI * 2); ctx.fillStyle = '#9A7040'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(cx - 7, hy); ctx.lineTo(cx + 7, hy); ctx.strokeStyle = '#9A7040'; ctx.lineWidth = 1.2; ctx.stroke();
+    }
+    // Centre seam
+    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#9A7040'; ctx.lineWidth = 0.9; ctx.globalAlpha = 0.5;
+    ctx.beginPath(); ctx.moveTo(cx, shT + 24); ctx.lineTo(cx, shB - 14); ctx.stroke(); ctx.restore();
+  } else {
+    // Front fold line
+    ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = '#9A7040'; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.3;
+    ctx.beginPath(); ctx.moveTo(cx, shT + 55); ctx.lineTo(cx, shB - 14); ctx.stroke(); ctx.restore();
+  }
+
+  // ── Hem embroidery ───────────────────────────────────────────────────
+  ctx.strokeStyle = gold; ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(hpL, shB); ctx.lineTo(hpR, shB); ctx.stroke();
+  var spots = 14;
+  for (var j = 0; j <= spots; j++) {
+    var ex = hpL + 10 + j * ((hpR - hpL - 20) / spots);
+    ctx.beginPath(); ctx.arc(ex, shB + 8, 4, 0, Math.PI * 2); ctx.strokeStyle = gold; ctx.lineWidth = 1.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex, shB + 8, 1.8, 0, Math.PI * 2); ctx.fillStyle = gold; ctx.fill();
+  }
+  ctx.beginPath(); ctx.moveTo(hpL, shB + 16); ctx.lineTo(hpR, shB + 16); ctx.strokeStyle = gold; ctx.lineWidth = 1; ctx.stroke();
+
+  // ── Body outline ─────────────────────────────────────────────────────
+  bodyPath();
+  ctx.strokeStyle = dHex; ctx.lineWidth = 2.2; ctx.stroke();
+
+  var tex = new THREE.CanvasTexture(cnv);
+  tex.encoding = THREE.sRGBEncoding;
+  if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
+  return tex;
+}
+
+// Called by host with style params — draws texture without any API call
+window.setStyleParams = function(frontP, backP) {
+  if (hintTimer) clearTimeout(hintTimer);
+  frontTex = drawBlouseCanvas(frontP || {}, false);
+  backTex  = drawBlouseCanvas(backP  || {}, true);
+  texLoaded = 2;
+  rebuildMaterials();
+  loaderEl.style.display = 'none';
+  viewLabel.style.display = 'block';
+  hintEl.style.display = 'block';
+  hintTimer = setTimeout(function() { hintEl.style.opacity = '0'; }, 4200);
+};
+
 function loadTex(uri, isBack, done) {
   if (!uri) { done(null); return; }
   var isSvg = uri.indexOf('image/svg+xml') !== -1;
@@ -479,7 +695,8 @@ animate();
 function handleMsg(e){
   try {
     var d = typeof e.data==='string' ? JSON.parse(e.data) : e.data;
-    if(d && d.frontUri && d.backUri){ window.setImages(d.frontUri, d.backUri); }
+    if(d && d.front && d.back){ window.setStyleParams(d.front, d.back); }
+    else if(d && d.frontUri && d.backUri){ window.setImages(d.frontUri, d.backUri); }
     if(d && d.fabric){ window.selectFab(d.fabric); }
     if(d && d.color){ window.selectColor(d.color); }
   } catch(err){}
