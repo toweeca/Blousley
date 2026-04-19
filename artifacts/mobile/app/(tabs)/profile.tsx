@@ -29,7 +29,6 @@ import BlousePatternDiagram from "@/components/BlousePatternDiagram";
 import BlouseBeginnerPattern from "@/components/BlouseBeginnerPattern";
 import RotationViewer from "@/components/RotationViewer";
 import BlouseViewer3D from "@/components/BlouseViewer3D";
-import BlouseDesignSVG from "@/components/BlouseDesignSVG";
 import {
   HighBustDiagram, BustDiagram, UnderBustDiagram, BustPointDiagram,
   ShoulderWidthDiagram, BlouseLengthDiagram, SleeveLengthDiagram,
@@ -453,36 +452,17 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       {showPreview && (
         <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
           <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
-            {/* Front + Back side-by-side native SVG — works everywhere instantly */}
-            <View style={{ flexDirection: "row", justifyContent: "space-around", paddingVertical: 12, paddingHorizontal: 8, gap: 4 }}>
-              <View style={{ alignItems: "center", gap: 4 }}>
-                <BlouseDesignSVG
-                  neck={neck || "Round"}
-                  sleeve={sleeve || "Short"}
-                  back={back || "Hook"}
-                  color={Colors.brand.primary}
-                  isBack={false}
-                  width={(SCREEN_WIDTH - 64) / 2}
-                  height={((SCREEN_WIDTH - 64) / 2) * 1.35}
-                />
-                <Text style={{ color: Colors.brand.gold, fontSize: 11, fontFamily: "Cormorant-SemiBold" }}>Front</Text>
-              </View>
-              <View style={{ alignItems: "center", gap: 4 }}>
-                <BlouseDesignSVG
-                  neck={neck || "Round"}
-                  sleeve={sleeve || "Short"}
-                  back={back || "Hook"}
-                  color={Colors.brand.primary}
-                  isBack={true}
-                  width={(SCREEN_WIDTH - 64) / 2}
-                  height={((SCREEN_WIDTH - 64) / 2) * 1.35}
-                />
-                <Text style={{ color: Colors.brand.gold, fontSize: 11, fontFamily: "Cormorant-SemiBold" }}>Back</Text>
-              </View>
-            </View>
+            <BlouseViewer3D
+              styleParams={{
+                front: { neck: neck || "Round", sleeve: sleeve || "Short", back: back || "Hook", color: Colors.brand.primary },
+                back:  { neck: neck || "Round", sleeve: sleeve || "Short", back: back || "Hook", color: Colors.brand.primary },
+              }}
+              width={SCREEN_WIDTH - 48}
+              height={SCREEN_WIDTH - 48}
+            />
             <View style={styles.aiPreviewFooter}>
               <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                ✦ {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
+                ✦ 3D preview · drag to spin · {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
               </Text>
               <TouchableOpacity onPress={() => setShowPreview(false)}>
                 <Feather name="x" size={16} color={Colors.brand.gold} />

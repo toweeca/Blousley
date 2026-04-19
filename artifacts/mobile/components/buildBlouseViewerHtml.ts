@@ -416,54 +416,117 @@ function _scale(hex, f){
 }
 
 // ── Draw blouse design on a canvas — no SVG/API needed ──────────────────
+// NOTE: All helpers are declared as var = function(){} at function scope
+//       (NOT as function declarations inside try blocks — that breaks strict mode).
 function drawBlouseCanvas(p, isBack) {
   var SZ = 512;
   var cnv = document.createElement('canvas');
   cnv.width = cnv.height = SZ;
   var ctx = cnv.getContext('2d');
-  if (!ctx) { console.warn('drawBlouseCanvas: no 2d context'); return null; }
-
-  try {
+  if (!ctx) { return null; }
 
   var neck   = (p && p.neck)   || 'Round';
   var sleeve = (p && p.sleeve) || 'Short';
   var bk     = (p && p.back)   || 'Hook';
-  var hex    = (p && p.color)  || curColor || '#8B2252';
+  var hex    = (p && p.color)  || '#8B2252';
   var bg     = '#0D0508';
 
-  // Derive shaded colours with pure-JS helpers
   var pHex = hex;
   var lHex = _scale(hex, 1.38);
   var dHex = _scale(hex, 0.52);
   var gold = '#C9A96E';
 
-  // Geometry (fits 512×512 with margin for sleeves)
-  var cx = SZ / 2;
+  var CX = SZ / 2;
   var shT = 35, shB = 465;
-  var shL = cx - 148, shR = cx + 148;
-  var hpL = cx - 182, hpR = cx + 182;
+  var shL = CX - 148, shR = CX + 148;
+  var hpL = CX - 182, hpR = CX + 182;
   var ahD = 65;
 
-  // ── Background ──────────────────────────────────────────────────────
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, SZ, SZ);
-
-  // ── Body path helper ────────────────────────────────────────────────
-  function bodyPath() {
+  // helpers declared as var expressions — safe in strict mode anywhere
+  var doBodyPath = function() {
     ctx.beginPath();
     ctx.moveTo(shL, shT);
     ctx.bezierCurveTo(shL - 4, shT + ahD, hpL + 4, shB - 70, hpL, shB);
     ctx.lineTo(hpR, shB);
     ctx.bezierCurveTo(hpR + 4, shB - 70, shR + 4, shT + ahD, shR, shT);
     ctx.closePath();
-  }
+  };
 
-  // ── Sleeves (drawn behind body) ─────────────────────────────────────
+  var doNeckPath = function() {
+    ctx.beginPath();
+    if (neck === 'V') {
+      ctx.moveTo(shL, shT); ctx.lineTo(shL + 28, shT + 16); ctx.lineTo(CX, shT + 75);
+      ctx.lineTo(shR - 28, shT + 16); ctx.lineTo(shR, shT); ctx.closePath();
+    } else if (neck === 'Deep V') {
+      ctx.moveTo(shL, shT); ctx.lineTo(shL + 22, shT + 14); ctx.lineTo(CX, shT + 105);
+      ctx.lineTo(shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.closePath();
+    } else if (neck === 'Sweetheart') {
+      ctx.moveTo(shL, shT + 8);
+      ctx.bezierCurveTo(shL + 10, shT + 20, shL + 40, shT + 52, CX - 8, shT + 52);
+      ctx.bezierCurveTo(CX + 8, shT + 52, shR - 40, shT + 52, shR - 10, shT + 20);
+      ctx.lineTo(shR, shT + 8); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (neck === 'Boat Neck') {
+      ctx.moveTo(shL - 4, shT + 8); ctx.quadraticCurveTo(CX, shT + 28, shR + 4, shT + 8);
+      ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (neck === 'Square') {
+      ctx.rect(shL + 26, shT, shR - shL - 52, 50);
+    } else if (neck === 'Halter') {
+      ctx.moveTo(shL + 14, shT - 4); ctx.lineTo(CX - 18, shT + 30);
+      ctx.quadraticCurveTo(CX, shT + 40, CX + 18, shT + 30);
+      ctx.lineTo(shR - 14, shT - 4); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (neck === 'Off-Shoulder') {
+      ctx.moveTo(shL - 24, shT + 24); ctx.quadraticCurveTo(CX, shT + 52, shR + 24, shT + 24);
+      ctx.lineTo(shR, shT - 10); ctx.lineTo(shL, shT - 10); ctx.closePath();
+    } else {
+      ctx.moveTo(shL, shT);
+      ctx.bezierCurveTo(shL + 20, shT + 12, CX - 38, shT + 48, CX, shT + 50);
+      ctx.bezierCurveTo(CX + 38, shT + 48, shR - 20, shT + 12, shR, shT);
+      ctx.closePath();
+    }
+  };
+
+  var doBackNeckPath = function() {
+    ctx.beginPath();
+    if (bk === 'Deep Back') {
+      ctx.moveTo(shL + 22, shT + 14);
+      ctx.bezierCurveTo(shL + 30, shT + 80, CX - 40, shT + 130, CX, shT + 135);
+      ctx.bezierCurveTo(CX + 40, shT + 130, shR - 30, shT + 80, shR - 22, shT + 14);
+      ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (bk === 'Open Back') {
+      ctx.moveTo(shL + 22, shT + 14);
+      ctx.bezierCurveTo(shL + 30, shT + 100, CX - 40, shT + 160, CX, shT + 165);
+      ctx.bezierCurveTo(CX + 40, shT + 160, shR - 30, shT + 100, shR - 22, shT + 14);
+      ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (bk === 'Tie Back') {
+      ctx.moveTo(shL + 22, shT + 14);
+      ctx.bezierCurveTo(shL + 30, shT + 90, CX - 40, shT + 145, CX, shT + 150);
+      ctx.bezierCurveTo(CX + 40, shT + 145, shR - 30, shT + 90, shR - 22, shT + 14);
+      ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else if (bk === 'Mid Back') {
+      ctx.moveTo(shL + 18, shT + 10);
+      ctx.bezierCurveTo(shL + 28, shT + 55, CX - 36, shT + 88, CX, shT + 90);
+      ctx.bezierCurveTo(CX + 36, shT + 88, shR - 28, shT + 55, shR - 18, shT + 10);
+      ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
+    } else {
+      ctx.moveTo(shL, shT);
+      ctx.bezierCurveTo(shL + 18, shT + 10, CX - 30, shT + 22, CX, shT + 22);
+      ctx.bezierCurveTo(CX + 30, shT + 22, shR - 18, shT + 10, shR, shT);
+      ctx.closePath();
+    }
+  };
+
+  // ── Draw ─────────────────────────────────────────────────────────────
+  // Background
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, SZ, SZ);
+
+  // Sleeves (behind body)
   if (sleeve !== 'None' && sleeve !== 'Sleeveless') {
-    var sLen = sleeve === 'Short' ? 55 : sleeve === 'Elbow' ? 100 : sleeve === '3/4' ? 135 : sleeve === 'Long' ? 180 : 55;
+    var sLen = sleeve === 'Elbow' ? 100 : sleeve === '3/4' ? 135 : sleeve === 'Long' ? 180 : 55;
     ctx.fillStyle = dHex;
-    [[shL, -1], [shR, 1]].forEach(function(pair) {
-      var tx = pair[0], dir = pair[1];
+    var sides = [[shL, -1], [shR, 1]];
+    for (var si = 0; si < sides.length; si++) {
+      var tx = sides[si][0], dir = sides[si][1];
       ctx.beginPath();
       if (sleeve === 'Cap') {
         ctx.ellipse(tx + dir * 18, shT + ahD + 4, 20, 14, dir * 0.3, 0, Math.PI * 2);
@@ -471,138 +534,90 @@ function drawBlouseCanvas(p, isBack) {
         ctx.ellipse(tx + dir * 22, shT + ahD + 10, 24, 20, 0, 0, Math.PI * 2);
       } else {
         ctx.moveTo(tx, shT + ahD - 4);
-        ctx.bezierCurveTo(tx + dir * 28, shT + ahD - 14, tx + dir * 44, shT + ahD + sLen - 30, tx + dir * 20, shT + ahD + sLen);
+        ctx.bezierCurveTo(tx + dir*28, shT+ahD-14, tx+dir*44, shT+ahD+sLen-30, tx+dir*20, shT+ahD+sLen);
         ctx.lineTo(tx + dir * 5, shT + ahD + sLen);
         ctx.lineTo(tx, shT + ahD + 22);
         ctx.closePath();
       }
       ctx.fill();
       ctx.strokeStyle = dHex; ctx.lineWidth = 1.5; ctx.stroke();
-    });
+    }
   }
 
-  // ── Body fill ───────────────────────────────────────────────────────
+  // Body fill with gradient
   var grd = ctx.createLinearGradient(shL, shT, shR, shB);
   grd.addColorStop(0, lHex);
   grd.addColorStop(0.38, pHex);
   grd.addColorStop(1, dHex);
-  bodyPath();
+  doBodyPath();
   ctx.fillStyle = grd;
   ctx.fill();
 
   // Side shading
   ctx.save();
-  bodyPath();
+  doBodyPath();
   ctx.clip();
-  [[shL, -10, 65, 0, 0.24], [shR - 60, 0, 70, 0.24, 0]].forEach(function(r) {
-    var lg = ctx.createLinearGradient(r[0], 0, r[0] + r[2], 0);
-    lg.addColorStop(r[3], 'rgba(0,0,0,' + r[4] + ')');
-    lg.addColorStop(r[4] === 0 ? 1 : 0, 'rgba(0,0,0,0)');
+  var sides2 = [[shL-10, 65, 0.24], [shR-60, 70, 0]];
+  for (var s2 = 0; s2 < sides2.length; s2++) {
+    var r = sides2[s2];
+    var lg = ctx.createLinearGradient(r[0], 0, r[0] + r[1], 0);
+    lg.addColorStop(0, s2 === 0 ? 'rgba(0,0,0,0.24)' : 'rgba(0,0,0,0)');
+    lg.addColorStop(1, s2 === 0 ? 'rgba(0,0,0,0)' : 'rgba(0,0,0,0.24)');
     ctx.fillStyle = lg;
-    ctx.fillRect(r[0], shT, r[2], shB - shT);
-  });
+    ctx.fillRect(r[0], shT, r[1], shB - shT);
+  }
   ctx.restore();
 
-  // ── Neckline cutout ─────────────────────────────────────────────────
-  function neckPath() {
-    ctx.beginPath();
-    if (neck === 'V') {
-      ctx.moveTo(shL, shT); ctx.lineTo(shL + 28, shT + 16); ctx.lineTo(cx, shT + 75); ctx.lineTo(shR - 28, shT + 16); ctx.lineTo(shR, shT); ctx.closePath();
-    } else if (neck === 'Deep V') {
-      ctx.moveTo(shL, shT); ctx.lineTo(shL + 22, shT + 14); ctx.lineTo(cx, shT + 105); ctx.lineTo(shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.closePath();
-    } else if (neck === 'Sweetheart') {
-      ctx.moveTo(shL, shT + 8);
-      ctx.bezierCurveTo(shL + 10, shT + 20, shL + 40, shT + 52, cx - 8, shT + 52);
-      ctx.bezierCurveTo(cx + 8, shT + 52, shR - 40, shT + 52, shR - 10, shT + 20);
-      ctx.lineTo(shR, shT + 8); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else if (neck === 'Boat Neck') {
-      ctx.moveTo(shL - 4, shT + 8); ctx.quadraticCurveTo(cx, shT + 28, shR + 4, shT + 8); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else if (neck === 'Square') {
-      ctx.rect(shL + 26, shT, shR - shL - 52, 50);
-    } else if (neck === 'Halter') {
-      ctx.moveTo(shL + 14, shT - 4); ctx.lineTo(cx - 18, shT + 30); ctx.quadraticCurveTo(cx, shT + 40, cx + 18, shT + 30); ctx.lineTo(shR - 14, shT - 4); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else if (neck === 'Off-Shoulder') {
-      ctx.moveTo(shL - 24, shT + 24); ctx.quadraticCurveTo(cx, shT + 52, shR + 24, shT + 24); ctx.lineTo(shR, shT - 10); ctx.lineTo(shL, shT - 10); ctx.closePath();
-    } else {
-      // Round (default)
-      ctx.moveTo(shL, shT);
-      ctx.bezierCurveTo(shL + 20, shT + 12, cx - 38, shT + 48, cx, shT + 50);
-      ctx.bezierCurveTo(cx + 38, shT + 48, shR - 20, shT + 12, shR, shT);
-      ctx.closePath();
-    }
-  }
-
-  function backNeckPath() {
-    ctx.beginPath();
-    if (bk === 'Deep Back') {
-      ctx.moveTo(shL + 22, shT + 14); ctx.bezierCurveTo(shL + 30, shT + 80, cx - 40, shT + 130, cx, shT + 135); ctx.bezierCurveTo(cx + 40, shT + 130, shR - 30, shT + 80, shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else if (bk === 'Open Back') {
-      ctx.moveTo(shL + 22, shT + 14); ctx.bezierCurveTo(shL + 30, shT + 100, cx - 40, shT + 160, cx, shT + 165); ctx.bezierCurveTo(cx + 40, shT + 160, shR - 30, shT + 100, shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else if (bk === 'Tie Back') {
-      ctx.moveTo(shL + 22, shT + 14); ctx.bezierCurveTo(shL + 30, shT + 90, cx - 40, shT + 145, cx, shT + 150); ctx.bezierCurveTo(cx + 40, shT + 145, shR - 30, shT + 90, shR - 22, shT + 14); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else if (bk === 'Mid Back') {
-      ctx.moveTo(shL + 18, shT + 10); ctx.bezierCurveTo(shL + 28, shT + 55, cx - 36, shT + 88, cx, shT + 90); ctx.bezierCurveTo(cx + 36, shT + 88, shR - 28, shT + 55, shR - 18, shT + 10); ctx.lineTo(shR, shT); ctx.lineTo(shL, shT); ctx.closePath();
-    } else {
-      // Hook / High Back (shallow cutout)
-      ctx.moveTo(shL, shT); ctx.bezierCurveTo(shL + 18, shT + 10, cx - 30, shT + 22, cx, shT + 22); ctx.bezierCurveTo(cx + 30, shT + 22, shR - 18, shT + 10, shR, shT); ctx.closePath();
-    }
-  }
-
-  // Cut out neckline
+  // Neckline cutout
   ctx.save();
-  bodyPath();
+  doBodyPath();
   ctx.clip();
-  if (isBack) { backNeckPath(); } else { neckPath(); }
+  if (isBack) { doBackNeckPath(); } else { doNeckPath(); }
   ctx.fillStyle = bg;
   ctx.fill();
   ctx.restore();
 
-  // ── Neckline embroidery stroke ───────────────────────────────────────
+  // Neckline embroidery
   ctx.save();
   ctx.strokeStyle = gold;
   ctx.lineWidth = 2.2;
   ctx.setLineDash([4, 3]);
-  if (isBack) { backNeckPath(); } else { neckPath(); }
+  if (isBack) { doBackNeckPath(); } else { doNeckPath(); }
   ctx.stroke();
   ctx.setLineDash([]);
   ctx.restore();
 
-  // ── Back-specific details ────────────────────────────────────────────
+  // Back details
   if (isBack) {
-    // Hook closures along centre
     for (var i = 0; i < 7; i++) {
       var hy = shT + 30 + i * 30;
-      ctx.beginPath(); ctx.arc(cx, hy, 3, 0, Math.PI * 2); ctx.fillStyle = '#9A7040'; ctx.fill();
-      ctx.beginPath(); ctx.moveTo(cx - 7, hy); ctx.lineTo(cx + 7, hy); ctx.strokeStyle = '#9A7040'; ctx.lineWidth = 1.2; ctx.stroke();
+      ctx.beginPath(); ctx.arc(CX, hy, 3, 0, Math.PI * 2); ctx.fillStyle = '#9A7040'; ctx.fill();
+      ctx.beginPath(); ctx.moveTo(CX-7, hy); ctx.lineTo(CX+7, hy); ctx.strokeStyle='#9A7040'; ctx.lineWidth=1.2; ctx.stroke();
     }
-    // Centre seam
-    ctx.save(); ctx.setLineDash([5, 4]); ctx.strokeStyle = '#9A7040'; ctx.lineWidth = 0.9; ctx.globalAlpha = 0.5;
-    ctx.beginPath(); ctx.moveTo(cx, shT + 24); ctx.lineTo(cx, shB - 14); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.setLineDash([5,4]); ctx.strokeStyle='#9A7040'; ctx.lineWidth=0.9; ctx.globalAlpha=0.5;
+    ctx.beginPath(); ctx.moveTo(CX, shT+24); ctx.lineTo(CX, shB-14); ctx.stroke(); ctx.restore();
   } else {
-    // Front fold line
-    ctx.save(); ctx.setLineDash([6, 5]); ctx.strokeStyle = '#9A7040'; ctx.lineWidth = 0.8; ctx.globalAlpha = 0.3;
-    ctx.beginPath(); ctx.moveTo(cx, shT + 55); ctx.lineTo(cx, shB - 14); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.setLineDash([6,5]); ctx.strokeStyle='#9A7040'; ctx.lineWidth=0.8; ctx.globalAlpha=0.3;
+    ctx.beginPath(); ctx.moveTo(CX, shT+55); ctx.lineTo(CX, shB-14); ctx.stroke(); ctx.restore();
   }
 
-  // ── Hem embroidery ───────────────────────────────────────────────────
+  // Hem embroidery
   ctx.strokeStyle = gold; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(hpL, shB); ctx.lineTo(hpR, shB); ctx.stroke();
-  var spots = 14;
-  for (var j = 0; j <= spots; j++) {
-    var ex = hpL + 10 + j * ((hpR - hpL - 20) / spots);
-    ctx.beginPath(); ctx.arc(ex, shB + 8, 4, 0, Math.PI * 2); ctx.strokeStyle = gold; ctx.lineWidth = 1.2; ctx.stroke();
-    ctx.beginPath(); ctx.arc(ex, shB + 8, 1.8, 0, Math.PI * 2); ctx.fillStyle = gold; ctx.fill();
+  for (var j = 0; j <= 14; j++) {
+    var ex = hpL + 10 + j * ((hpR - hpL - 20) / 14);
+    ctx.beginPath(); ctx.arc(ex, shB+8, 4, 0, Math.PI*2); ctx.strokeStyle=gold; ctx.lineWidth=1.2; ctx.stroke();
+    ctx.beginPath(); ctx.arc(ex, shB+8, 1.8, 0, Math.PI*2); ctx.fillStyle=gold; ctx.fill();
   }
-  ctx.beginPath(); ctx.moveTo(hpL, shB + 16); ctx.lineTo(hpR, shB + 16); ctx.strokeStyle = gold; ctx.lineWidth = 1; ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(hpL, shB+16); ctx.lineTo(hpR, shB+16); ctx.strokeStyle=gold; ctx.lineWidth=1; ctx.stroke();
 
-  // ── Body outline ─────────────────────────────────────────────────────
-  bodyPath();
+  // Body outline
+  doBodyPath();
   ctx.strokeStyle = dHex; ctx.lineWidth = 2.2; ctx.stroke();
-
-  } catch(drawErr) { console.error('drawBlouseCanvas draw error:', drawErr); }
 
   try {
     var tex = new THREE.CanvasTexture(cnv);
+    tex.needsUpdate = true;
     if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
     return tex;
   } catch(e) { return null; }

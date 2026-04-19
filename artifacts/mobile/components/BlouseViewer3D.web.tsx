@@ -1,31 +1,37 @@
 import React, { useEffect, useRef, useState } from "react";
 import { View } from "react-native";
 import { buildBlouseViewerHtml } from "./buildBlouseViewerHtml";
+import type { BlouseStyleParamsObj } from "./buildBlouseViewerHtml";
 
 export interface BlouseViewer3DProps {
-  frontUri: string;
-  backUri: string;
+  styleParams?: { front: BlouseStyleParamsObj; back: BlouseStyleParamsObj };
+  frontUri?: string;
+  backUri?: string;
   width: number;
   height: number;
   onFabricChange?: (fabric: string, color: string) => void;
 }
 
 const BlouseViewer3D: React.FC<BlouseViewer3DProps> = ({
-  frontUri, backUri, width, height, onFabricChange,
+  styleParams, frontUri, backUri, width, height, onFabricChange,
 }) => {
   const [blobUrl, setBlobUrl] = useState<string>("");
   const iframeRef = useRef<HTMLIFrameElement>(null);
 
   useEffect(() => {
-    // Embed images directly in the HTML blob so the iframe gets them immediately
-    const html = buildBlouseViewerHtml({ embedImages: true, frontUri, backUri });
+    const hasImages = !!(frontUri && backUri && !styleParams);
+    const html = buildBlouseViewerHtml({
+      embedImages: hasImages,
+      frontUri: frontUri ?? "",
+      backUri: backUri ?? "",
+      styleParams: styleParams ?? undefined,
+    });
     const blob = new Blob([html], { type: "text/html" });
     const url = URL.createObjectURL(blob);
     setBlobUrl(url);
     return () => URL.revokeObjectURL(url);
-  }, [frontUri, backUri]);
+  }, [styleParams, frontUri, backUri]);
 
-  // Listen for fabric change messages from the iframe
   useEffect(() => {
     const handler = (e: MessageEvent) => {
       try {
