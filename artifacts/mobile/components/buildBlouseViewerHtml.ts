@@ -1,19 +1,32 @@
 // Shared HTML builder for BlouseViewer3D — used by both native (WebView) and web (iframe) renders.
 // All Three.js code, fabric simulation, UI, and messaging lives inside this self-contained HTML string.
 
+export interface BlouseStyleParamsObj {
+  neck?: string;
+  sleeve?: string;
+  back?: string;
+  color?: string;
+  fabric?: string;
+}
+
 export interface BlouseViewerHtmlOptions {
   /** Pass true for the web (iframe) version — images are embedded directly in JS. */
   embedImages?: boolean;
   frontUri?: string;
   backUri?: string;
+  /** Embed style params directly in HTML so the blouse draws on first paint — no injectJavaScript needed */
+  styleParams?: { front: BlouseStyleParamsObj; back: BlouseStyleParamsObj };
 }
 
 export function buildBlouseViewerHtml(opts: BlouseViewerHtmlOptions = {}): string {
-  const { embedImages = false, frontUri = "", backUri = "" } = opts;
+  const { embedImages = false, frontUri = "", backUri = "", styleParams } = opts;
 
   // Safely embed data URIs (may be very long base64 strings)
   const fJson = embedImages ? JSON.stringify(frontUri) : "null";
   const bJson = embedImages ? JSON.stringify(backUri) : "null";
+
+  // Pre-embed style params so the blouse draws immediately on load (no injectJavaScript timing issues)
+  const spJson = styleParams ? JSON.stringify(styleParams) : "null";
 
   return `<!DOCTYPE html>
 <html>
@@ -386,24 +399,42 @@ function onTexReady() {
   }
 }
 
+// ── Pure-JS colour helpers (no THREE.Color dependency) ───────────────────
+function _parseHex(hex) {
+  var h = (hex || '#8B2252').replace('#','');
+  if (h.length === 3) h = h[0]+h[0]+h[1]+h[1]+h[2]+h[2];
+  return [parseInt(h.slice(0,2),16)/255, parseInt(h.slice(2,4),16)/255, parseInt(h.slice(4,6),16)/255];
+}
+function _toHex(r,g,b){
+  return '#'+ [r,g,b].map(function(x){
+    return ('0'+Math.round(Math.max(0,Math.min(1,x))*255).toString(16)).slice(-2);
+  }).join('');
+}
+function _scale(hex, f){
+  var c = _parseHex(hex);
+  return _toHex(c[0]*f, c[1]*f, c[2]*f);
+}
+
 // ── Draw blouse design on a canvas — no SVG/API needed ──────────────────
 function drawBlouseCanvas(p, isBack) {
   var SZ = 512;
   var cnv = document.createElement('canvas');
   cnv.width = cnv.height = SZ;
   var ctx = cnv.getContext('2d');
+  if (!ctx) { console.warn('drawBlouseCanvas: no 2d context'); return null; }
 
-  var neck   = p.neck   || 'Round';
-  var sleeve = p.sleeve || 'Short';
-  var bk     = p.back   || 'Hook';
-  var hex    = p.color  || curColor || '#8B2252';
+  try {
+
+  var neck   = (p && p.neck)   || 'Round';
+  var sleeve = (p && p.sleeve) || 'Short';
+  var bk     = (p && p.back)   || 'Hook';
+  var hex    = (p && p.color)  || curColor || '#8B2252';
   var bg     = '#0D0508';
 
-  // Derive shaded colours from the chosen hex
-  var col = new THREE.Color(hex);
-  var pHex = '#' + col.getHexString();
-  var lHex = '#' + col.clone().multiplyScalar(1.38).clamp().getHexString();
-  var dHex = '#' + col.clone().multiplyScalar(0.52).getHexString();
+  // Derive shaded colours with pure-JS helpers
+  var pHex = hex;
+  var lHex = _scale(hex, 1.38);
+  var dHex = _scale(hex, 0.52);
   var gold = '#C9A96E';
 
   // Geometry (fits 512×512 with margin for sleeves)
@@ -568,23 +599,32 @@ function drawBlouseCanvas(p, isBack) {
   bodyPath();
   ctx.strokeStyle = dHex; ctx.lineWidth = 2.2; ctx.stroke();
 
-  var tex = new THREE.CanvasTexture(cnv);
-  tex.encoding = THREE.sRGBEncoding;
-  if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
-  return tex;
+  } catch(drawErr) { console.error('drawBlouseCanvas draw error:', drawErr); }
+
+  try {
+    var tex = new THREE.CanvasTexture(cnv);
+    if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
+    return tex;
+  } catch(e) { return null; }
 }
 
 // Called by host with style params — draws texture without any API call
 window.setStyleParams = function(frontP, backP) {
-  if (hintTimer) clearTimeout(hintTimer);
-  frontTex = drawBlouseCanvas(frontP || {}, false);
-  backTex  = drawBlouseCanvas(backP  || {}, true);
-  texLoaded = 2;
-  rebuildMaterials();
-  loaderEl.style.display = 'none';
-  viewLabel.style.display = 'block';
-  hintEl.style.display = 'block';
-  hintTimer = setTimeout(function() { hintEl.style.opacity = '0'; }, 4200);
+  try {
+    if (hintTimer) clearTimeout(hintTimer);
+    var ft = drawBlouseCanvas(frontP || {}, false);
+    var bt = drawBlouseCanvas(backP  || {}, true);
+    if (ft) { frontTex = ft; }
+    if (bt) { backTex  = bt; }
+    texLoaded = 2;
+    rebuildMaterials();
+    loaderEl.style.display = 'none';
+    viewLabel.style.display = 'block';
+    hintEl.style.display = 'block';
+    hintTimer = setTimeout(function() { hintEl.style.opacity = '0'; }, 4200);
+  } catch(err) {
+    console.error('setStyleParams failed:', err);
+  }
 };
 
 function loadTex(uri, isBack, done) {
@@ -704,17 +744,20 @@ function handleMsg(e){
 window.addEventListener('message', handleMsg);
 document.addEventListener('message', handleMsg);
 
-// ── Auto-load for web embed version ──────────────────────────────────
+// ── Auto-load: draw from embedded params or images ────────────────────
 (function(){
+  var sp = ${spJson};
   var fUri = ${fJson};
   var bUri = ${bJson};
-  if(fUri && bUri){
-    // Show loader until textures arrive
+  if(sp && sp.front && sp.back){
+    // Style params embedded in HTML — draw immediately, no API/CDN wait
+    window.setStyleParams(sp.front, sp.back);
+  } else if(fUri && bUri){
+    // Pre-generated image URIs — load as textures
     loaderEl.style.display = 'flex';
-    // Delay slightly to let Three.js finish initialising
     setTimeout(function(){ window.setImages(fUri, bUri); }, 120);
   } else {
-    // No images: show fabric preview immediately with solid colour
+    // Nothing yet — show solid fabric preview
     texLoaded = 2;
     loaderEl.style.display = 'none';
     viewLabel.style.display = 'block';

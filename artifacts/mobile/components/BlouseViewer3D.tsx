@@ -26,29 +26,15 @@ const BlouseViewer3D: React.FC<BlouseViewer3DProps> = ({
   styleParams, frontUri, backUri, width, height, onFabricChange,
 }) => {
   const webViewRef = useRef<WebView>(null);
-  const html = buildBlouseViewerHtml({ embedImages: false });
 
-  const onLoad = useCallback(() => {
-    if (styleParams) {
-      const payload = JSON.stringify(styleParams);
-      webViewRef.current?.injectJavaScript(`
-        (function(){
-          var d=${payload};
-          if(typeof window.setStyleParams==='function') window.setStyleParams(d.front, d.back);
-        })();
-        true;
-      `);
-    } else if (frontUri && backUri) {
-      const payload = JSON.stringify({ frontUri, backUri });
-      webViewRef.current?.injectJavaScript(`
-        (function(){
-          var d=${payload};
-          if(typeof window.setImages==='function') window.setImages(d.frontUri,d.backUri);
-        })();
-        true;
-      `);
-    }
-  }, [styleParams, frontUri, backUri]);
+  // Embed style params directly into the HTML — the viewer draws on first paint
+  // without needing injectJavaScript, which avoids all timing/CDN-delay issues.
+  const html = buildBlouseViewerHtml({
+    embedImages: !!(frontUri && backUri && !styleParams),
+    frontUri: frontUri ?? "",
+    backUri: backUri ?? "",
+    styleParams: styleParams ?? undefined,
+  });
 
   const onMessage = useCallback((e: WebViewMessageEvent) => {
     try {
@@ -64,7 +50,6 @@ const BlouseViewer3D: React.FC<BlouseViewer3DProps> = ({
       <WebView
         ref={webViewRef}
         source={{ html }}
-        onLoad={onLoad}
         onMessage={onMessage}
         style={{ width, height, backgroundColor: "#0D0508" }}
         scrollEnabled={false}
