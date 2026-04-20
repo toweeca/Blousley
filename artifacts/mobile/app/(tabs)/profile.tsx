@@ -292,6 +292,9 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [notes, setNotes] = useState("");
   const [initialized, setInitialized] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [aiGenerating, setAiGenerating] = useState(false);
+  const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
+  const [aiPreviewBackUri, setAiPreviewBackUri] = useState<string | null>(null);
   const [dlFrontUri, setDlFrontUri] = useState<string | null>(null);
   const [dlBackUri, setDlBackUri] = useState<string | null>(null);
   const [dlLoading, setDlLoading] = useState(false);
@@ -311,6 +314,8 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const handleStyleChange = (setter: (v: string) => void, value: string) => {
     setter(value);
     setShowPreview(false);
+    setAiPreviewUri(null);
+    setAiPreviewBackUri(null);
     setDlFrontUri(null);
     setDlBackUri(null);
   };
@@ -340,13 +345,39 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     onError: () => Alert.alert("Error", "Could not save preferences."),
   });
 
-  const showStylePreview = () => {
+  const generateAIPreview = async () => {
     if (!neck && !sleeve && !back && !fabric) {
       Alert.alert("Select styles first", "Choose at least one style option before previewing.");
       return;
     }
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setAiGenerating(true);
     setShowPreview(true);
+    setAiPreviewUri(null);
+    setAiPreviewBackUri(null);
+    try {
+      const [frontRes, backRes] = await Promise.all([
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, view: "front" }),
+        }),
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, view: "back" }),
+        }),
+      ]);
+      const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
+      const fUri = `data:${fData.mimeType};base64,${fData.b64_json}`;
+      const bUri = `data:${bData.mimeType};base64,${bData.b64_json}`;
+      setAiPreviewUri(fUri);
+      setAiPreviewBackUri(bUri);
+    } catch (err) {
+      console.error("generateAIPreview error:", err);
+    } finally {
+      setAiGenerating(false);
+    }
   };
 
   // Download: fetch SVG from API only when the user explicitly requests it
@@ -441,30 +472,43 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
         </TouchableOpacity>
 
         <TouchableOpacity
-          style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80" }]}
-          onPress={showStylePreview}
+          style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80", opacity: aiGenerating ? 0.7 : 1 }]}
+          onPress={generateAIPreview}
+          disabled={aiGenerating}
         >
-          <Text style={styles.aiGenBtnIcon}>✦</Text>
-          <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>Preview My Design in 3D</Text>
+          {aiGenerating
+            ? <ActivityIndicator size="small" color={Colors.brand.gold} />
+            : <Text style={styles.aiGenBtnIcon}>✦</Text>
+          }
+          <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>
+            {aiGenerating ? "Generating…" : "Preview My Design in 3D"}
+          </Text>
         </TouchableOpacity>
       </Animated.View>
 
       {showPreview && (
         <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
           <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
-            <BlouseViewer3D
-              styleParams={{
-                front: { neck: neck || "Round", sleeve: sleeve || "Short", back: back || "Hook", color: Colors.brand.primary },
-                back:  { neck: neck || "Round", sleeve: sleeve || "Short", back: back || "Hook", color: Colors.brand.primary },
-              }}
-              width={SCREEN_WIDTH - 48}
-              height={SCREEN_WIDTH - 48}
-            />
+            {aiGenerating || (!aiPreviewUri && !aiPreviewBackUri) ? (
+              <View style={styles.aiPreviewPlaceholder}>
+                <ActivityIndicator size="large" color={Colors.brand.gold} />
+                <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
+                  Drawing your blouse…
+                </Text>
+              </View>
+            ) : (
+              <BlouseViewer3D
+                frontUri={aiPreviewUri ?? ""}
+                backUri={aiPreviewBackUri ?? ""}
+                width={SCREEN_WIDTH - 48}
+                height={SCREEN_WIDTH - 48}
+              />
+            )}
             <View style={styles.aiPreviewFooter}>
               <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
                 ✦ 3D preview · drag to spin · {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
               </Text>
-              <TouchableOpacity onPress={() => setShowPreview(false)}>
+              <TouchableOpacity onPress={() => { setShowPreview(false); setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
                 <Feather name="x" size={16} color={Colors.brand.gold} />
               </TouchableOpacity>
             </View>
