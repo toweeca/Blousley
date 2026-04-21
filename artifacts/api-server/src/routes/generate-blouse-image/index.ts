@@ -38,6 +38,127 @@ function parseColor(color?: string): string {
 
 // ─── SVG blouse illustration ─────────────────────────────────────────────────
 
+// ─── Border pattern SVG element generators ───────────────────────────────────
+
+function borderPatternElement(
+  pattern: string | undefined,
+  gold: string,
+  goldDark: string,
+  x1: number,
+  x2: number,
+  y: number,
+  isNeck = false,
+): string {
+  if (!pattern || pattern === "None") return "";
+  const W = x2 - x1;
+  const spacing = isNeck ? 22 : 20;
+  const count = Math.floor(W / spacing);
+  const startX = x1 + (W - count * spacing) / 2;
+  const cy = y;
+
+  const motifs: string[] = [];
+
+  switch (pattern) {
+    case "Floral": {
+      for (let i = 0; i < count; i++) {
+        const cx = startX + i * spacing + spacing / 2;
+        const r = 7;
+        for (let a = 0; a < 360; a += 72) {
+          const px = cx + r * Math.cos((a * Math.PI) / 180);
+          const py = cy + r * Math.sin((a * Math.PI) / 180);
+          motifs.push(`<ellipse cx="${px}" cy="${py}" rx="3.5" ry="2" fill="${gold}" opacity="0.85" transform="rotate(${a},${px},${py})"/>`);
+        }
+        motifs.push(`<circle cx="${cx}" cy="${cy}" r="2.5" fill="${gold}"/>`);
+      }
+      break;
+    }
+    case "Paisley": {
+      for (let i = 0; i < count; i++) {
+        const cx = startX + i * spacing + spacing / 2;
+        const flip = i % 2 === 0 ? 1 : -1;
+        motifs.push(`<path d="M ${cx} ${cy - 10 * flip} C ${cx - 8} ${cy} ${cx - 4} ${cy + 10 * flip} ${cx} ${cy + 8 * flip} C ${cx + 4} ${cy + 10 * flip} ${cx + 8} ${cy} ${cx} ${cy - 10 * flip} Z" fill="${gold}" opacity="0.9"/>`);
+        motifs.push(`<circle cx="${cx}" cy="${cy - 6 * flip}" r="2" fill="#0D0508"/>`);
+      }
+      break;
+    }
+    case "Geometric": {
+      for (let i = 0; i <= count; i++) {
+        const x = x1 + i * (W / count);
+        const up = i % 2 === 0;
+        if (up) {
+          motifs.push(`<polygon points="${x},${cy - 10} ${x - 8},${cy + 8} ${x + 8},${cy + 8}" fill="${gold}" opacity="0.85"/>`);
+        } else {
+          motifs.push(`<polygon points="${x},${cy + 10} ${x - 8},${cy - 8} ${x + 8},${cy - 8}" fill="${gold}" opacity="0.85"/>`);
+        }
+      }
+      break;
+    }
+    case "Temple Border": {
+      for (let i = 0; i < count; i++) {
+        const cx = startX + i * spacing + spacing / 2;
+        motifs.push(`<rect x="${cx - 7}" y="${cy + 2}" width="14" height="12" fill="${gold}" opacity="0.7" rx="1"/>`);
+        motifs.push(`<path d="M ${cx - 7} ${cy + 2} Q ${cx} ${cy - 14} ${cx + 7} ${cy + 2}" fill="${gold}" opacity="0.9"/>`);
+        motifs.push(`<rect x="${cx - 2}" y="${cy - 4}" width="4" height="6" fill="${goldDark}"/>`);
+      }
+      break;
+    }
+    case "Peacock": {
+      const pCount = Math.floor(count / 2);
+      for (let i = 0; i < pCount; i++) {
+        const cx = startX + i * spacing * 2 + spacing;
+        const angles = [-30, -15, 0, 15, 30];
+        for (const a of angles) {
+          const ex = cx + 20 * Math.sin((a * Math.PI) / 180);
+          const ey = cy - 16;
+          motifs.push(`<path d="M ${cx} ${cy + 8} Q ${cx + 12 * Math.sin((a * Math.PI) / 180)} ${cy - 6} ${ex} ${ey}" stroke="${gold}" stroke-width="1.5" fill="none" opacity="0.8"/>`);
+        }
+        motifs.push(`<circle cx="${cx}" cy="${cy - 16}" r="3.5" fill="${gold}"/>`);
+        motifs.push(`<circle cx="${cx}" cy="${cy - 16}" r="1.5" fill="#0D0508"/>`);
+      }
+      break;
+    }
+    case "Lotus": {
+      for (let i = 0; i < count; i++) {
+        const cx = startX + i * spacing + spacing / 2;
+        motifs.push(`<path d="M ${cx} ${cy + 8} Q ${cx - 9} ${cy - 8} ${cx - 5} ${cy - 6} Q ${cx - 2} ${cy + 2} ${cx} ${cy + 8}" fill="${gold}" opacity="0.65"/>`);
+        motifs.push(`<path d="M ${cx} ${cy + 8} Q ${cx + 9} ${cy - 8} ${cx + 5} ${cy - 6} Q ${cx + 2} ${cy + 2} ${cx} ${cy + 8}" fill="${gold}" opacity="0.65"/>`);
+        motifs.push(`<path d="M ${cx} ${cy + 8} Q ${cx} ${cy - 12} ${cx} ${cy - 8} Q ${cx} ${cy + 2} ${cx} ${cy + 8}" fill="${gold}" opacity="1"/>`);
+        motifs.push(`<ellipse cx="${cx}" cy="${cy + 6}" rx="6" ry="3" fill="${gold}" opacity="0.4"/>`);
+      }
+      break;
+    }
+    case "Vine & Leaf": {
+      const pts = [];
+      for (let t = 0; t <= 1; t += 0.02) {
+        const vx = x1 + t * W;
+        const vy = cy + Math.sin(t * Math.PI * 3) * 10;
+        pts.push(`${vx},${vy}`);
+      }
+      motifs.push(`<polyline points="${pts.join(" ")}" stroke="${gold}" stroke-width="1.8" fill="none"/>`);
+      for (let i = 0; i <= count; i++) {
+        const t = i / Math.max(count, 1);
+        const lx = x1 + t * W;
+        const ly = cy + Math.sin(t * Math.PI * 3) * 10;
+        const side = i % 2 === 0 ? -1 : 1;
+        motifs.push(`<ellipse cx="${lx + side * 8}" cy="${ly - side * 7}" rx="5" ry="3" fill="${gold}" opacity="0.75" transform="rotate(${side * 30},${lx + side * 8},${ly - side * 7})"/>`);
+      }
+      break;
+    }
+    case "Zari Stripe": {
+      const lines = [-10, -5, 0, 5, 10];
+      for (const dy of lines) {
+        const isCenter = dy === 0;
+        motifs.push(`<line x1="${x1}" y1="${cy + dy}" x2="${x2}" y2="${cy + dy}" stroke="${isCenter ? gold : goldDark}" stroke-width="${isCenter ? 2.5 : 1}" opacity="${isCenter ? 1 : 0.6}"/>`);
+      }
+      break;
+    }
+    default:
+      return "";
+  }
+
+  return motifs.join("\n");
+}
+
 function generateBlouseSVG(opts: {
   neck?: string;
   sleeve?: string;
@@ -47,6 +168,7 @@ function generateBlouseSVG(opts: {
   view?: "front" | "back";
   description?: string;
   sketchColors?: string[];
+  borderPattern?: string;
 }): string {
   const W = 400;
   const H = 520;
@@ -298,6 +420,13 @@ function generateBlouseSVG(opts: {
   ${neckBorder()}
   ${hemBorder(shBot, hipL, hipR)}
 
+  <!-- Border pattern motifs -->
+  ${borderPatternElement(opts.borderPattern, gold, goldDark, hipL + 10, hipR - 10, shBot - 10)}
+  ${opts.borderPattern && opts.borderPattern !== "None"
+    ? borderPatternElement(opts.borderPattern, gold, goldDark, cx - 40, cx + 40, shTop + 60, true)
+    : ""
+  }
+
   <!-- Back details -->
   ${isBack ? `
     ${hooks}
@@ -339,13 +468,14 @@ async function generateBlousePhoto(prompt: string): Promise<{ b64_json: string; 
 
 router.post("/style", async (req, res) => {
   try {
-    const { neck, sleeve, back, fabric, color, view } = req.body as {
+    const { neck, sleeve, back, fabric, color, view, borderPattern } = req.body as {
       neck?: string;
       sleeve?: string;
       back?: string;
       fabric?: string;
       color?: string;
       view?: "front" | "back";
+      borderPattern?: string;
     };
 
     const hasSelections = neck || sleeve || back || fabric;
@@ -369,7 +499,7 @@ router.post("/style", async (req, res) => {
       const result = await generateBlousePhoto(prompt);
       res.json(result);
     } catch {
-      const svg = generateBlouseSVG({ neck, sleeve, back, fabric, color, view });
+      const svg = generateBlouseSVG({ neck, sleeve, back, fabric, color, view, borderPattern });
       const b64 = Buffer.from(svg).toString("base64");
       res.json({ b64_json: b64, mimeType: "image/svg+xml" });
     }
@@ -399,7 +529,8 @@ router.post("/sketch", async (req, res) => {
       const result = await generateBlousePhoto(prompt);
       res.json(result);
     } catch {
-      const svg = generateBlouseSVG({ sketchColors: colors, description, view });
+      const { borderPattern: bp } = req.body as { borderPattern?: string };
+      const svg = generateBlouseSVG({ sketchColors: colors, description, view, borderPattern: bp });
       const b64 = Buffer.from(svg).toString("base64");
       res.json({ b64_json: b64, mimeType: "image/svg+xml" });
     }

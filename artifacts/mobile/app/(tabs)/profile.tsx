@@ -188,6 +188,231 @@ const FABRIC_IMAGES: Record<string, any> = {
   "Linen": require("@/assets/images/styles/fabric_linen.png"),
 };
 
+// ─── Border Pattern Options ────────────────────────────────────────────────
+
+const BORDER_PATTERN_OPTIONS = [
+  "None", "Floral", "Paisley", "Geometric", "Temple Border",
+  "Peacock", "Lotus", "Vine & Leaf", "Zari Stripe",
+];
+
+const BORDER_PATTERN_LABELS: Record<string, string> = {
+  "None": "Plain",
+  "Floral": "Floral",
+  "Paisley": "Paisley",
+  "Geometric": "Geometric",
+  "Temple Border": "Temple",
+  "Peacock": "Peacock",
+  "Lotus": "Lotus",
+  "Vine & Leaf": "Vine & Leaf",
+  "Zari Stripe": "Zari Stripe",
+};
+
+function PatternPreviewSVG({ pattern, width = 76, height = 56 }: { pattern: string; width?: number; height?: number }) {
+  const gold = "#C9A96E";
+  const dark = "#9A7040";
+  const bg = "#18060F";
+  const mid = height / 2;
+  const W = width;
+
+  const renderPattern = () => {
+    switch (pattern) {
+      case "Floral":
+        return Array.from({ length: 5 }, (_, i) => {
+          const cx = 8 + i * (W - 12) / 4;
+          const cy = mid;
+          return (
+            <React.Fragment key={i}>
+              {[0, 72, 144, 216, 288].map((a, pi) => {
+                const r = 7, px = cx + r * Math.cos((a * Math.PI) / 180), py = cy + r * Math.sin((a * Math.PI) / 180);
+                return <Ellipse key={pi} cx={px} cy={py} rx={3.5} ry={2} fill={gold} opacity={0.85} transform={`rotate(${a}, ${px}, ${py})`} />;
+              })}
+              <Circle cx={cx} cy={cy} r={2.5} fill={gold} />
+            </React.Fragment>
+          );
+        });
+      case "Paisley":
+        return Array.from({ length: 4 }, (_, i) => {
+          const cx = 10 + i * (W - 14) / 3;
+          return (
+            <React.Fragment key={i}>
+              <Path d={`M ${cx} ${mid - 10} C ${cx - 8} ${mid} ${cx - 4} ${mid + 10} ${cx} ${mid + 8} C ${cx + 4} ${mid + 10} ${cx + 8} ${mid} ${cx} ${mid - 10} Z`}
+                fill={gold} opacity={0.9} />
+              <Circle cx={cx} cy={mid - 6} r={2} fill={bg} />
+            </React.Fragment>
+          );
+        });
+      case "Geometric":
+        return Array.from({ length: 7 }, (_, i) => {
+          const x = 4 + i * (W - 6) / 6;
+          const up = i % 2 === 0;
+          return <Polygon key={i}
+            points={up ? `${x},${mid - 10} ${x - 7},${mid + 8} ${x + 7},${mid + 8}` : `${x},${mid + 10} ${x - 7},${mid - 8} ${x + 7},${mid - 8}`}
+            fill={gold} opacity={0.85} />;
+        });
+      case "Temple Border":
+        return Array.from({ length: 4 }, (_, i) => {
+          const cx = 10 + i * (W - 14) / 3;
+          return (
+            <React.Fragment key={i}>
+              <Rect x={cx - 6} y={mid + 2} width={12} height={10} fill={gold} opacity={0.7} rx={1} />
+              <Path d={`M ${cx - 6} ${mid + 2} Q ${cx} ${mid - 14} ${cx + 6} ${mid + 2}`} fill={gold} opacity={0.9} />
+              <Rect x={cx - 1.5} y={mid - 2} width={3} height={4} fill={dark} />
+            </React.Fragment>
+          );
+        });
+      case "Peacock":
+        return Array.from({ length: 3 }, (_, i) => {
+          const cx = 14 + i * (W - 20) / 2;
+          return (
+            <React.Fragment key={i}>
+              {[-30, -15, 0, 15, 30].map((a, fi) => (
+                <Path key={fi}
+                  d={`M ${cx} ${mid + 8} Q ${cx + 12 * Math.sin((a * Math.PI) / 180)} ${mid - 8 + 3 * fi} ${cx + 20 * Math.sin((a * Math.PI) / 180)} ${mid - 14}`}
+                  stroke={gold} strokeWidth={1.5} fill="none" opacity={0.8} />
+              ))}
+              <Circle cx={cx} cy={mid - 14} r={3} fill={gold} />
+              <Circle cx={cx} cy={mid - 14} r={1.5} fill={bg} />
+            </React.Fragment>
+          );
+        });
+      case "Lotus":
+        return Array.from({ length: 4 }, (_, i) => {
+          const cx = 10 + i * (W - 14) / 3;
+          return (
+            <React.Fragment key={i}>
+              {[-1, 0, 1].map((o) => (
+                <Path key={o}
+                  d={`M ${cx} ${mid + 6} Q ${cx + o * 9} ${mid - 10} ${cx + o * 5} ${mid - 8} Q ${cx + o * 2} ${mid + 2} ${cx} ${mid + 6}`}
+                  fill={gold} opacity={o === 0 ? 1 : 0.65} />
+              ))}
+              <Ellipse cx={cx} cy={mid + 4} rx={6} ry={3} fill={gold} opacity={0.4} />
+            </React.Fragment>
+          );
+        });
+      case "Vine & Leaf":
+        return (
+          <>
+            <Path d={`M 2 ${mid} Q ${W * 0.25} ${mid - 14} ${W * 0.5} ${mid} Q ${W * 0.75} ${mid + 14} ${W - 2} ${mid}`}
+              stroke={gold} strokeWidth={1.8} fill="none" />
+            {[0.15, 0.35, 0.55, 0.75, 0.9].map((t, i) => {
+              const lx = t * W, ly = mid + Math.sin(t * Math.PI * 2) * 12;
+              const side = i % 2 === 0 ? -1 : 1;
+              return <Ellipse key={i} cx={lx + side * 7} cy={ly - side * 6} rx={5} ry={3}
+                fill={gold} opacity={0.75} transform={`rotate(${side * 30}, ${lx + side * 7}, ${ly - side * 6})`} />;
+            })}
+          </>
+        );
+      case "Zari Stripe":
+        return (
+          <>
+            {[mid - 12, mid - 5, mid, mid + 5, mid + 12].map((y, i) => (
+              <Line key={i} x1={2} y1={y} x2={W - 2} y2={y}
+                stroke={i === 2 ? gold : dark} strokeWidth={i === 2 ? 2.5 : 1} opacity={i === 2 ? 1 : 0.6} />
+            ))}
+          </>
+        );
+      default:
+        return (
+          <>
+            <Line x1={2} y1={mid - 3} x2={W - 2} y2={mid - 3} stroke={gold} strokeWidth={2} />
+            <Line x1={2} y1={mid + 3} x2={W - 2} y2={mid + 3} stroke={dark} strokeWidth={1} opacity={0.6} />
+          </>
+        );
+    }
+  };
+
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <Rect width={width} height={height} fill={bg} rx={6} />
+      <Rect x={0} y={mid - 16} width={width} height={32} fill="#2A0F1C" rx={3} />
+      {renderPattern()}
+      <Line x1={0} y1={mid - 16} x2={width} y2={mid - 16} stroke={dark} strokeWidth={0.8} opacity={0.5} />
+      <Line x1={0} y1={mid + 16} x2={width} y2={mid + 16} stroke={dark} strokeWidth={0.8} opacity={0.5} />
+    </Svg>
+  );
+}
+
+function PatternCard({
+  pattern, label, selected, onPress, isCustom, hasCustom, theme,
+}: {
+  pattern: string; label: string; selected: boolean; onPress: () => void;
+  isCustom?: boolean; hasCustom?: boolean; theme: typeof Colors.light;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.styleCard,
+        {
+          backgroundColor: selected ? Colors.brand.primary + "12" : theme.card,
+          borderColor: selected ? Colors.brand.primary : theme.border,
+          borderWidth: selected ? 2 : 1,
+        },
+      ]}
+    >
+      <View style={[styles.styleCardImgWrap, selected && { borderColor: Colors.brand.primary, borderWidth: 2 }, { overflow: "hidden", borderRadius: 8 }]}>
+        {isCustom ? (
+          <View style={{ width: 76, height: 56, backgroundColor: "#18060F", alignItems: "center", justifyContent: "center", borderRadius: 8 }}>
+            <Feather name={hasCustom ? "check-circle" : "upload"} size={22} color={hasCustom ? Colors.brand.primary : Colors.brand.gold} />
+          </View>
+        ) : (
+          <PatternPreviewSVG pattern={pattern} width={76} height={56} />
+        )}
+        {selected && (
+          <View style={styles.styleCardCheck}>
+            <Feather name="check" size={12} color="#fff" />
+          </View>
+        )}
+      </View>
+      <Text style={[styles.styleCardLabel, { color: selected ? Colors.brand.primary : theme.text }]} numberOfLines={2}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function PatternPickerRow({
+  selected, onSelect, onUpload, customUri, theme,
+}: {
+  selected: string;
+  onSelect: (v: string) => void;
+  onUpload: () => void;
+  customUri?: string | null;
+  theme: typeof Colors.light;
+}) {
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={[styles.groupLabel, { color: theme.text }]}>Border Pattern</Text>
+        <Text style={{ fontSize: 11, color: theme.textSecondary, fontFamily: "Inter_400Regular" }}>
+          Shown on neckline & hem
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+        {BORDER_PATTERN_OPTIONS.map((opt) => (
+          <PatternCard
+            key={opt}
+            pattern={opt}
+            label={BORDER_PATTERN_LABELS[opt] ?? opt}
+            selected={selected === opt}
+            onPress={() => { onSelect(selected === opt ? "None" : opt); Haptics.selectionAsync(); }}
+            theme={theme}
+          />
+        ))}
+        <PatternCard
+          pattern="custom"
+          label="My Photo"
+          selected={selected === "custom"}
+          onPress={() => { onUpload(); Haptics.selectionAsync(); }}
+          isCustom
+          hasCustom={!!customUri}
+          theme={theme}
+        />
+      </ScrollView>
+    </View>
+  );
+}
+
 const ROLES: { label: string; value: UserRole; icon: string; desc: string }[] = [
   { label: "Customer", value: "customer", icon: "human-female", desc: "Get AI blouse fitting recommendations" },
   { label: "Tailor", value: "tailor", icon: "scissors-cutting", desc: "View customer profiles & add notes" },
@@ -298,6 +523,8 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [dlFrontUri, setDlFrontUri] = useState<string | null>(null);
   const [dlBackUri, setDlBackUri] = useState<string | null>(null);
   const [dlLoading, setDlLoading] = useState(false);
+  const [borderPattern, setBorderPattern] = useState("None");
+  const [borderPatternCustomUri, setBorderPatternCustomUri] = useState<string | null>(null);
 
   React.useEffect(() => {
     if (prefs && !initialized) {
@@ -318,6 +545,30 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     setAiPreviewBackUri(null);
     setDlFrontUri(null);
     setDlBackUri(null);
+  };
+
+  const handleUploadCustomPattern = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const uri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        setBorderPatternCustomUri(uri);
+        setBorderPattern("custom");
+        setAiPreviewUri(null);
+        setAiPreviewBackUri(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      Alert.alert("Error", "Could not load the image.");
+    }
   };
 
   const saveMutation = useMutation({
@@ -356,16 +607,17 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     setAiPreviewUri(null);
     setAiPreviewBackUri(null);
     try {
+      const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
       const [frontRes, backRes] = await Promise.all([
         fetch(`${domain}/api/generate-blouse-image/style`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, view: "front" }),
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, borderPattern: pattern, view: "front" }),
         }),
         fetch(`${domain}/api/generate-blouse-image/style`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, view: "back" }),
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, borderPattern: pattern, view: "back" }),
         }),
       ]);
       const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
@@ -442,6 +694,16 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
 
       <Animated.View entering={FadeInDown.delay(260).springify()}>
         <StyleRow label="Fabric" options={FABRIC_OPTIONS} images={FABRIC_IMAGES} selected={fabric} onSelect={(v) => handleStyleChange(setFabric, v)} theme={theme} />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(300).springify()}>
+        <PatternPickerRow
+          selected={borderPattern}
+          onSelect={(v) => { setBorderPattern(v); setAiPreviewUri(null); setAiPreviewBackUri(null); }}
+          onUpload={handleUploadCustomPattern}
+          customUri={borderPatternCustomUri}
+          theme={theme}
+        />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ gap: 8 }}>
@@ -713,6 +975,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [aiSketchImageUri, setAiSketchImageUri] = useState<string | null>(null);
   const [aiSketchBackUri, setAiSketchBackUri] = useState<string | null>(null);
   const [addedIdeaIds, setAddedIdeaIds] = useState<Set<number>>(new Set());
+  const [ideaBorderPattern, setIdeaBorderPattern] = useState("None");
+  const [ideaBorderPatternCustomUri, setIdeaBorderPatternCustomUri] = useState<string | null>(null);
 
   const addIdeaToFitsMutation = useMutation({
     mutationFn: async ({ ideaId, imageUrl }: { ideaId: number; imageUrl: string }) => {
@@ -742,10 +1006,12 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     setAiSketchImageUri(null);
     setAiSketchBackUri(null);
     try {
+      const ideaBP = ideaBorderPattern !== "None" && ideaBorderPattern !== "custom" ? ideaBorderPattern : undefined;
       const payload = {
-        description: `a blouse design sketch with ${sketchPaths.length} strokes`,
+        description: `a blouse design sketch with ${sketchPaths.length} strokes${ideaBP ? `, ${ideaBP} border pattern` : ""}`,
         colors,
         strokes: sketchPaths.length,
+        borderPattern: ideaBP,
       };
       const [frontRes, backRes] = await Promise.all([
         fetch(`${domain}/api/generate-blouse-image/sketch`, {
@@ -1006,6 +1272,25 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
             <Text style={[styles.sketchNote, { color: theme.textMuted }]}>
               {sketchBackground ? "Draw annotations, markings, or design notes on your photo" : "Draw neckline shape, sleeve length, back design — or add a photo background above"}
             </Text>
+
+            {/* Border Pattern picker for sketch */}
+            <PatternPickerRow
+              selected={ideaBorderPattern}
+              onSelect={(v) => { setIdeaBorderPattern(v); setAiSketchImageUri(null); setAiSketchBackUri(null); }}
+              onUpload={async () => {
+                try {
+                  const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8, base64: true });
+                  if (!r.canceled && r.assets[0]) {
+                    const a = r.assets[0];
+                    setIdeaBorderPatternCustomUri(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+                    setIdeaBorderPattern("custom");
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                } catch { Alert.alert("Error", "Could not load image."); }
+              }}
+              customUri={ideaBorderPatternCustomUri}
+              theme={theme}
+            />
 
             {/* AI Generate from Sketch */}
             <TouchableOpacity
@@ -1906,6 +2191,8 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [aiDesignUri, setAiDesignUri] = useState<string | null>(null);
   const [aiDesignBackUri, setAiDesignBackUri] = useState<string | null>(null);
   const [fitAdded, setFitAdded] = useState(false);
+  const [designBorderPattern, setDesignBorderPattern] = useState("None");
+  const [designBorderPatternCustomUri, setDesignBorderPatternCustomUri] = useState<string | null>(null);
 
   const addToFitsMutation = useMutation({
     mutationFn: async (imageUrl: string) => {
@@ -1980,7 +2267,8 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
     setAiDesignBackUri(null);
     setStep(2);
     try {
-      const stylePayload = { neck: neckline, sleeve, back, color: fabricColor };
+      const bp = designBorderPattern !== "None" && designBorderPattern !== "custom" ? designBorderPattern : undefined;
+      const stylePayload = { neck: neckline, sleeve, back, color: fabricColor, borderPattern: bp };
       const [designResp, frontResp, backResp] = await Promise.all([
         fetch(`${API_BASE}/api/blouse/design`, {
           method: "POST",
@@ -1994,7 +2282,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
               sleeveLength: +sleeveLen || 0,
               unit,
             },
-            styles: { neckline, sleeve, back, fabric, fabricColor },
+            styles: { neckline, sleeve, back, fabric, fabricColor, borderPattern: bp },
           }),
         }),
         fetch(`${API_BASE}/api/generate-blouse-image/style`, {
@@ -2305,6 +2593,24 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
               Selected: <Text style={{ fontFamily: "Inter_600SemiBold", color: fabricColor }}>{fabricColor}</Text>
             </Text>
           </View>
+
+          <PatternPickerRow
+            selected={designBorderPattern}
+            onSelect={(v) => { setDesignBorderPattern(v); setAiDesignUri(null); setAiDesignBackUri(null); }}
+            onUpload={async () => {
+              try {
+                const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8, base64: true });
+                if (!r.canceled && r.assets[0]) {
+                  const a = r.assets[0];
+                  setDesignBorderPatternCustomUri(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+                  setDesignBorderPattern("custom");
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+              } catch { Alert.alert("Error", "Could not load image."); }
+            }}
+            customUri={designBorderPatternCustomUri}
+            theme={theme}
+          />
 
           <View style={{ flexDirection: "row", gap: 12 }}>
             <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
