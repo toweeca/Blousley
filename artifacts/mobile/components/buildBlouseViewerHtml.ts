@@ -117,7 +117,11 @@ html,body{width:100%;height:100%;overflow:hidden;background:#0D0508;font-family:
   <div id="hint">Drag to rotate \u00b7 Pinch to zoom</div>
   <div id="fabric-label">Silk \u00b7 High sheen, fluid drape</div>
 </div>
-<div id="flat-view" style="display:none;position:absolute;top:0;left:0;right:0;bottom:96px;background:#0D0508;overflow:hidden;"></div>
+<div id="flat-view" style="display:none;position:absolute;top:0;left:0;right:0;bottom:96px;background:#0D0508;overflow:hidden;flex-direction:column;align-items:center;justify-content:center;">
+  <div id="flat-label" style="position:absolute;top:12px;left:50%;transform:translateX(-50%);background:rgba(201,169,110,0.1);border:1px solid rgba(201,169,110,0.25);color:rgba(201,169,110,0.9);font-size:9px;font-weight:700;letter-spacing:2.8px;text-transform:uppercase;padding:4px 13px;border-radius:20px;white-space:nowrap;z-index:2;">FRONT VIEW</div>
+  <img id="flat-img" src="" alt="" style="width:100%;height:100%;object-fit:contain;display:block;" />
+  <button id="flat-flip-btn" onclick="flatFlip()" style="position:absolute;bottom:14px;left:50%;transform:translateX(-50%);background:rgba(201,169,110,0.12);border:1px solid rgba(201,169,110,0.4);color:#C9A96E;font-size:10px;font-weight:700;letter-spacing:1.5px;padding:7px 24px;border-radius:20px;cursor:pointer;white-space:nowrap;z-index:2;">&#8635; Flip View</button>
+</div>
 
 <div id="panel">
   <div id="fab-row">
@@ -642,35 +646,45 @@ window.setStyleParams = function(frontP, backP) {
   }
 };
 
+// ── Flat view (for SVG / data-URI images — bypasses canvas taint issue) ──────
+var flatFront = '', flatBack = '', flatShowingBack = false;
+var flatViewEl = document.getElementById('flat-view');
+var flatImgEl  = document.getElementById('flat-img');
+var flatLblEl  = document.getElementById('flat-label');
+
+function showFlatView(fUri, bUri) {
+  flatFront = fUri; flatBack = bUri; flatShowingBack = false;
+  flatImgEl.src = fUri;
+  flatLblEl.textContent = 'FRONT VIEW';
+  flatViewEl.style.display = 'flex';
+  document.getElementById('c').style.display = 'none';
+  document.getElementById('overlay').style.display = 'none';
+  loaderEl.style.display = 'none';
+}
+
+window.flatFlip = function() {
+  flatShowingBack = !flatShowingBack;
+  flatImgEl.src = flatShowingBack ? flatBack : flatFront;
+  flatLblEl.textContent = flatShowingBack ? 'BACK VIEW' : 'FRONT VIEW';
+};
+
 function loadTex(uri, isBack, done) {
   if (!uri) { done(null); return; }
-  var isSvg = uri.indexOf('image/svg+xml') !== -1;
-  if (isSvg) {
-    // Rasterise SVG → canvas → CanvasTexture so WebGL can use it
-    var img = new Image();
-    img.onload = function() {
-      var cnv = document.createElement('canvas');
-      cnv.width = 1024; cnv.height = 1024;
-      var ctx = cnv.getContext('2d');
-      ctx.drawImage(img, 0, 0, 1024, 1024);
-      var tex = new THREE.CanvasTexture(cnv);
-      tex.encoding = THREE.sRGBEncoding;
-      if (isBack) { tex.repeat.set(-1,1); tex.offset.set(1,0); }
-      done(tex);
-    };
-    img.onerror = function() { done(null); };
-    img.src = uri;
-  } else {
-    var loader = new THREE.TextureLoader();
-    loader.load(uri, function(tex) {
-      tex.encoding = THREE.sRGBEncoding;
-      if (isBack) { tex.repeat.set(-1,1); tex.offset.set(1,0); }
-      done(tex);
-    }, undefined, function() { done(null); });
-  }
+  var loader = new THREE.TextureLoader();
+  loader.load(uri, function(tex) {
+    if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+    if (isBack) { tex.repeat.set(-1,1); tex.offset.set(1,0); }
+    done(tex);
+  }, undefined, function() { done(null); });
 }
 
 window.setImages = function(fUri, bUri) {
+  var isSvg = (fUri && fUri.indexOf('image/svg+xml') !== -1) ||
+              (bUri && bUri.indexOf('image/svg+xml') !== -1);
+  if (isSvg) {
+    showFlatView(fUri, bUri);
+    return;
+  }
   texLoaded = 0;
   loadTex(fUri, false, function(tex) { frontTex = tex; onTexReady(); });
   loadTex(bUri, true,  function(tex) { backTex  = tex; onTexReady(); });
@@ -768,9 +782,14 @@ document.addEventListener('message', handleMsg);
     // Style params embedded in HTML — draw immediately, no API/CDN wait
     window.setStyleParams(sp.front, sp.back);
   } else if(fUri && bUri){
-    // Pre-generated image URIs — load as textures
-    loaderEl.style.display = 'flex';
-    setTimeout(function(){ window.setImages(fUri, bUri); }, 120);
+    // Pre-generated image URIs — SVG → flat view, PNG/JPEG → 3D textures
+    var isSvgUri = fUri.indexOf('image/svg+xml') !== -1 || bUri.indexOf('image/svg+xml') !== -1;
+    if (isSvgUri) {
+      showFlatView(fUri, bUri);
+    } else {
+      loaderEl.style.display = 'flex';
+      setTimeout(function(){ window.setImages(fUri, bUri); }, 120);
+    }
   } else {
     // Nothing yet — show solid fabric preview
     texLoaded = 2;
