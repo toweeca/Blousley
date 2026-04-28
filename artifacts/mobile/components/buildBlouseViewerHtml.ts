@@ -395,6 +395,12 @@ var texLoaded = 0;
 function onTexReady() {
   texLoaded++;
   if (texLoaded >= 2) {
+    // If SVG texture loading failed completely, fall back to flat image view
+    if (!frontTex && !backTex && pendingSvgFront && pendingSvgBack) {
+      showFlatView(pendingSvgFront, pendingSvgBack);
+      pendingSvgFront = ''; pendingSvgBack = '';
+      return;
+    }
     rebuildMaterials();
     loaderEl.style.display = 'none';
     viewLabel.style.display = 'block';
@@ -646,7 +652,7 @@ window.setStyleParams = function(frontP, backP) {
   }
 };
 
-// ── Flat view (for SVG / data-URI images — bypasses canvas taint issue) ──────
+// ── Flat view fallback (used when 3D texture loading fails) ──────────────────
 var flatFront = '', flatBack = '', flatShowingBack = false;
 var flatViewEl = document.getElementById('flat-view');
 var flatImgEl  = document.getElementById('flat-img');
@@ -668,22 +674,60 @@ window.flatFlip = function() {
   flatLblEl.textContent = flatShowingBack ? 'BACK VIEW' : 'FRONT VIEW';
 };
 
+// Load SVG via Blob URL — same-origin blob: URLs never taint a canvas,
+// unlike data: SVG URIs which are treated as cross-origin in some WebViews.
+function loadSvgTex(uri, isBack, done) {
+  try {
+    var b64 = uri.split(',')[1];
+    var binary = atob(b64);
+    var bytes = new Uint8Array(binary.length);
+    for (var k = 0; k < binary.length; k++) bytes[k] = binary.charCodeAt(k);
+    var blob = new Blob([bytes], { type: 'image/svg+xml' });
+    var blobUrl = URL.createObjectURL(blob);
+    var img = new Image();
+    img.onload = function() {
+      var cnv = document.createElement('canvas');
+      cnv.width = 1024; cnv.height = 1024;
+      var c2 = cnv.getContext('2d');
+      try {
+        c2.drawImage(img, 0, 0, 1024, 1024);
+        URL.revokeObjectURL(blobUrl);
+        var tex = new THREE.CanvasTexture(cnv);
+        tex.needsUpdate = true;
+        if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
+        done(tex);
+      } catch(e) {
+        URL.revokeObjectURL(blobUrl);
+        done(null);
+      }
+    };
+    img.onerror = function() { URL.revokeObjectURL(blobUrl); done(null); };
+    img.src = blobUrl;
+  } catch(e) { done(null); }
+}
+
 function loadTex(uri, isBack, done) {
   if (!uri) { done(null); return; }
-  var loader = new THREE.TextureLoader();
-  loader.load(uri, function(tex) {
-    if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
-    if (isBack) { tex.repeat.set(-1,1); tex.offset.set(1,0); }
-    done(tex);
-  }, undefined, function() { done(null); });
+  if (uri.indexOf('image/svg+xml') !== -1) {
+    loadSvgTex(uri, isBack, done);
+  } else {
+    var loader = new THREE.TextureLoader();
+    loader.load(uri, function(tex) {
+      if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
+      if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
+      done(tex);
+    }, undefined, function() { done(null); });
+  }
 }
+
+// Track the pending SVG URIs so we can fall back to flat view if 3D fails
+var pendingSvgFront = '', pendingSvgBack = '';
 
 window.setImages = function(fUri, bUri) {
   var isSvg = (fUri && fUri.indexOf('image/svg+xml') !== -1) ||
               (bUri && bUri.indexOf('image/svg+xml') !== -1);
   if (isSvg) {
-    showFlatView(fUri, bUri);
-    return;
+    pendingSvgFront = fUri; pendingSvgBack = bUri;
   }
   texLoaded = 0;
   loadTex(fUri, false, function(tex) { frontTex = tex; onTexReady(); });
@@ -782,14 +826,9 @@ document.addEventListener('message', handleMsg);
     // Style params embedded in HTML — draw immediately, no API/CDN wait
     window.setStyleParams(sp.front, sp.back);
   } else if(fUri && bUri){
-    // Pre-generated image URIs — SVG → flat view, PNG/JPEG → 3D textures
-    var isSvgUri = fUri.indexOf('image/svg+xml') !== -1 || bUri.indexOf('image/svg+xml') !== -1;
-    if (isSvgUri) {
-      showFlatView(fUri, bUri);
-    } else {
-      loaderEl.style.display = 'flex';
-      setTimeout(function(){ window.setImages(fUri, bUri); }, 120);
-    }
+    // Pre-generated image URIs — always try 3D first (SVG via Blob URL); flat view is the fallback
+    loaderEl.style.display = 'flex';
+    setTimeout(function(){ window.setImages(fUri, bUri); }, 120);
   } else {
     // Nothing yet — show solid fabric preview
     texLoaded = 2;
