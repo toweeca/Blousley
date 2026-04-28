@@ -278,7 +278,12 @@ function buildMat(fab, hexColor, mapTex, isBack) {
     sheen: fab.sheen,
     sheenColor: col.clone().multiplyScalar(1.6),
     sheenRoughness: fab.sheenR,
-    side: THREE.FrontSide
+    side: THREE.FrontSide,
+    // transparent + alphaTest lets the neckline/background areas of the texture
+    // be fully cut out, so the scene background shows through instead of a
+    // darkly-lit rectangle of opaque plane being visible around the blouse.
+    transparent: true,
+    alphaTest: 0.05
   });
 
   mat.normalMap = makeNormalTex(fab.ntype);
@@ -526,9 +531,8 @@ function drawBlouseCanvas(p, isBack) {
   };
 
   // ── Draw ─────────────────────────────────────────────────────────────
-  // Background
-  ctx.fillStyle = bg;
-  ctx.fillRect(0, 0, SZ, SZ);
+  // No background fill — leave canvas transparent so the 3D scene background
+  // shows through instead of the dark rectangle being lit differently by scene lights.
 
   // Sleeves (behind body)
   if (sleeve !== 'None' && sleeve !== 'Sleeveless') {
@@ -578,12 +582,14 @@ function drawBlouseCanvas(p, isBack) {
   }
   ctx.restore();
 
-  // Neckline cutout
+  // Neckline cutout — use destination-out to punch a transparent hole
+  // (do NOT fill with the dark bg color, which when lit would cause a mismatch with the scene background)
   ctx.save();
   doBodyPath();
   ctx.clip();
   if (isBack) { doBackNeckPath(); } else { doNeckPath(); }
-  ctx.fillStyle = bg;
+  ctx.globalCompositeOperation = 'destination-out';
+  ctx.fillStyle = 'rgba(0,0,0,1)';
   ctx.fill();
   ctx.restore();
 
@@ -628,6 +634,8 @@ function drawBlouseCanvas(p, isBack) {
   try {
     var tex = new THREE.CanvasTexture(cnv);
     tex.needsUpdate = true;
+    // Ensure colour-space matches the regular TextureLoader path
+    if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
     if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
     return tex;
   } catch(e) { return null; }
@@ -694,6 +702,9 @@ function loadSvgTex(uri, isBack, done) {
         URL.revokeObjectURL(blobUrl);
         var tex = new THREE.CanvasTexture(cnv);
         tex.needsUpdate = true;
+        // Match the encoding used by TextureLoader path — without this
+        // the colours are subtly wrong (LinearEncoding treats sRGB data as already linear).
+        if (THREE.sRGBEncoding !== undefined) tex.encoding = THREE.sRGBEncoding;
         if (isBack) { tex.repeat.set(-1, 1); tex.offset.set(1, 0); }
         done(tex);
       } catch(e) {
@@ -724,14 +735,26 @@ function loadTex(uri, isBack, done) {
 var pendingSvgFront = '', pendingSvgBack = '';
 
 window.setImages = function(fUri, bUri) {
+  // Log raw image receipt for debugging — helps verify the generated image is correct
+  // before the 3D pipeline touches it.
+  console.log('[BlouseViewer] setImages called — front type:', fUri ? fUri.split(';')[0] : 'null',
+    'front length:', fUri ? fUri.length : 0,
+    '| back type:', bUri ? bUri.split(';')[0] : 'null',
+    'back length:', bUri ? bUri.length : 0);
   var isSvg = (fUri && fUri.indexOf('image/svg+xml') !== -1) ||
               (bUri && bUri.indexOf('image/svg+xml') !== -1);
   if (isSvg) {
     pendingSvgFront = fUri; pendingSvgBack = bUri;
   }
   texLoaded = 0;
-  loadTex(fUri, false, function(tex) { frontTex = tex; onTexReady(); });
-  loadTex(bUri, true,  function(tex) { backTex  = tex; onTexReady(); });
+  loadTex(fUri, false, function(tex) {
+    console.log('[BlouseViewer] front texture loaded:', tex ? 'OK' : 'FAILED');
+    frontTex = tex; onTexReady();
+  });
+  loadTex(bUri, true, function(tex) {
+    console.log('[BlouseViewer] back texture loaded:', tex ? 'OK' : 'FAILED');
+    backTex = tex; onTexReady();
+  });
 };
 
 // ── postMessage to host ───────────────────────────────────────────────

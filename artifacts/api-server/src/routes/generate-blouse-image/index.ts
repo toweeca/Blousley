@@ -372,16 +372,17 @@ function generateBlouseSVG(opts: {
     L ${hipR} ${shBot}
     C ${hipR + 4} ${shBot - 60} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop}`;
 
-  // Dark viewer bg colour — matches the 3D WebView background exactly
-  const viewerBg = "#0D0508";
+  // Neckline hole path used to punch a transparent cutout via SVG even-odd fill rule.
+  // Using fill="${viewerBg}" on a separate rect used to "fake" the hole but the dark
+  // background colour when lit by Three.js scene lights became a different shade, making
+  // the rectangular plane visible as a dark blocked area over the rendered image.
+  const neckHole = isBack
+    ? `${backNkPath} L ${shR} ${shTop} L ${shL} ${shTop} Z`
+    : nk.clip;
 
-  // ── Assemble SVG — clean garment on dark bg, no text, no borders ─────────
+  // ── Assemble SVG — transparent background so the 3D scene shows through ──────
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
-    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
-      <stop offset="0%" stop-color="${viewerBg}"/>
-      <stop offset="100%" stop-color="${viewerBg}"/>
-    </linearGradient>
     <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="${light}"/>
       <stop offset="35%" stop-color="${primary}"/>
@@ -393,27 +394,26 @@ function generateBlouseSVG(opts: {
     ${fabricTexture()}
   </defs>
 
-  <!-- Dark background -->
-  <rect width="${W}" height="${H}" fill="${viewerBg}"/>
+  <!-- NO background rect — SVG is transparent so the 3D scene background shows through
+       seamlessly without the lighting mismatch that caused the dark blocked area. -->
 
   <!-- Sleeves (behind body) -->
   ${sleeve_left(sleeve)}
   ${sleeve_right(sleeve)}
 
-  <!-- Main blouse body -->
-  <path d="${bodyPath} Z" fill="url(#body)" filter="url(#drop)"/>
-  <path d="${bodyPath} Z" fill="url(#silk)" opacity="0.85"/>
+  <!-- Main blouse body — compound path with even-odd rule punches the neckline hole
+       so that area is transparent (not filled with a dark colour that clashes with lighting). -->
+  <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#body)" filter="url(#drop)"/>
+  <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#silk)" opacity="0.85"/>
 
   <!-- Side shading -->
   <path d="M ${hipL} ${shBot} C ${hipL + 4} ${shBot - 70} ${shL - 4} ${shTop + ahDepth} ${shL} ${shTop} L ${shL + 32} ${shTop} C ${shL + 24} ${shTop + ahDepth} ${hipL + 36} ${shBot - 70} ${hipL + 32} ${shBot} Z" fill="${dark}" opacity="0.25"/>
   <path d="M ${hipR} ${shBot} C ${hipR + 4} ${shBot - 70} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop} L ${shR - 32} ${shTop} C ${shR - 24} ${shTop + ahDepth} ${hipR - 36} ${shBot - 70} ${hipR - 32} ${shBot} Z" fill="${dark}" opacity="0.25"/>
 
-  <!-- Neckline cutout — dark bg shows through as "hole" -->
+  <!-- Neckline cutout stroke only — fill handled by compound path above -->
   ${isBack
-    ? `<path d="${backNkPath} L ${shR} ${shTop} L ${shL} ${shTop} Z" fill="${viewerBg}"/>
-       <path d="${backNkPath}" fill="none" stroke="${dark}" stroke-width="2"/>`
-    : `<path d="${nk.clip}" fill="${viewerBg}"/>
-       <path d="${nk.path}" fill="none" stroke="${dark}" stroke-width="2"/>`
+    ? `<path d="${backNkPath}" fill="none" stroke="${dark}" stroke-width="2"/>`
+    : `<path d="${nk.path}" fill="none" stroke="${dark}" stroke-width="2"/>`
   }
 
   <!-- Gold embroidery -->
