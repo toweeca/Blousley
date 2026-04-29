@@ -547,23 +547,17 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     setDlBackUri(null);
   };
 
-  // Auto-generate AI preview whenever all four style options are set
-  React.useEffect(() => {
-    if (!neck || !sleeve || !back || !fabric) {
-      setShowPreview(false);
-      setAiPreviewUri(null);
-      setAiPreviewBackUri(null);
-      return;
-    }
-    setShowPreview(true);
+  const allSelected = !!(neck && sleeve && back && fabric);
+
+  const generateAIPreview = async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAiGenerating(true);
+    setShowPreview(true);
     setAiPreviewUri(null);
     setAiPreviewBackUri(null);
-
-    const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
-
-    const timer = setTimeout(() => {
-      Promise.all([
+    try {
+      const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
+      const [frontRes, backRes] = await Promise.all([
         fetch(`${domain}/api/generate-blouse-image/style`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -574,22 +568,17 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "back" }),
         }),
-      ])
-        .then(([fr, br]) => Promise.all([fr.json(), br.json()]))
-        .then(([fData, bData]) => {
-          setAiPreviewUri(`data:${fData.mimeType};base64,${fData.b64_json}`);
-          setAiPreviewBackUri(`data:${bData.mimeType};base64,${bData.b64_json}`);
-        })
-        .catch((err) => console.error("Auto-preview error:", err))
-        .finally(() => setAiGenerating(false));
-    }, 600);
-
-    return () => {
-      clearTimeout(timer);
+      ]);
+      const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
+      setAiPreviewUri(`data:${fData.mimeType};base64,${fData.b64_json}`);
+      setAiPreviewBackUri(`data:${bData.mimeType};base64,${bData.b64_json}`);
+    } catch (err) {
+      console.error("generateAIPreview error:", err);
+      Alert.alert("Preview failed", "Could not generate the preview. Please try again.");
+    } finally {
       setAiGenerating(false);
-    };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [neck, sleeve, back, fabric, fabricColor, borderPattern]);
+    }
+  };
 
   const handleUploadCustomPattern = async () => {
     try {
@@ -772,11 +761,36 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
           )}
         </TouchableOpacity>
 
-        {/* Hint shown until all four options are selected */}
-        {(!neck || !sleeve || !back || !fabric) && (
-          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 6, opacity: 0.65 }}>
-            <Text style={{ fontSize: 13, color: Colors.brand.gold, fontFamily: "Inter_400Regular" }}>
-              ✦ Select neckline, sleeve, back & fabric to see your AI preview
+        {/* AI Preview button — visible only once all selections are made */}
+        {allSelected ? (
+          <TouchableOpacity
+            style={[
+              styles.aiGenBtn,
+              {
+                borderColor: Colors.brand.gold,
+                borderWidth: 1.5,
+                backgroundColor: "#1A0A12",
+                opacity: aiGenerating ? 0.7 : 1,
+                paddingVertical: 14,
+              },
+            ]}
+            onPress={generateAIPreview}
+            disabled={aiGenerating}
+            activeOpacity={0.8}
+          >
+            {aiGenerating ? (
+              <ActivityIndicator size="small" color={Colors.brand.gold} />
+            ) : (
+              <Text style={{ fontSize: 18, color: Colors.brand.gold }}>✦</Text>
+            )}
+            <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold, fontSize: 15, fontFamily: "Inter_600SemiBold" }]}>
+              {aiGenerating ? "Generating AI Preview…" : "AI Preview"}
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <View style={{ alignItems: "center", paddingVertical: 8, opacity: 0.5 }}>
+            <Text style={{ fontSize: 12, color: theme.textSecondary, fontFamily: "Inter_400Regular", textAlign: "center" }}>
+              Select neckline · sleeve · back · fabric to unlock AI Preview
             </Text>
           </View>
         )}
