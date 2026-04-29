@@ -331,24 +331,32 @@ function generateBlouseSVG(opts: {
 
   // ── Fabric texture overlay ───────────────────────────────────────────────
   function fabricTexture(): string {
-    const fab = (opts.fabric ?? "").toLowerCase();
+    // Returns ONLY the inner pattern element — the caller embeds this inside <defs>.
+    // Previously this function returned its own <defs> wrapper, producing nested <defs>
+    // in the SVG.  The fallback pattern also had an implicit black fill (no fill attr on
+    // <rect>) which, combined with opacity="0.85" on the body silk-overlay path, was
+    // making the entire blouse body render as ~85% black — the primary dark blocked area.
+    const fab = (opts.fabric ?? "silk").toLowerCase();
     if (fab.includes("silk") || fab.includes("kanjivaram")) {
-      return `<defs><pattern id="silk" patternUnits="userSpaceOnUse" width="8" height="8">
+      return `<pattern id="silk" patternUnits="userSpaceOnUse" width="8" height="8">
         <path d="M0 0 L8 8 M-2 2 L2 -2 M6 10 L10 6" stroke="${gold}" stroke-width="0.3" opacity="0.18"/>
-      </pattern></defs>`;
+      </pattern>`;
     }
     if (fab.includes("cotton")) {
-      return `<defs><pattern id="silk" patternUnits="userSpaceOnUse" width="6" height="6">
+      return `<pattern id="silk" patternUnits="userSpaceOnUse" width="6" height="6">
         <line x1="0" y1="0" x2="0" y2="6" stroke="${dark}" stroke-width="0.3" opacity="0.15"/>
         <line x1="0" y1="0" x2="6" y2="0" stroke="${dark}" stroke-width="0.3" opacity="0.15"/>
-      </pattern></defs>`;
+      </pattern>`;
     }
     if (fab.includes("georgette") || fab.includes("chiffon")) {
-      return `<defs><pattern id="silk" patternUnits="userSpaceOnUse" width="4" height="4">
+      return `<pattern id="silk" patternUnits="userSpaceOnUse" width="4" height="4">
         <circle cx="2" cy="2" r="0.8" fill="${dark}" opacity="0.1"/>
-      </pattern></defs>`;
+      </pattern>`;
     }
-    return `<defs><pattern id="silk" patternUnits="userSpaceOnUse" width="1" height="1"><rect width="1" height="1"/></pattern></defs>`;
+    // Generic sheen: very faint transparent diagonal lines — no dark fill, no blocking.
+    return `<pattern id="silk" patternUnits="userSpaceOnUse" width="6" height="6">
+      <path d="M0 0 L6 6" stroke="${light}" stroke-width="0.2" opacity="0.12"/>
+    </pattern>`;
   }
 
   // ── Mirror-work motif (for Mirror Work back) ──────────────────────────────
@@ -401,9 +409,12 @@ function generateBlouseSVG(opts: {
   ${sleeve_left(sleeve)}
   ${sleeve_right(sleeve)}
 
-  <!-- Main blouse body — compound path with even-odd rule punches the neckline hole
-       so that area is transparent (not filled with a dark colour that clashes with lighting). -->
-  <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#body)" filter="url(#drop)"/>
+  <!-- Main blouse body — compound path with even-odd rule punches the neckline hole.
+       NO drop-shadow filter: feDropShadow on a transparent canvas bleeds semi-transparent
+       dark pixels around the silhouette edges that straddle the alphaTest:0.5 threshold,
+       producing a visible dark strip on the 3D plane. Shading is applied via the silk
+       overlay and the side-shading paths below instead. -->
+  <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#body)"/>
   <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#silk)" opacity="0.85"/>
 
   <!-- Side shading -->

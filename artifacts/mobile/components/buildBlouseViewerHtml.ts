@@ -189,9 +189,14 @@ scene.background = new THREE.Color(0x0D0508);
 var camera = new THREE.PerspectiveCamera(42, W/H, 0.1, 100);
 camera.position.set(0, 0.06, 3.8);
 
-var renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
-renderer.setSize(W, H);
-renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+var renderer = null;
+try {
+  renderer = new THREE.WebGLRenderer({ canvas: canvasEl, antialias: true });
+  renderer.setSize(W, H);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1, 2));
+} catch(glErr) {
+  console.warn('[BlouseViewer] WebGL unavailable — 3D render disabled:', glErr && glErr.message);
+}
 
 // Retry resize — WebView may report 0 initially
 function doResize() {
@@ -201,7 +206,7 @@ function doResize() {
     W = w; H = h;
     camera.aspect = W / H;
     camera.updateProjectionMatrix();
-    renderer.setSize(W, H);
+    if (renderer) renderer.setSize(W, H);
   }
 }
 window.addEventListener('resize', doResize);
@@ -423,6 +428,7 @@ function onTexReady() {
     viewLabel.style.display = 'block';
     hintEl.style.display = 'block';
     hintTimer = setTimeout(function(){ hintEl.style.opacity = '0'; }, 4200);
+
   }
 }
 
@@ -456,8 +462,6 @@ function drawBlouseCanvas(p, isBack) {
   var sleeve = (p && p.sleeve) || 'Short';
   var bk     = (p && p.back)   || 'Hook';
   var hex    = (p && p.color)  || '#8B2252';
-  var bg     = '#0D0508';
-
   var pHex = hex;
   var lHex = _scale(hex, 1.38);
   var dHex = _scale(hex, 0.52);
@@ -707,10 +711,24 @@ function loadSvgTex(uri, isBack, done) {
     var img = new Image();
     img.onload = function() {
       var cnv = document.createElement('canvas');
-      cnv.width = 1024; cnv.height = 1024;
+      // Match SVG aspect ratio exactly so the silhouette maps correctly onto the plane UVs.
+      // Drawing a 400×520 SVG into a 1024×1024 square was squishing the silhouette, which
+      // shifted the opaque/transparent boundary and produced visible dark strips.
+      var svgW = img.naturalWidth  || img.width  || 400;
+      var svgH = img.naturalHeight || img.height || 520;
+      var texSize = 1024;
+      // Scale so the larger dimension fills texSize, keeping aspect ratio.
+      var scale = texSize / Math.max(svgW, svgH);
+      var drawW = Math.round(svgW * scale);
+      var drawH = Math.round(svgH * scale);
+      var offX = Math.round((texSize - drawW) / 2);
+      var offY = Math.round((texSize - drawH) / 2);
+      cnv.width = texSize; cnv.height = texSize;
       var c2 = cnv.getContext('2d');
       try {
-        c2.drawImage(img, 0, 0, 1024, 1024);
+        // Draw SVG centered and aspect-correct into the square canvas.
+        // The margins (offX, offY) are transparent, matching the transparent scene background.
+        c2.drawImage(img, offX, offY, drawW, drawH);
         URL.revokeObjectURL(blobUrl);
         var tex = new THREE.CanvasTexture(cnv);
         tex.needsUpdate = true;
@@ -835,7 +853,7 @@ function animate(){
   group.rotation.x = rotX;
   ring.rotation.z += 0.003;
   updateLabel();
-  renderer.render(scene, camera);
+  if (renderer) renderer.render(scene, camera);
 }
 animate();
 
