@@ -391,52 +391,53 @@ function generateBlouseSVG(opts: {
     L ${hipR} ${shBot}
     C ${hipR + 4} ${shBot - 60} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop}`;
 
-  // Neckline hole path used to punch a transparent cutout via SVG even-odd fill rule.
-  // Using fill="${viewerBg}" on a separate rect used to "fake" the hole but the dark
-  // background colour when lit by Three.js scene lights became a different shade, making
-  // the rectangular plane visible as a dark blocked area over the rendered image.
-  const neckHole = isBack
+  // Neckline interior — drawn ON TOP of the filled body so the "opening" shows a lining
+  // colour instead of punching a transparent hole (which looks like a blocked solid area).
+  const neckInterior = isBack
     ? `${backNkPath} L ${shR} ${shTop} L ${shL} ${shTop} Z`
     : nk.clip;
 
-  // ── Assemble SVG — light canvas background for clean 2D flat-lay display ────
+  // ── Assemble SVG — solid blouse with lining showing at neckline opening ───
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
       <stop offset="0%" stop-color="${light}"/>
-      <stop offset="35%" stop-color="${primary}"/>
+      <stop offset="40%" stop-color="${primary}"/>
       <stop offset="100%" stop-color="${dark}"/>
     </linearGradient>
     <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0%" stop-color="#FDFAF4"/>
       <stop offset="100%" stop-color="#EDE6D6"/>
     </linearGradient>
+    <linearGradient id="lining" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FAF6EF"/>
+      <stop offset="100%" stop-color="#EDE8DC"/>
+    </linearGradient>
     ${fabricTexture()}
   </defs>
 
-  <!-- Soft parchment background for 2D flat-lay — neckline cutout shows canvas not darkness -->
+  <!-- Canvas background -->
   <rect width="${W}" height="${H}" fill="url(#bg)"/>
 
   <!-- Sleeves (behind body) -->
   ${sleeve_left(sleeve)}
   ${sleeve_right(sleeve)}
 
-  <!-- Main blouse body — compound path with even-odd rule punches the neckline hole.
-       NO drop-shadow filter: feDropShadow on a transparent canvas bleeds semi-transparent
-       dark pixels around the silhouette edges that straddle the alphaTest:0.5 threshold,
-       producing a visible dark strip on the 3D plane. Shading is applied via the silk
-       overlay and the side-shading paths below instead. -->
-  <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#body)"/>
-  <path d="${bodyPath} Z ${neckHole}" fill-rule="evenodd" fill="url(#silk)" opacity="0.85"/>
+  <!-- Full blouse body — solid fabric fill, no hole punched out -->
+  <path d="${bodyPath} Z" fill="url(#body)"/>
+  <path d="${bodyPath} Z" fill="url(#silk)" opacity="0.85"/>
 
-  <!-- Side shading -->
-  <path d="M ${hipL} ${shBot} C ${hipL + 4} ${shBot - 70} ${shL - 4} ${shTop + ahDepth} ${shL} ${shTop} L ${shL + 32} ${shTop} C ${shL + 24} ${shTop + ahDepth} ${hipL + 36} ${shBot - 70} ${hipL + 32} ${shBot} Z" fill="${dark}" opacity="0.25"/>
-  <path d="M ${hipR} ${shBot} C ${hipR + 4} ${shBot - 70} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop} L ${shR - 32} ${shTop} C ${shR - 24} ${shTop + ahDepth} ${hipR - 36} ${shBot - 70} ${hipR - 32} ${shBot} Z" fill="${dark}" opacity="0.25"/>
+  <!-- Side shading strips -->
+  <path d="M ${hipL} ${shBot} C ${hipL + 4} ${shBot - 70} ${shL - 4} ${shTop + ahDepth} ${shL} ${shTop} L ${shL + 32} ${shTop} C ${shL + 24} ${shTop + ahDepth} ${hipL + 36} ${shBot - 70} ${hipL + 32} ${shBot} Z" fill="${dark}" opacity="0.22"/>
+  <path d="M ${hipR} ${shBot} C ${hipR + 4} ${shBot - 70} ${shR + 4} ${shTop + ahDepth} ${shR} ${shTop} L ${shR - 32} ${shTop} C ${shR - 24} ${shTop + ahDepth} ${hipR - 36} ${shBot - 70} ${hipR - 32} ${shBot} Z" fill="${dark}" opacity="0.22"/>
 
-  <!-- Neckline cutout stroke only — fill handled by compound path above -->
+  <!-- Neckline interior: lining colour drawn over the body — this is the visible collar opening -->
+  <path d="${neckInterior}" fill="url(#lining)"/>
+
+  <!-- Neckline inner fold-shadow — thin dark arc just inside the collar opening -->
   ${isBack
-    ? `<path d="${backNkPath}" fill="none" stroke="${dark}" stroke-width="2"/>`
-    : `<path d="${nk.path}" fill="none" stroke="${dark}" stroke-width="2"/>`
+    ? `<path d="${backNkPath}" fill="none" stroke="${dark}" stroke-width="2.5" opacity="0.6"/>`
+    : `<path d="${nk.path}" fill="none" stroke="${dark}" stroke-width="2.5" opacity="0.6"/>`
   }
 
   <!-- Gold embroidery -->
