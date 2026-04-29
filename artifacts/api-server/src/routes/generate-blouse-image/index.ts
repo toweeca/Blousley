@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
 
 const router: IRouter = Router();
 
@@ -465,27 +466,11 @@ function generateBlouseSVG(opts: {
 </svg>`;
 }
 
-// ─── AI image generation (with SVG fallback) ────────────────────────────────
+// ─── AI image generation via Replit AI Integrations proxy ───────────────────
 
 async function generateBlousePhoto(prompt: string): Promise<{ b64_json: string; mimeType: string }> {
-  const apiKey = process.env.OPENAI_API_KEY;
-  if (!apiKey) throw new Error("OPENAI_API_KEY not set");
-  const resp = await fetch("https://api.openai.com/v1/images/generations", {
-    method: "POST",
-    headers: {
-      "Authorization": `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({ model: "gpt-image-1", prompt, size: "1024x1024" }),
-  });
-  if (!resp.ok) {
-    const text = await resp.text();
-    throw new Error(`OpenAI images API ${resp.status}: ${text}`);
-  }
-  const json = await resp.json() as { data?: Array<{ b64_json?: string }> };
-  const b64 = json.data?.[0]?.b64_json ?? "";
-  if (!b64) throw new Error("No image returned");
-  return { b64_json: b64, mimeType: "image/png" };
+  const buffer = await generateImageBuffer(prompt, "1024x1024");
+  return { b64_json: buffer.toString("base64"), mimeType: "image/png" };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────

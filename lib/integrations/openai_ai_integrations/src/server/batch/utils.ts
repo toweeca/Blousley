@@ -17,7 +17,7 @@ import pRetry from "p-retry";
  *   async (artwork) => {
  *     // Your custom LLM logic here
  *     const response = await openai.chat.completions.create({
- *       model: "gpt-5.1",
+ *       model: "gpt-5.4",
  *       messages: [{ role: "user", content: `Categorize: ${artwork.name}` }],
  *       response_format: { type: "json_object" },
  *     });

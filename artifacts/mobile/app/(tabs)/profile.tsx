@@ -784,7 +784,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
               <Text style={{ fontSize: 18, color: Colors.brand.gold }}>✦</Text>
             )}
             <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold, fontSize: 15, fontFamily: "Inter_600SemiBold" }]}>
-              {aiGenerating ? "Generating AI Preview…" : "AI Preview"}
+              {aiGenerating ? "Generating AI Preview…" : "AI Preview from Selections"}
             </Text>
           </TouchableOpacity>
         ) : (
