@@ -1,7 +1,14 @@
 import React from "react";
 import Svg, {
-  Path, Defs, LinearGradient, Stop,
-  Circle, G, Line, Ellipse, Rect,
+  Path,
+  Defs,
+  LinearGradient,
+  Stop,
+  Circle,
+  G,
+  Line,
+  Ellipse,
+  Rect,
 } from "react-native-svg";
 
 export interface BlouseDesignSVGProps {
@@ -23,7 +30,7 @@ function lighten(hex: string, f: number): string {
       .map((x) =>
         Math.min(255, Math.round(x * f))
           .toString(16)
-          .padStart(2, "0")
+          .padStart(2, "0"),
       )
       .join("")
   );
@@ -36,13 +43,13 @@ const VH = 260;
 
 // Blouse geometry constants
 const cx = VW / 2; // 100
-const shT = 18;    // shoulder top Y
-const shL = 44;    // shoulder left X
-const shR = 156;   // shoulder right X
-const ahD = 36;    // armhole depth (how far down armhole is from shoulder top)
-const hipL = 26;   // hip left X
-const hipR = 174;  // hip right X
-const hipY = 242;  // hip bottom Y
+const shT = 18; // shoulder top Y
+const shL = 44; // shoulder left X
+const shR = 156; // shoulder right X
+const ahD = 36; // armhole depth (how far down armhole is from shoulder top)
+const hipL = 26; // hip left X
+const hipR = 174; // hip right X
+const hipY = 242; // hip bottom Y
 const armY = shT + ahD; // 54 — where sleeves attach
 
 function bodyD(): string {
@@ -56,7 +63,8 @@ function bodyD(): string {
 
 function neckCutD(neck: string): string {
   const y0 = shT;
-  const x0 = shL, x1 = shR;
+  const x0 = shL,
+    x1 = shR;
   switch (neck) {
     case "V":
       return `M ${x0} ${y0} L ${x0 + 14} ${y0 + 8} L ${cx} ${y0 + 40} L ${x1 - 14} ${y0 + 8} L ${x1} ${y0} Z`;
@@ -92,7 +100,8 @@ function neckCutD(neck: string): string {
 
 function backNeckCutD(bk: string): string {
   const y0 = shT;
-  const x0 = shL, x1 = shR;
+  const x0 = shL,
+    x1 = shR;
   switch (bk) {
     case "Deep Back":
       return (
@@ -145,12 +154,16 @@ export const BlouseDesignSVG: React.FC<BlouseDesignSVGProps> = ({
   const dHex = lighten(pHex, 0.45);
 
   const sleeveLen =
-    sleeve === "Elbow" ? 52 :
-    sleeve === "3/4"   ? 70 :
-    sleeve === "Long"  ? 94 : 30; // Short / default
+    sleeve === "Elbow"
+      ? 52
+      : sleeve === "3/4"
+        ? 70
+        : sleeve === "Long"
+          ? 94
+          : 30; // Short / default
 
   const hasSleeve = sleeve !== "None" && sleeve !== "Sleeveless";
-  const isCap  = sleeve === "Cap";
+  const isCap = sleeve === "Cap";
   const isPuff = sleeve === "Puff";
   const isShortOrLonger = hasSleeve && !isCap && !isPuff;
 
@@ -165,15 +178,19 @@ export const BlouseDesignSVG: React.FC<BlouseDesignSVGProps> = ({
       preserveAspectRatio="xMidYMid meet"
     >
       <Defs>
-        <LinearGradient id={`bg${isBack ? "b" : "f"}`} x1="0%" y1="0%" x2="100%" y2="100%">
+        <LinearGradient
+          id={`bg${isBack ? "b" : "f"}`}
+          x1="0%"
+          y1="0%"
+          x2="100%"
+          y2="100%"
+        >
           <Stop offset="0%" stopColor={lHex} />
           <Stop offset="40%" stopColor={pHex} />
           <Stop offset="100%" stopColor={dHex} />
         </LinearGradient>
       </Defs>
-
       {/* Background */}
-      <Rect width={VW} height={VH} fill={BG} />
 
       {/* ── Sleeves (behind body) ───────────────────────────────── */}
       {hasSleeve && isShortOrLonger && (
@@ -212,16 +229,12 @@ export const BlouseDesignSVG: React.FC<BlouseDesignSVGProps> = ({
           <Ellipse cx={shR + 12} cy={armY + 8} rx={15} ry={12} fill={dHex} />
         </>
       )}
-
       {/* ── Body fill ───────────────────────────────────────────── */}
       <Path d={bodyPath} fill={`url(#bg${isBack ? "b" : "f"})`} />
-
       {/* Side shading */}
       <Path d={bodyPath} fill="rgba(0,0,0,0.18)" />
-
       {/* ── Neckline / back cutout ──────────────────────────────── */}
-      <Path d={cutPath} fill={BG} />
-
+      <Path d={cutPath} fill="none" />
       {/* Neckline embroidery edge */}
       <Path
         d={cutPath}
@@ -230,7 +243,6 @@ export const BlouseDesignSVG: React.FC<BlouseDesignSVGProps> = ({
         strokeWidth="1.1"
         strokeDasharray="3,2"
       />
-
       {/* ── Back-specific details ───────────────────────────────── */}
       {isBack && (
         <>
@@ -240,39 +252,74 @@ export const BlouseDesignSVG: React.FC<BlouseDesignSVGProps> = ({
             return (
               <G key={i}>
                 <Circle cx={cx} cy={hy} r={1.5} fill={GOLD} opacity={0.9} />
-                <Line x1={cx - 4} y1={hy} x2={cx + 4} y2={hy} stroke={GOLD} strokeWidth="0.7" opacity={0.6} />
+                <Line
+                  x1={cx - 4}
+                  y1={hy}
+                  x2={cx + 4}
+                  y2={hy}
+                  stroke={GOLD}
+                  strokeWidth="0.7"
+                  opacity={0.6}
+                />
               </G>
             );
           })}
           {/* Tie strings for Tie Back */}
           {back === "Tie Back" && (
             <>
-              <Line x1={cx} y1={shT + 88} x2={cx - 20} y2={shT + 116} stroke={GOLD} strokeWidth="1.1" />
-              <Line x1={cx} y1={shT + 88} x2={cx + 20} y2={shT + 116} stroke={GOLD} strokeWidth="1.1" />
+              <Line
+                x1={cx}
+                y1={shT + 88}
+                x2={cx - 20}
+                y2={shT + 116}
+                stroke={GOLD}
+                strokeWidth="1.1"
+              />
+              <Line
+                x1={cx}
+                y1={shT + 88}
+                x2={cx + 20}
+                y2={shT + 116}
+                stroke={GOLD}
+                strokeWidth="1.1"
+              />
             </>
           )}
           {/* Centre seam */}
           <Line
-            x1={cx} y1={shT + 14}
-            x2={cx} y2={hipY - 10}
-            stroke={GOLD} strokeWidth="0.6"
-            strokeDasharray="4,3" opacity={0.3}
+            x1={cx}
+            y1={shT + 14}
+            x2={cx}
+            y2={hipY - 10}
+            stroke={GOLD}
+            strokeWidth="0.6"
+            strokeDasharray="4,3"
+            opacity={0.3}
           />
         </>
       )}
-
       {/* ── Front fold line ─────────────────────────────────────── */}
       {!isBack && (
         <Line
-          x1={cx} y1={shT + 30}
-          x2={cx} y2={hipY - 8}
-          stroke={GOLD} strokeWidth="0.6"
-          strokeDasharray="4,3" opacity={0.2}
+          x1={cx}
+          y1={shT + 30}
+          x2={cx}
+          y2={hipY - 8}
+          stroke={GOLD}
+          strokeWidth="0.6"
+          strokeDasharray="4,3"
+          opacity={0.2}
         />
       )}
-
       {/* ── Hem embroidery ──────────────────────────────────────── */}
-      <Line x1={hipL} y1={hipY} x2={hipR} y2={hipY} stroke={GOLD} strokeWidth="1.2" />
+      <Line
+        x1={hipL}
+        y1={hipY}
+        x2={hipR}
+        y2={hipY}
+        stroke={GOLD}
+        strokeWidth="1.2"
+      />
       {Array.from({ length: 13 }, (_, i) => (
         <Circle
           key={i}
@@ -283,8 +330,15 @@ export const BlouseDesignSVG: React.FC<BlouseDesignSVGProps> = ({
           opacity={0.9}
         />
       ))}
-      <Line x1={hipL} y1={hipY + 9} x2={hipR} y2={hipY + 9} stroke={GOLD} strokeWidth="0.7" opacity={0.7} />
-
+      <Line
+        x1={hipL}
+        y1={hipY + 9}
+        x2={hipR}
+        y2={hipY + 9}
+        stroke={GOLD}
+        strokeWidth="0.7"
+        opacity={0.7}
+      />
       {/* ── Body outline ────────────────────────────────────────── */}
       <Path d={bodyPath} fill="none" stroke={dHex} strokeWidth="1.2" />
     </Svg>
