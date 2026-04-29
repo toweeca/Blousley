@@ -329,9 +329,14 @@ function buildMat(fab, hexColor, mapTex, isBack) {
       '#include <begin_vertex>',
       [
         'vec3 transformed = position;',
+        // normY = 0 at bottom hem (Y=-1.4), 1 at top shoulder (Y=+1.4)
         'float normY = clamp((position.y + 1.4) / 2.8, 0.0, 1.0);',
-        'float hem = normY * normY;',
-        'float cv = 1.0 - pow(position.x / 1.1, 2.0);',
+        // hem weight: maximum drape at BOTTOM hem, zero at shoulders — inverted normY
+        'float hem = (1.0 - normY) * (1.0 - normY);',
+        // FIX: avoid pow() with potentially negative base (undefined in GLSL ES 1.0).
+        // Use multiplication instead: pnx ∈ [-1,1], pnx*pnx ∈ [0,1] always safe.
+        'float pnx = position.x / 1.1;',
+        'float cv = 1.0 - pnx * pnx;',
         'transformed.z += cv * u_curve;',
         'transformed.z += sin(u_time * u_speed + position.x * u_freq) * u_amp * hem;',
         'transformed.x += cos(u_time * u_speed * 0.6 + position.y * u_freq * 0.7) * u_amp * 0.3 * hem;'
