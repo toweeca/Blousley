@@ -279,11 +279,18 @@ function buildMat(fab, hexColor, mapTex, isBack) {
     sheenColor: col.clone().multiplyScalar(1.6),
     sheenRoughness: fab.sheenR,
     side: THREE.FrontSide,
-    // transparent + alphaTest lets the neckline/background areas of the texture
-    // be fully cut out, so the scene background shows through instead of a
-    // darkly-lit rectangle of opaque plane being visible around the blouse.
-    transparent: true,
-    alphaTest: 0.05
+    // Hard alpha-cutout mode:
+    //   transparent: false — keeps depthWrite ON and avoids Three.js back-to-front
+    //     sorting of the two plane meshes, which was causing one mesh to block the
+    //     other when the group rotated (the sort order flips as camera distance flips).
+    //   alphaTest: 0.5  — any pixel whose alpha < 0.5 is fully discarded (transparent
+    //     neckline hole, outside silhouette). Pixels >= 0.5 are fully opaque.
+    //     0.5 is the correct threshold for a garment silhouette with hard edges.
+    //   depthWrite: true (default when transparent:false) — opaque silhouette pixels
+    //     correctly block anything behind them in the depth buffer.
+    transparent: false,
+    alphaTest: 0.5,
+    depthWrite: true
   });
 
   mat.normalMap = makeNormalTex(fab.ntype);
@@ -342,10 +349,15 @@ var backGeo  = new THREE.PlaneGeometry(2.2, 2.8, 28, 28);
 var fab0 = FABRICS['silk'];
 var frontMesh = new THREE.Mesh(frontGeo, buildMat(fab0, curColor, null, false));
 frontMesh.position.z = 0.07;
+// renderOrder 1 > 0: front plane always rasterised after back plane.
+// With transparent:false + alphaTest the depth buffer handles visibility correctly,
+// but explicit renderOrder prevents any edge-case draw-order races during rotation.
+frontMesh.renderOrder = 1;
 
 var backMesh = new THREE.Mesh(backGeo, buildMat(fab0, curColor, null, true));
 backMesh.position.z = -0.07;
 backMesh.rotation.y = Math.PI;
+backMesh.renderOrder = 0;
 
 group.add(frontMesh, backMesh);
 
