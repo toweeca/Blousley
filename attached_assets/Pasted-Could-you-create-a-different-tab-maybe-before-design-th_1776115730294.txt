@@ -1,0 +1,124 @@
+Could you create a different tab maybe before design that has Sewing Pattern Legend + Beginner Guide page that turns sewing pattern language into a simple, visual, easy-to-follow learning tool.
+The page should help a beginner understand sewing patterns by showing:
+1.	What each sewing symbol means.
+2.	How to cut the fabric pieces.
+3.	How the pieces fit together.
+4.	A step-by-step plain-English sewing guide.
+5.	A fabric cut-layout preview that looks like the real fabric.
+Main goal
+I want the page to act like a pattern decoder — something that takes confusing sewing pattern terms and explains them clearly for beginners.
+Include a full legend section
+Add a legend that explains these sewing terms in plain English:
+•	Grainline.
+•	Fold line.
+•	Cut on fold.
+•	Notches.
+•	Dots.
+•	Cut 1.
+•	Cut 2.
+•	Cut 2 mirrored.
+•	Seam allowance.
+•	Interfacing.
+•	Lining.
+•	Selvage.
+•	Bias.
+•	Match points.
+•	Dart.
+•	Pleat.
+•	Gather.
+For each term, show:
+•	The sewing term.
+•	A simple explanation.
+•	What the user should physically do.
+•	A small visual or symbol if possible.
+Include a beginner guide section
+Rewrite sewing instructions into simple step-by-step language.
+Each step should include:
+•	The step title.
+•	What to do.
+•	Why it matters.
+•	Common mistakes to avoid.
+•	Which pattern pieces are involved.
+Use short, beginner-friendly wording. Do not assume the user already knows sewing terms.
+Include a fabric cut-layout preview
+Show the blouse pattern pieces laid out on top of the chosen fabric so the preview reflects how the actual fabric will look after cutting.
+The preview should:
+•	Use the selected fabric color, print, or texture.
+•	Show correct print direction.
+•	Show mirrored pieces when needed.
+•	Show lining if relevant.
+•	Show labels on each piece.
+•	Show whether each piece is cut once, twice, or on the fold.
+•	Show grainline arrows.
+•	Show match points / notches.
+•	Look realistic, not like plain white shapes.
+If the fabric has stripes, florals, or motifs, keep the print direction aligned properly in the preview.
+Include a sewing pattern explainer
+Add a section that explains the most common sewing pattern markings in very simple language:
+•	Grainline = align the pattern with the selvage.
+•	Notches = points that must match with another piece.
+•	Cut on fold = place the edge on the folded fabric.
+•	Cut 2 mirrored = cut two matching pieces, one left and one right.
+•	Seam allowance = extra fabric space for sewing.
+•	Interfacing = stiffening layer used for support.
+•	Lining = inner layer that helps finish the garment cleanly.
+Include a “Beginner Mode”
+Add a beginner mode that simplifies everything.
+When beginner mode is on:
+•	Use shorter sentences.
+•	Replace hard sewing words with simple explanations.
+•	Keep the instructions extra clear.
+•	Show a small glossary for difficult words.
+Include a “Detailed Mode”
+Add a detailed mode that keeps the original sewing words, but explains them beside the simple meaning.
+This mode should show:
+•	Original sewing term.
+•	Plain-English meaning.
+•	What it means in the actual sewing process.
+Use the blouse tutorial logic
+Base the guide on the princess saree blouse tutorial flow, including:
+•	Pattern pieces.
+•	Grainline alignment.
+•	Cutting in a single layer.
+•	Lining placement.
+•	Marking notches and dots.
+•	Cutting front, back, side, sleeve, and neck band pieces.
+•	Using interfacing.
+•	Matching print or stripe direction.
+•	Preparing the neck band first before sewing.
+Page layout
+Make the page clean, modern, and mobile-friendly.
+Suggested layout:
+•	Top or left: visual pattern/fabric layout.
+•	Bottom or right: beginner guide and legend.
+•	Expandable glossary or side panel.
+•	Clear cards or sections for each term.
+•	Easy-to-read typography.
+•	Good spacing.
+•	Works well on phone and desktop.
+Important behavior
+The guide should feel like a sewing translator:
+•	It should convert sewing jargon into plain English.
+•	It should explain each step in order.
+•	It should help someone understand how to cut the fabric and sew the blouse without confusion.
+•	It should be visually helpful, not just text.
+Tone
+Make it:
+•	Friendly.
+•	Beginner-safe.
+•	Clear.
+•	Educational.
+•	Detailed but not overwhelming.
+Optional features
+If possible, add:
+•	Search/filter for sewing terms.
+•	Hover or tap tooltips on pattern symbols.
+•	A checklist mode for each sewing step.
+•	A fabric selector so the preview updates.
+•	A toggle for “simple” vs “detailed” explanation.
+Build this as a polished, responsive, interactive sewing guide page.
+
+1.	Legend — all sewing symbols explained.
+2.	Visual layout — fabric and pattern pieces shown together.
+3.	Step-by-step guide — simple sewing instructions.
+4.	Glossary + modes — beginner mode and detailed mode.

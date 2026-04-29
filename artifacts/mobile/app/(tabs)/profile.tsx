@@ -1,7 +1,11 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
+import * as MediaLibrary from "expo-media-library";
+import * as Sharing from "expo-sharing";
+import * as FileSystem from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState, useRef } from "react";
 import {
   View,
@@ -20,14 +24,17 @@ import {
   Modal,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
-import Svg, { Path, Circle, Ellipse, Line, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
+import Svg, { Path, Circle, Ellipse, Line, Polygon, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
+import BlouseBeginnerPattern from "@/components/BlouseBeginnerPattern";
 import RotationViewer from "@/components/RotationViewer";
+import BlouseFlatViewer from "@/components/BlouseFlatViewer";
 import {
   HighBustDiagram, BustDiagram, UnderBustDiagram, BustPointDiagram,
   ShoulderWidthDiagram, BlouseLengthDiagram, SleeveLengthDiagram,
   SleeveRoundDiagram, ArmholeDiagram, NeckDiagram,
 } from "@/components/BlouseMeasurementDiagrams";
+import PatternGuideTab from "@/components/PatternGuideTab";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
@@ -42,7 +49,94 @@ const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 const CANVAS_H = 300;
 
-type Tab = "preferences" | "ideas" | "measurements" | "design";
+function isSvgUri(uri: string) {
+  return uri.startsWith("data:image/svg") || uri.endsWith(".svg");
+}
+
+async function saveImageUtil(uri: string, label = "blouse") {
+  try {
+    const isSvg = isSvgUri(uri);
+    const ext = isSvg ? "svg" : "png";
+    const mimeType = isSvg ? "image/svg+xml" : "image/png";
+
+    if (Platform.OS === "web") {
+      const a = document.createElement("a");
+      a.href = uri;
+      a.download = `blousify-${label}-${Date.now()}.${ext}`;
+      a.click();
+      Alert.alert("Downloaded!", `Design saved as .${ext} to your downloads folder.`);
+      return;
+    }
+
+    // On mobile: SVGs can't be stored in the photo library — share as file instead
+    if (isSvg) {
+      const b64 = uri.split(",")[1];
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.svg`;
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      const available = await Sharing.isAvailableAsync();
+      if (available) {
+        await Sharing.shareAsync(path, { mimeType, dialogTitle: "Save or share your Blousify design" });
+      } else {
+        Alert.alert("Sharing not available", "Please use a device that supports file sharing.");
+      }
+      return;
+    }
+
+    const { status } = await MediaLibrary.requestPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert("Permission needed", "Allow access to photos to save images.");
+      return;
+    }
+    let localUri = uri;
+    if (uri.startsWith("data:")) {
+      const b64 = uri.split(",")[1];
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.png`;
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      localUri = path;
+    } else if (uri.startsWith("http")) {
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.png`;
+      const { uri: downloaded } = await FileSystem.downloadAsync(uri, path);
+      localUri = downloaded;
+    }
+    await MediaLibrary.saveToLibraryAsync(localUri);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    Alert.alert("Saved! ✓", "Image saved to your photo library.");
+  } catch (e) {
+    console.error("Save error:", e);
+    try {
+      const available = await Sharing.isAvailableAsync();
+      if (available) await Sharing.shareAsync(uri);
+    } catch {
+      Alert.alert("Error", "Could not save the image.");
+    }
+  }
+}
+
+async function shareImageUtil(uri: string) {
+  try {
+    const isSvg = isSvgUri(uri);
+    const ext = isSvg ? "svg" : "png";
+    const mimeType = isSvg ? "image/svg+xml" : "image/png";
+
+    if (Platform.OS === "web") {
+      if (navigator.share) {
+        await navigator.share({ title: "My Blousify Design", url: uri.startsWith("data:") ? window.location.href : uri });
+      } else {
+        await saveImageUtil(uri, "share");
+      }
+      return;
+    }
+    const b64 = uri.split(",")[1];
+    const path = `${FileSystem.cacheDirectory}blousify-share-${Date.now()}.${ext}`;
+    await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+    const available = await Sharing.isAvailableAsync();
+    if (available) await Sharing.shareAsync(path, { mimeType, dialogTitle: "Share my Blousify design" });
+  } catch {
+    Alert.alert("Error", "Could not share the image.");
+  }
+}
+
+type Tab = "preferences" | "ideas" | "pattern" | "design";
 type SketchPath = { d: string; color: string; width: number };
 type SketchTool = "pen" | "eraser";
 
@@ -93,6 +187,231 @@ const FABRIC_IMAGES: Record<string, any> = {
   "Net": require("@/assets/images/styles/fabric_net.png"),
   "Linen": require("@/assets/images/styles/fabric_linen.png"),
 };
+
+// ─── Border Pattern Options ────────────────────────────────────────────────
+
+const BORDER_PATTERN_OPTIONS = [
+  "None", "Floral", "Paisley", "Geometric", "Temple Border",
+  "Peacock", "Lotus", "Vine & Leaf", "Zari Stripe",
+];
+
+const BORDER_PATTERN_LABELS: Record<string, string> = {
+  "None": "Plain",
+  "Floral": "Floral",
+  "Paisley": "Paisley",
+  "Geometric": "Geometric",
+  "Temple Border": "Temple",
+  "Peacock": "Peacock",
+  "Lotus": "Lotus",
+  "Vine & Leaf": "Vine & Leaf",
+  "Zari Stripe": "Zari Stripe",
+};
+
+function PatternPreviewSVG({ pattern, width = 76, height = 56 }: { pattern: string; width?: number; height?: number }) {
+  const gold = "#C9A96E";
+  const dark = "#9A7040";
+  const bg = "#18060F";
+  const mid = height / 2;
+  const W = width;
+
+  const renderPattern = () => {
+    switch (pattern) {
+      case "Floral":
+        return Array.from({ length: 5 }, (_, i) => {
+          const cx = 8 + i * (W - 12) / 4;
+          const cy = mid;
+          return (
+            <React.Fragment key={i}>
+              {[0, 72, 144, 216, 288].map((a, pi) => {
+                const r = 7, px = cx + r * Math.cos((a * Math.PI) / 180), py = cy + r * Math.sin((a * Math.PI) / 180);
+                return <Ellipse key={pi} cx={px} cy={py} rx={3.5} ry={2} fill={gold} opacity={0.85} transform={`rotate(${a}, ${px}, ${py})`} />;
+              })}
+              <Circle cx={cx} cy={cy} r={2.5} fill={gold} />
+            </React.Fragment>
+          );
+        });
+      case "Paisley":
+        return Array.from({ length: 4 }, (_, i) => {
+          const cx = 10 + i * (W - 14) / 3;
+          return (
+            <React.Fragment key={i}>
+              <Path d={`M ${cx} ${mid - 10} C ${cx - 8} ${mid} ${cx - 4} ${mid + 10} ${cx} ${mid + 8} C ${cx + 4} ${mid + 10} ${cx + 8} ${mid} ${cx} ${mid - 10} Z`}
+                fill={gold} opacity={0.9} />
+              <Circle cx={cx} cy={mid - 6} r={2} fill={bg} />
+            </React.Fragment>
+          );
+        });
+      case "Geometric":
+        return Array.from({ length: 7 }, (_, i) => {
+          const x = 4 + i * (W - 6) / 6;
+          const up = i % 2 === 0;
+          return <Polygon key={i}
+            points={up ? `${x},${mid - 10} ${x - 7},${mid + 8} ${x + 7},${mid + 8}` : `${x},${mid + 10} ${x - 7},${mid - 8} ${x + 7},${mid - 8}`}
+            fill={gold} opacity={0.85} />;
+        });
+      case "Temple Border":
+        return Array.from({ length: 4 }, (_, i) => {
+          const cx = 10 + i * (W - 14) / 3;
+          return (
+            <React.Fragment key={i}>
+              <Rect x={cx - 6} y={mid + 2} width={12} height={10} fill={gold} opacity={0.7} rx={1} />
+              <Path d={`M ${cx - 6} ${mid + 2} Q ${cx} ${mid - 14} ${cx + 6} ${mid + 2}`} fill={gold} opacity={0.9} />
+              <Rect x={cx - 1.5} y={mid - 2} width={3} height={4} fill={dark} />
+            </React.Fragment>
+          );
+        });
+      case "Peacock":
+        return Array.from({ length: 3 }, (_, i) => {
+          const cx = 14 + i * (W - 20) / 2;
+          return (
+            <React.Fragment key={i}>
+              {[-30, -15, 0, 15, 30].map((a, fi) => (
+                <Path key={fi}
+                  d={`M ${cx} ${mid + 8} Q ${cx + 12 * Math.sin((a * Math.PI) / 180)} ${mid - 8 + 3 * fi} ${cx + 20 * Math.sin((a * Math.PI) / 180)} ${mid - 14}`}
+                  stroke={gold} strokeWidth={1.5} fill="none" opacity={0.8} />
+              ))}
+              <Circle cx={cx} cy={mid - 14} r={3} fill={gold} />
+              <Circle cx={cx} cy={mid - 14} r={1.5} fill={bg} />
+            </React.Fragment>
+          );
+        });
+      case "Lotus":
+        return Array.from({ length: 4 }, (_, i) => {
+          const cx = 10 + i * (W - 14) / 3;
+          return (
+            <React.Fragment key={i}>
+              {[-1, 0, 1].map((o) => (
+                <Path key={o}
+                  d={`M ${cx} ${mid + 6} Q ${cx + o * 9} ${mid - 10} ${cx + o * 5} ${mid - 8} Q ${cx + o * 2} ${mid + 2} ${cx} ${mid + 6}`}
+                  fill={gold} opacity={o === 0 ? 1 : 0.65} />
+              ))}
+              <Ellipse cx={cx} cy={mid + 4} rx={6} ry={3} fill={gold} opacity={0.4} />
+            </React.Fragment>
+          );
+        });
+      case "Vine & Leaf":
+        return (
+          <>
+            <Path d={`M 2 ${mid} Q ${W * 0.25} ${mid - 14} ${W * 0.5} ${mid} Q ${W * 0.75} ${mid + 14} ${W - 2} ${mid}`}
+              stroke={gold} strokeWidth={1.8} fill="none" />
+            {[0.15, 0.35, 0.55, 0.75, 0.9].map((t, i) => {
+              const lx = t * W, ly = mid + Math.sin(t * Math.PI * 2) * 12;
+              const side = i % 2 === 0 ? -1 : 1;
+              return <Ellipse key={i} cx={lx + side * 7} cy={ly - side * 6} rx={5} ry={3}
+                fill={gold} opacity={0.75} transform={`rotate(${side * 30}, ${lx + side * 7}, ${ly - side * 6})`} />;
+            })}
+          </>
+        );
+      case "Zari Stripe":
+        return (
+          <>
+            {[mid - 12, mid - 5, mid, mid + 5, mid + 12].map((y, i) => (
+              <Line key={i} x1={2} y1={y} x2={W - 2} y2={y}
+                stroke={i === 2 ? gold : dark} strokeWidth={i === 2 ? 2.5 : 1} opacity={i === 2 ? 1 : 0.6} />
+            ))}
+          </>
+        );
+      default:
+        return (
+          <>
+            <Line x1={2} y1={mid - 3} x2={W - 2} y2={mid - 3} stroke={gold} strokeWidth={2} />
+            <Line x1={2} y1={mid + 3} x2={W - 2} y2={mid + 3} stroke={dark} strokeWidth={1} opacity={0.6} />
+          </>
+        );
+    }
+  };
+
+  return (
+    <Svg width={width} height={height} viewBox={`0 0 ${width} ${height}`}>
+      <Rect width={width} height={height} fill={bg} rx={6} />
+      <Rect x={0} y={mid - 16} width={width} height={32} fill="#2A0F1C" rx={3} />
+      {renderPattern()}
+      <Line x1={0} y1={mid - 16} x2={width} y2={mid - 16} stroke={dark} strokeWidth={0.8} opacity={0.5} />
+      <Line x1={0} y1={mid + 16} x2={width} y2={mid + 16} stroke={dark} strokeWidth={0.8} opacity={0.5} />
+    </Svg>
+  );
+}
+
+function PatternCard({
+  pattern, label, selected, onPress, isCustom, hasCustom, theme,
+}: {
+  pattern: string; label: string; selected: boolean; onPress: () => void;
+  isCustom?: boolean; hasCustom?: boolean; theme: typeof Colors.light;
+}) {
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.styleCard,
+        {
+          backgroundColor: selected ? Colors.brand.primary + "12" : theme.card,
+          borderColor: selected ? Colors.brand.primary : theme.border,
+          borderWidth: selected ? 2 : 1,
+        },
+      ]}
+    >
+      <View style={[styles.styleCardImgWrap, selected && { borderColor: Colors.brand.primary, borderWidth: 2 }, { overflow: "hidden", borderRadius: 8 }]}>
+        {isCustom ? (
+          <View style={{ width: 76, height: 56, backgroundColor: "#18060F", alignItems: "center", justifyContent: "center", borderRadius: 8 }}>
+            <Feather name={hasCustom ? "check-circle" : "upload"} size={22} color={hasCustom ? Colors.brand.primary : Colors.brand.gold} />
+          </View>
+        ) : (
+          <PatternPreviewSVG pattern={pattern} width={76} height={56} />
+        )}
+        {selected && (
+          <View style={styles.styleCardCheck}>
+            <Feather name="check" size={12} color="#fff" />
+          </View>
+        )}
+      </View>
+      <Text style={[styles.styleCardLabel, { color: selected ? Colors.brand.primary : theme.text }]} numberOfLines={2}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function PatternPickerRow({
+  selected, onSelect, onUpload, customUri, theme,
+}: {
+  selected: string;
+  onSelect: (v: string) => void;
+  onUpload: () => void;
+  customUri?: string | null;
+  theme: typeof Colors.light;
+}) {
+  return (
+    <View style={{ gap: 10 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+        <Text style={[styles.groupLabel, { color: theme.text }]}>Border Pattern</Text>
+        <Text style={{ fontSize: 11, color: theme.textSecondary, fontFamily: "Inter_400Regular" }}>
+          Shown on neckline & hem
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+        {BORDER_PATTERN_OPTIONS.map((opt) => (
+          <PatternCard
+            key={opt}
+            pattern={opt}
+            label={BORDER_PATTERN_LABELS[opt] ?? opt}
+            selected={selected === opt}
+            onPress={() => { onSelect(selected === opt ? "None" : opt); Haptics.selectionAsync(); }}
+            theme={theme}
+          />
+        ))}
+        <PatternCard
+          pattern="custom"
+          label="My Photo"
+          selected={selected === "custom"}
+          onPress={() => { onUpload(); Haptics.selectionAsync(); }}
+          isCustom
+          hasCustom={!!customUri}
+          theme={theme}
+        />
+      </ScrollView>
+    </View>
+  );
+}
 
 const ROLES: { label: string; value: UserRole; icon: string; desc: string }[] = [
   { label: "Customer", value: "customer", icon: "human-female", desc: "Get AI blouse fitting recommendations" },
@@ -197,8 +516,16 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [fabric, setFabric] = useState("");
   const [notes, setNotes] = useState("");
   const [initialized, setInitialized] = useState(false);
+  const [showPreview, setShowPreview] = useState(false);
   const [aiGenerating, setAiGenerating] = useState(false);
   const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
+  const [aiPreviewBackUri, setAiPreviewBackUri] = useState<string | null>(null);
+  const [dlFrontUri, setDlFrontUri] = useState<string | null>(null);
+  const [dlBackUri, setDlBackUri] = useState<string | null>(null);
+  const [dlLoading, setDlLoading] = useState(false);
+  const [borderPattern, setBorderPattern] = useState("None");
+  const [borderPatternCustomUri, setBorderPatternCustomUri] = useState<string | null>(null);
+  const [fabricColor, setFabricColor] = useState(Colors.brand.primary);
 
   React.useEffect(() => {
     if (prefs && !initialized) {
@@ -210,6 +537,40 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       setInitialized(true);
     }
   }, [prefs, initialized]);
+
+  // Reset preview when styles change
+  const handleStyleChange = (setter: (v: string) => void, value: string) => {
+    setter(value);
+    setShowPreview(false);
+    setAiPreviewUri(null);
+    setAiPreviewBackUri(null);
+    setDlFrontUri(null);
+    setDlBackUri(null);
+  };
+
+  const handleUploadCustomPattern = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+        base64: true,
+      });
+      if (!result.canceled && result.assets[0]) {
+        const asset = result.assets[0];
+        const uri = asset.base64
+          ? `data:image/jpeg;base64,${asset.base64}`
+          : asset.uri;
+        setBorderPatternCustomUri(uri);
+        setBorderPattern("custom");
+        setAiPreviewUri(null);
+        setAiPreviewBackUri(null);
+        Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      }
+    } catch {
+      Alert.alert("Error", "Could not load the image.");
+    }
+  };
 
   const saveMutation = useMutation({
     mutationFn: async () => {
@@ -238,24 +599,63 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
 
   const generateAIPreview = async () => {
     if (!neck && !sleeve && !back && !fabric) {
-      Alert.alert("Select styles first", "Choose at least one style option before generating a preview.");
+      Alert.alert("Select styles first", "Choose at least one style option before previewing.");
       return;
     }
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setAiGenerating(true);
+    setShowPreview(true);
     setAiPreviewUri(null);
+    setAiPreviewBackUri(null);
     try {
-      const r = await fetch(`${domain}/api/generate-blouse-image/style`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ neck, sleeve, back, fabric }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      const data = await r.json();
-      if (data.b64_json) setAiPreviewUri(`data:image/png;base64,${data.b64_json}`);
-    } catch {
-      Alert.alert("Generation failed", "Could not generate image. Please try again.");
+      const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
+      const [frontRes, backRes] = await Promise.all([
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "front" }),
+        }),
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "back" }),
+        }),
+      ]);
+      const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
+      const fUri = `data:${fData.mimeType};base64,${fData.b64_json}`;
+      const bUri = `data:${bData.mimeType};base64,${bData.b64_json}`;
+      setAiPreviewUri(fUri);
+      setAiPreviewBackUri(bUri);
+    } catch (err) {
+      console.error("generateAIPreview error:", err);
     } finally {
       setAiGenerating(false);
+    }
+  };
+
+  // Download: fetch SVG from API only when the user explicitly requests it
+  const downloadDesign = async (view: "front" | "back") => {
+    const cached = view === "front" ? dlFrontUri : dlBackUri;
+    if (cached) { saveImageUtil(cached, `styles-${view}`); return; }
+    setDlLoading(true);
+    try {
+      const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, view }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      if (data.b64_json) {
+        const uri = `data:${data.mimeType ?? "image/svg+xml"};base64,${data.b64_json}`;
+        if (view === "front") setDlFrontUri(uri);
+        else setDlBackUri(uri);
+        saveImageUtil(uri, `styles-${view}`);
+      }
+    } catch {
+      Alert.alert("Download failed", "Could not generate the design file. Please try again.");
+    } finally {
+      setDlLoading(false);
     }
   };
 
@@ -282,19 +682,60 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       )}
 
       <Animated.View entering={FadeInDown.delay(80).springify()}>
-        <StyleRow label="Neckline Style" options={NECK_OPTIONS} images={NECK_IMAGES} selected={neck} onSelect={setNeck} theme={theme} />
+        <StyleRow label="Neckline Style" options={NECK_OPTIONS} images={NECK_IMAGES} selected={neck} onSelect={(v) => handleStyleChange(setNeck, v)} theme={theme} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(140).springify()}>
-        <StyleRow label="Sleeve Style" options={SLEEVE_OPTIONS} images={SLEEVE_IMAGES} selected={sleeve} onSelect={setSleeve} theme={theme} />
+        <StyleRow label="Sleeve Style" options={SLEEVE_OPTIONS} images={SLEEVE_IMAGES} selected={sleeve} onSelect={(v) => handleStyleChange(setSleeve, v)} theme={theme} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(200).springify()}>
-        <StyleRow label="Back Design" options={BACK_OPTIONS} images={BACK_IMAGES} selected={back} onSelect={setBack} theme={theme} />
+        <StyleRow label="Back Design" options={BACK_OPTIONS} images={BACK_IMAGES} selected={back} onSelect={(v) => handleStyleChange(setBack, v)} theme={theme} />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(260).springify()}>
-        <StyleRow label="Fabric" options={FABRIC_OPTIONS} images={FABRIC_IMAGES} selected={fabric} onSelect={setFabric} theme={theme} />
+        <StyleRow label="Fabric" options={FABRIC_OPTIONS} images={FABRIC_IMAGES} selected={fabric} onSelect={(v) => handleStyleChange(setFabric, v)} theme={theme} />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(280).springify()} style={{ gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={[styles.groupLabel, { color: theme.text }]}>Fabric Colour</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: fabricColor, borderWidth: 1.5, borderColor: theme.border }} />
+            <Text style={{ fontSize: 11, color: theme.textSecondary, fontFamily: "Inter_400Regular" }}>{fabricColor}</Text>
+          </View>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+          {FABRIC_COLORS.map((col) => (
+            <TouchableOpacity
+              key={col}
+              onPress={() => { setFabricColor(col); setAiPreviewUri(null); setAiPreviewBackUri(null); Haptics.selectionAsync(); }}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: col,
+                borderWidth: fabricColor === col ? 3 : 1.5,
+                borderColor: fabricColor === col ? Colors.brand.gold : "rgba(0,0,0,0.15)",
+                shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+              }}
+            >
+              {fabricColor === col && (
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                  <Feather name="check" size={14} color={col === "#F8F9FA" || col === "#ECF0F1" ? "#333" : "#fff"} />
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(300).springify()}>
+        <PatternPickerRow
+          selected={borderPattern}
+          onSelect={(v) => { setBorderPattern(v); setAiPreviewUri(null); setAiPreviewBackUri(null); }}
+          onUpload={handleUploadCustomPattern}
+          customUri={borderPatternCustomUri}
+          theme={theme}
+        />
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(320).springify()} style={{ gap: 8 }}>
@@ -329,50 +770,84 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
           onPress={generateAIPreview}
           disabled={aiGenerating}
         >
-          {aiGenerating ? (
-            <>
-              <ActivityIndicator color={Colors.brand.gold} size="small" />
-              <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>Generating your blouse…</Text>
-            </>
-          ) : (
-            <>
-              <Text style={styles.aiGenBtnIcon}>✦</Text>
-              <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>AI Preview from Selections</Text>
-            </>
-          )}
+          {aiGenerating
+            ? <ActivityIndicator size="small" color={Colors.brand.gold} />
+            : <Text style={styles.aiGenBtnIcon}>✦</Text>
+          }
+          <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>
+            {aiGenerating ? "Generating…" : "Preview My Design"}
+          </Text>
         </TouchableOpacity>
       </Animated.View>
 
-      {(aiGenerating || aiPreviewUri) && (
+      {showPreview && (
         <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
           <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
-            {aiGenerating ? (
+            {aiGenerating || (!aiPreviewUri && !aiPreviewBackUri) ? (
               <View style={styles.aiPreviewPlaceholder}>
-                <ActivityIndicator color={Colors.brand.gold} size="large" />
+                <ActivityIndicator size="large" color={Colors.brand.gold} />
                 <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                  Creating your blouse design…{"\n"}This takes about 10–15 seconds
+                  Drawing your blouse…
                 </Text>
               </View>
-            ) : aiPreviewUri ? (
-              <>
-                <RotationViewer
-                  images={[{ uri: aiPreviewUri }]}
-                  width={SCREEN_WIDTH - 48}
-                  height={SCREEN_WIDTH - 48}
-                  angleLabels={["AI Generated Preview"]}
-                  borderRadius={0}
-                  showControls={false}
-                />
-                <View style={styles.aiPreviewFooter}>
-                  <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                    ✦ AI-generated preview · {[neck, sleeve, back, fabric].filter(Boolean).join(", ")}
-                  </Text>
-                  <TouchableOpacity onPress={() => { setAiPreviewUri(null); }}>
-                    <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
-                  </TouchableOpacity>
-                </View>
-              </>
-            ) : null}
+            ) : (
+              <BlouseFlatViewer
+                frontUri={aiPreviewUri ?? ""}
+                backUri={aiPreviewBackUri ?? ""}
+                width={SCREEN_WIDTH - 48}
+                height={SCREEN_WIDTH - 48}
+              />
+            )}
+            <View style={styles.aiPreviewFooter}>
+              <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
+                ✦ {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
+              </Text>
+              <TouchableOpacity onPress={() => { setShowPreview(false); setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
+                <Feather name="x" size={16} color={Colors.brand.gold} />
+              </TouchableOpacity>
+            </View>
+            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+              <TouchableOpacity
+                style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60", opacity: dlLoading ? 0.6 : 1 }]}
+                onPress={() => downloadDesign("front")}
+                disabled={dlLoading}
+              >
+                {dlLoading ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="download" size={13} color={Colors.brand.primary} />}
+                <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Front</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60", opacity: dlLoading ? 0.6 : 1 }]}
+                onPress={() => downloadDesign("back")}
+                disabled={dlLoading}
+              >
+                {dlLoading ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="download" size={13} color={Colors.brand.primary} />}
+                <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Back</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.dlBtn, { borderColor: Colors.brand.gold + "60", flex: 1.5, opacity: dlLoading ? 0.6 : 1 }]}
+                onPress={async () => {
+                  if (dlFrontUri) { shareImageUtil(dlFrontUri); return; }
+                  setDlLoading(true);
+                  try {
+                    const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
+                      method: "POST", headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({ neck, sleeve, back, fabric, view: "front" }),
+                    });
+                    const data = await res.json();
+                    if (data.b64_json) {
+                      const uri = `data:${data.mimeType ?? "image/svg+xml"};base64,${data.b64_json}`;
+                      setDlFrontUri(uri);
+                      shareImageUtil(uri);
+                    }
+                  } catch { Alert.alert("Error", "Could not generate file."); }
+                  finally { setDlLoading(false); }
+                }}
+                disabled={dlLoading}
+              >
+                <Feather name="share-2" size={13} color={Colors.brand.gold} />
+                <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share</Text>
+              </TouchableOpacity>
+            </View>
           </View>
         </Animated.View>
       )}
@@ -530,6 +1005,28 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [sketchBackground, setSketchBackground] = useState<string | null>(null);
   const [aiSketchGenerating, setAiSketchGenerating] = useState(false);
   const [aiSketchImageUri, setAiSketchImageUri] = useState<string | null>(null);
+  const [aiSketchBackUri, setAiSketchBackUri] = useState<string | null>(null);
+  const [addedIdeaIds, setAddedIdeaIds] = useState<Set<number>>(new Set());
+  const [ideaBorderPattern, setIdeaBorderPattern] = useState("None");
+  const [ideaBorderPatternCustomUri, setIdeaBorderPatternCustomUri] = useState<string | null>(null);
+
+  const addIdeaToFitsMutation = useMutation({
+    mutationFn: async ({ ideaId, imageUrl }: { ideaId: number; imageUrl: string }) => {
+      const r = await fetch(`${API_BASE}/api/tailor/fits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user.id, imageUrl, notes: "Saved from Ideas gallery" }),
+      });
+      if (!r.ok) throw new Error("Failed to add fit");
+      return ideaId;
+    },
+    onSuccess: (ideaId) => {
+      setAddedIdeaIds((prev) => new Set(prev).add(ideaId));
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Added to Fits! ✓", "This idea is now visible to your tailor.");
+    },
+    onError: () => Alert.alert("Error", "Could not add to fits. Try again."),
+  });
 
   const generateAIFromSketch = async () => {
     if (sketchPaths.length === 0) {
@@ -539,21 +1036,33 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     const colors = [...new Set(sketchPaths.map((p) => p.color))];
     setAiSketchGenerating(true);
     setAiSketchImageUri(null);
+    setAiSketchBackUri(null);
     try {
-      const r = await fetch(`${domain}/api/generate-blouse-image/sketch`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          description: `a blouse design sketch with ${sketchPaths.length} strokes`,
-          colors,
-          strokes: sketchPaths.length,
+      const ideaBP = ideaBorderPattern !== "None" && ideaBorderPattern !== "custom" ? ideaBorderPattern : undefined;
+      const payload = {
+        description: `a blouse design sketch with ${sketchPaths.length} strokes${ideaBP ? `, ${ideaBP} border pattern` : ""}`,
+        colors,
+        strokes: sketchPaths.length,
+        borderPattern: ideaBP,
+      };
+      const [frontRes, backRes] = await Promise.all([
+        fetch(`${domain}/api/generate-blouse-image/sketch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, view: "front" }),
         }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      const data = await r.json();
-      if (data.b64_json) setAiSketchImageUri(`data:image/png;base64,${data.b64_json}`);
+        fetch(`${domain}/api/generate-blouse-image/sketch`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...payload, view: "back" }),
+        }),
+      ]);
+      if (!frontRes.ok || !backRes.ok) throw new Error("Failed");
+      const [frontData, backData] = await Promise.all([frontRes.json(), backRes.json()]);
+      if (frontData.b64_json) setAiSketchImageUri(`data:${frontData.mimeType ?? "image/png"};base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiSketchBackUri(`data:${backData.mimeType ?? "image/png"};base64,${backData.b64_json}`);
     } catch {
-      Alert.alert("Generation failed", "Could not generate image. Please try again.");
+      Alert.alert("Generation failed", "Could not generate 3D preview. Please try again.");
     } finally {
       setAiSketchGenerating(false);
     }
@@ -796,6 +1305,25 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
               {sketchBackground ? "Draw annotations, markings, or design notes on your photo" : "Draw neckline shape, sleeve length, back design — or add a photo background above"}
             </Text>
 
+            {/* Border Pattern picker for sketch */}
+            <PatternPickerRow
+              selected={ideaBorderPattern}
+              onSelect={(v) => { setIdeaBorderPattern(v); setAiSketchImageUri(null); setAiSketchBackUri(null); }}
+              onUpload={async () => {
+                try {
+                  const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8, base64: true });
+                  if (!r.canceled && r.assets[0]) {
+                    const a = r.assets[0];
+                    setIdeaBorderPatternCustomUri(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+                    setIdeaBorderPattern("custom");
+                    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                  }
+                } catch { Alert.alert("Error", "Could not load image."); }
+              }}
+              customUri={ideaBorderPatternCustomUri}
+              theme={theme}
+            />
+
             {/* AI Generate from Sketch */}
             <TouchableOpacity
               style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80", opacity: aiSketchGenerating ? 0.7 : 1 }]}
@@ -821,25 +1349,46 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                   <View style={styles.aiPreviewPlaceholder}>
                     <ActivityIndicator color={Colors.brand.gold} size="large" />
                     <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                      Transforming your sketch into a blouse design…{"\n"}This takes about 10–15 seconds
+                      Creating your sketch design…{"\n"}Generating front &amp; back views
                     </Text>
                   </View>
-                ) : aiSketchImageUri ? (
+                ) : aiSketchImageUri && aiSketchBackUri ? (
                   <>
-                    <RotationViewer
-                      images={[{ uri: aiSketchImageUri }]}
+                    <BlouseFlatViewer
+                      frontUri={aiSketchImageUri}
+                      backUri={aiSketchBackUri}
                       width={SCREEN_WIDTH - 48}
                       height={SCREEN_WIDTH - 48}
-                      angleLabels={["AI Sketch Preview"]}
-                      borderRadius={0}
-                      showControls={false}
                     />
                     <View style={styles.aiPreviewFooter}>
                       <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                        ✦ AI-generated from your {sketchPaths.length} stroke sketch
+                        ✦ From your {sketchPaths.length}-stroke sketch
                       </Text>
-                      <TouchableOpacity onPress={() => setAiSketchImageUri(null)}>
+                      <TouchableOpacity onPress={() => { setAiSketchImageUri(null); setAiSketchBackUri(null); }}>
                         <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
+                      </TouchableOpacity>
+                    </View>
+                    <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
+                      <TouchableOpacity
+                        style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                        onPress={() => saveImageUtil(aiSketchImageUri, "ideas-front")}
+                      >
+                        <Feather name="download" size={13} color={Colors.brand.primary} />
+                        <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Front</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                        onPress={() => saveImageUtil(aiSketchBackUri, "ideas-back")}
+                      >
+                        <Feather name="download" size={13} color={Colors.brand.primary} />
+                        <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Back</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[styles.dlBtn, { borderColor: Colors.brand.gold + "60", flex: 1.5 }]}
+                        onPress={() => shareImageUtil(aiSketchImageUri)}
+                      >
+                        <Feather name="share-2" size={13} color={Colors.brand.gold} />
+                        <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share Design</Text>
                       </TouchableOpacity>
                     </View>
                   </>
@@ -942,7 +1491,42 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 </Text>
               </View>
             </View>
-            <View style={[styles.ideaCardActions, { borderTopColor: theme.border }]}>
+            <View style={[styles.ideaCardActions, { borderTopColor: theme.border, flexWrap: "wrap" }]}>
+              {/* Add to Fits — shown if idea has an image */}
+              {idea.imageUrl && (
+                <TouchableOpacity
+                  style={[styles.ideaActionBtn, {
+                    backgroundColor: addedIdeaIds.has(idea.id) ? Colors.brand.gold + "20" : Colors.brand.gold + "10",
+                    borderWidth: 1,
+                    borderColor: Colors.brand.gold + "50",
+                  }]}
+                  onPress={() => {
+                    if (!addedIdeaIds.has(idea.id)) {
+                      addIdeaToFitsMutation.mutate({ ideaId: idea.id, imageUrl: idea.imageUrl! });
+                    }
+                  }}
+                  disabled={addIdeaToFitsMutation.isPending}
+                >
+                  <Feather name={addedIdeaIds.has(idea.id) ? "check-circle" : "plus-circle"} size={14}
+                    color={Colors.brand.gold} />
+                  <Text style={[styles.ideaActionText, { color: Colors.brand.gold }]}>
+                    {addedIdeaIds.has(idea.id) ? "In Fits" : "Add to Fits"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Save image to gallery */}
+              {idea.imageUrl && (
+                <TouchableOpacity
+                  style={[styles.ideaActionBtn, { backgroundColor: Colors.brand.primary + "10" }]}
+                  onPress={() => saveImageUtil(idea.imageUrl!, "idea")}
+                >
+                  <Feather name="download" size={14} color={Colors.brand.primary} />
+                  <Text style={[styles.ideaActionText, { color: Colors.brand.primary }]}>Save</Text>
+                </TouchableOpacity>
+              )}
+
+              {/* Share with tailor */}
               <TouchableOpacity
                 style={[styles.ideaActionBtn, { backgroundColor: idea.sharedWithTailors ? Colors.brand.primary + "15" : theme.background }]}
                 onPress={() => toggleShareMutation.mutate({ id: idea.id, val: !idea.sharedWithTailors })}
@@ -1560,6 +2144,7 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
 const D_NECK = ["Sweetheart", "Boat Neck", "Deep V", "Round", "Halter", "Square"];
 const D_SLEEVE = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Puff Sleeve"];
 const D_BACK = ["Hook", "Tie Back", "Mid Back", "High Back", "Deep Back", "Open Back"];
+const D_FABRIC = ["Silk", "Georgette", "Chiffon", "Cotton", "Velvet", "Brocade", "Net", "Linen"];
 
 function ChipRow({ label, options, value, onSelect, color, theme }: {
   label: string; options: string[]; value: string;
@@ -1588,28 +2173,35 @@ function ChipRow({ label, options, value, onSelect, color, theme }: {
   );
 }
 
-function DesignMeasureRow({ label, value, onChange, hint, unit, theme }: {
+function DesignMeasureRow({ label, value, onChange, hint, unit, theme, accentColor }: {
   label: string; value: string; onChange: (v: string) => void;
-  hint: string; unit: string; theme: typeof Colors.light;
+  hint: string; unit: string; theme: typeof Colors.light; accentColor?: string;
 }) {
+  const accent = accentColor ?? Colors.brand.primary;
   return (
     <View style={{ gap: 4 }}>
       <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
-        <Text style={{ fontFamily: "Inter_500Medium", fontSize: 13, color: theme.text }}>{label}</Text>
+        <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.text }}>{label}</Text>
         <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted }}>{unit}</Text>
       </View>
-      <TextInput
-        style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 12,
-          paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text }}
-        value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={hint}
-        placeholderTextColor={theme.textMuted}
-      />
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 0 }}>
+        <View style={{ width: 4, alignSelf: "stretch", borderRadius: 4, backgroundColor: accent, marginRight: 10 }} />
+        <TextInput
+          style={{ flex: 1, backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 12,
+            paddingHorizontal: 14, paddingVertical: 11, fontSize: 15, fontFamily: "Inter_400Regular", color: theme.text }}
+          value={value} onChangeText={onChange} keyboardType="decimal-pad" placeholder={hint}
+          placeholderTextColor={theme.textMuted}
+        />
+      </View>
     </View>
   );
 }
 
 function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
   const [step, setStep] = useState(0);
+  const [measEditing, setMeasEditing] = useState(true);
+  const [guideOpen, setGuideOpen] = useState(false);
+  const [designDiagIdx, setDesignDiagIdx] = useState(0);
   const [unit, setUnit] = useState<"cm" | "in">("cm");
   const [bust, setBust] = useState("");
   const [underBust, setUnderBust] = useState("");
@@ -1619,13 +2211,48 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const [neckline, setNeckline] = useState("Round");
   const [sleeve, setSleeve] = useState("Elbow Length");
   const [back, setBack] = useState("Hook");
+  const [fabric, setFabric] = useState("Silk");
   const [fabricColor, setFabricColor] = useState(Colors.brand.primary);
   const [generating, setGenerating] = useState(false);
   const [aiIdeas, setAiIdeas] = useState<{ title: string; description: string }[] | null>(null);
   const [patternSvg, setPatternSvg] = useState<string | null>(null);
   const [instructions, setInstructions] = useState<string | null>(null);
   const [showInstructions, setShowInstructions] = useState(false);
+  const [showTechnicalPattern, setShowTechnicalPattern] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [aiDesignUri, setAiDesignUri] = useState<string | null>(null);
+  const [aiDesignBackUri, setAiDesignBackUri] = useState<string | null>(null);
+  const [fitAdded, setFitAdded] = useState(false);
+  const [designBorderPattern, setDesignBorderPattern] = useState("None");
+  const [designBorderPatternCustomUri, setDesignBorderPatternCustomUri] = useState<string | null>(null);
+
+  const addToFitsMutation = useMutation({
+    mutationFn: async (imageUrl: string) => {
+      const r = await fetch(`${API_BASE}/api/tailor/fits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          imageUrl,
+          measurements: { bust: +bust || undefined, underBust: +underBust || undefined },
+          stylePrefs: { neckline, sleeves: sleeve, back, fabric },
+          notes: `AI-generated design — ${neckline} neckline, ${sleeve} sleeves, ${back} back`,
+          aiAnalysis: `Fabric: ${fabric}. Blouse length: ${blouseLen} ${unit}. Sleeve length: ${sleeveLen} ${unit}.`,
+        }),
+      });
+      if (!r.ok) throw new Error("Failed to add fit");
+      return r.json();
+    },
+    onSuccess: () => {
+      setFitAdded(true);
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Added to Fits! ✓", "This design is now visible to your tailor under Customer Fits.");
+    },
+    onError: () => Alert.alert("Error", "Could not add to fits. Try again."),
+  });
+
+  const saveImageToGallery = (uri: string, label = "blouse") => saveImageUtil(uri, label);
+  const shareImage = (uri: string) => shareImageUtil(uri);
 
   const { data: savedDesign } = useQuery({
     queryKey: ["blouse-design", user.id],
@@ -1640,7 +2267,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       const m = savedDesign.measurements ?? {};
       const s = savedDesign.styles ?? {};
       if (m.unit) setUnit(m.unit);
-      if (m.bust) setBust(String(m.bust));
+      if (m.bust) { setBust(String(m.bust)); setMeasEditing(false); }
       if (m.underBust) setUnderBust(String(m.underBust));
       if (m.bustPointSpacing) setBustPt(String(m.bustPointSpacing));
       if (m.blouseLength) setBlouseLen(String(m.blouseLength));
@@ -1648,6 +2275,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       if (s.neckline) setNeckline(s.neckline);
       if (s.sleeve) setSleeve(s.sleeve);
       if (s.back) setBack(s.back);
+      if (s.fabric) setFabric(s.fabric);
       if (s.fabricColor) setFabricColor(s.fabricColor);
       if (savedDesign.aiIdeas) setAiIdeas(savedDesign.aiIdeas);
       if (savedDesign.patternSvg) setPatternSvg(savedDesign.patternSvg);
@@ -1667,28 +2295,50 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const generate = async () => {
     if (!validateMeasures()) return;
     setGenerating(true);
+    setAiDesignUri(null);
+    setAiDesignBackUri(null);
     setStep(2);
     try {
-      const resp = await fetch(`${API_BASE}/api/blouse/design`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          userId: user.id,
-          measurements: {
-            bust: +bust, underBust: +underBust,
-            bustPointSpacing: +bustPt || (unit === "cm" ? 18 : 7),
-            blouseLength: +blouseLen,
-            sleeveLength: +sleeveLen || 0,
-            unit,
-          },
-          styles: { neckline, sleeve, back, fabricColor },
+      const bp = designBorderPattern !== "None" && designBorderPattern !== "custom" ? designBorderPattern : undefined;
+      const stylePayload = { neck: neckline, sleeve, back, color: fabricColor, borderPattern: bp };
+      const [designResp, frontResp, backResp] = await Promise.all([
+        fetch(`${API_BASE}/api/blouse/design`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            userId: user.id,
+            measurements: {
+              bust: +bust, underBust: +underBust,
+              bustPointSpacing: +bustPt || (unit === "cm" ? 18 : 7),
+              blouseLength: +blouseLen,
+              sleeveLength: +sleeveLen || 0,
+              unit,
+            },
+            styles: { neckline, sleeve, back, fabric, fabricColor, borderPattern: bp },
+          }),
         }),
-      });
-      if (!resp.ok) throw new Error("API error");
-      const data = await resp.json();
-      setAiIdeas(data.aiIdeas);
-      setPatternSvg(data.patternSvg);
-      setInstructions(data.instructions);
+        fetch(`${API_BASE}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...stylePayload, view: "front" }),
+        }),
+        fetch(`${API_BASE}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ...stylePayload, view: "back" }),
+        }),
+      ]);
+      if (!designResp.ok) throw new Error("API error");
+      const [designData, frontData, backData] = await Promise.all([
+        designResp.json(),
+        frontResp.ok ? frontResp.json() : Promise.resolve({}),
+        backResp.ok ? backResp.json() : Promise.resolve({}),
+      ]);
+      setAiIdeas(designData.aiIdeas);
+      setPatternSvg(designData.patternSvg);
+      setInstructions(designData.instructions);
+      if (frontData.b64_json) setAiDesignUri(`data:${frontData.mimeType ?? "image/png"};base64,${frontData.b64_json}`);
+      if (backData.b64_json) setAiDesignBackUri(`data:${backData.mimeType ?? "image/png"};base64,${backData.b64_json}`);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     } catch {
       Alert.alert("Error", "Could not generate design. Please try again.");
@@ -1737,48 +2387,221 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       </View>
 
       {/* ── STEP 0: MEASUREMENTS ────────────────────────────────── */}
-      {step === 0 && (
-        <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
-          <View style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
-              <Feather name="ruler" size={18} color={Colors.brand.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.guideTitle, { color: theme.text }]}>Your Measurements</Text>
-              <Text style={[styles.guideSub, { color: theme.textMuted }]}>Measure snugly with a tape, not tight</Text>
-            </View>
-            <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              {(["cm", "in"] as const).map((u) => (
-                <TouchableOpacity key={u} style={[styles.unitBtn, { backgroundColor: unit === u ? Colors.brand.primary : "transparent" }]}
-                  onPress={() => setUnit(u)}>
-                  <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>{u}</Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-          </View>
+      {step === 0 && (() => {
+        const DM_FIELDS = [
+          { key: "bust",       icon: "A", label: "Bust",            color: "#8B2252", val: bust,       set: setBust,       hint: unit === "cm" ? "e.g. 86" : "e.g. 34",  desc: "Fullest part of bust, horizontal" },
+          { key: "underBust",  icon: "B", label: "Under Bust",      color: "#2471A3", val: underBust,  set: setUnderBust,  hint: unit === "cm" ? "e.g. 72" : "e.g. 28",  desc: "Just below the bust, breathe normally" },
+          { key: "bustPt",     icon: "C", label: "Bust Point–Pt",   color: "#E67E22", val: bustPt,     set: setBustPt,     hint: unit === "cm" ? "e.g. 18" : "e.g. 7",   desc: "Nipple to nipple, straight across" },
+          { key: "blouseLen",  icon: "D", label: "Blouse Length",   color: "#27AE60", val: blouseLen,  set: setBlouseLen,  hint: unit === "cm" ? "e.g. 15" : "e.g. 6",   desc: "Shoulder tip down to desired hem" },
+          { key: "sleeveLen",  icon: "E", label: "Sleeve Length",   color: "#8E44AD", val: sleeveLen,  set: setSleeveLen,  hint: unit === "cm" ? "e.g. 20" : "e.g. 8",   desc: "Shoulder tip to desired sleeve end (0 if sleeveless)" },
+        ];
+        return (
+          <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
 
-          {[
-            { lbl: "Bust (fullest point)", val: bust, set: setBust, hint: unit === "cm" ? "e.g. 86" : "e.g. 34", key: "bust" },
-            { lbl: "Under Bust (below bust)", val: underBust, set: setUnderBust, hint: unit === "cm" ? "e.g. 72" : "e.g. 28", key: "underBust" },
-            { lbl: "Bust Point-to-Point (nipple spacing)", val: bustPt, set: setBustPt, hint: unit === "cm" ? "e.g. 18" : "e.g. 7", key: "bustPt" },
-            { lbl: "Blouse Length", val: blouseLen, set: setBlouseLen, hint: unit === "cm" ? "e.g. 15" : "e.g. 6", key: "blouseLen" },
-            { lbl: "Sleeve Length (0 if sleeveless)", val: sleeveLen, set: setSleeveLen, hint: unit === "cm" ? "e.g. 20" : "e.g. 8", key: "sleeveLen" },
-          ].map(({ lbl, val, set, hint, key }) => (
-            <View key={key}>
-              <DesignMeasureRow label={lbl} value={val} onChange={set} hint={hint} unit={unit} theme={theme} />
-              {errors[key] && <Text style={styles.errorText}>{errors[key]}</Text>}
-            </View>
-          ))}
+            {/* ── How to Measure (collapsible) ── */}
+            <TouchableOpacity
+              style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}
+              onPress={() => { setGuideOpen(!guideOpen); Haptics.selectionAsync(); }}
+            >
+              <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "18" }]}>
+                <Feather name="info" size={18} color={Colors.brand.primary} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.guideTitle, { color: theme.text }]}>How to Measure</Text>
+                <Text style={[styles.guideSub, { color: theme.textMuted }]}>Tap to {guideOpen ? "hide" : "view"} diagram & placement guide</Text>
+              </View>
+              <Feather name={guideOpen ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
-            onPress={() => { if (validateMeasures()) { setStep(1); Haptics.selectionAsync(); } }}
-          >
-            <Text style={styles.primaryBtnText}>Next: Choose Styles</Text>
-            <Feather name="arrow-right" size={18} color="#fff" />
-          </TouchableOpacity>
-        </Animated.View>
-      )}
+            {guideOpen && (() => {
+              const DESIGN_DIAGRAMS = [
+                { label: "Bust",                 Component: BustDiagram,         key: "bust",      color: "#8B2252", desc: "Fullest part of your bust, tape level and snug all around." },
+                { label: "Under Bust",           Component: UnderBustDiagram,    key: "underBust", color: "#2471A3", desc: "Just below the bust, parallel to the floor. Breathe normally." },
+                { label: "Bust Point to Point",  Component: BustPointDiagram,    key: "bustPt",    color: "#E67E22", desc: "Distance from nipple to nipple, measured straight across." },
+                { label: "Blouse Length",        Component: BlouseLengthDiagram, key: "blouseLen", color: "#27AE60", desc: "Top of shoulder straight down to where you want the hem." },
+                { label: "Sleeve Length",        Component: SleeveLengthDiagram, key: "sleeveLen", color: "#8E44AD", desc: "Shoulder seam to desired sleeve end. Enter 0 for sleeveless." },
+              ] as const;
+              const d = DESIGN_DIAGRAMS[designDiagIdx];
+              const DiagramComp = d.Component;
+              return (
+                <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  {/* ── Carousel ── */}
+                  <View style={styles.diagCarousel}>
+                    <View style={styles.diagHeader}>
+                      <TouchableOpacity
+                        onPress={() => { setDesignDiagIdx((i) => (i - 1 + DESIGN_DIAGRAMS.length) % DESIGN_DIAGRAMS.length); Haptics.selectionAsync(); }}
+                        style={[styles.diagNavBtn, { borderColor: Colors.brand.primary + "40" }]}
+                      >
+                        <Feather name="chevron-left" size={18} color={Colors.brand.primary} />
+                      </TouchableOpacity>
+                      <View style={{ flex: 1, alignItems: "center" }}>
+                        <Text style={[styles.diagTitle, { color: theme.text }]}>{d.label}</Text>
+                        <Text style={[styles.diagCounter, { color: theme.textMuted }]}>
+                          {designDiagIdx + 1} of {DESIGN_DIAGRAMS.length}
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={() => { setDesignDiagIdx((i) => (i + 1) % DESIGN_DIAGRAMS.length); Haptics.selectionAsync(); }}
+                        style={[styles.diagNavBtn, { borderColor: Colors.brand.primary + "40" }]}
+                      >
+                        <Feather name="chevron-right" size={18} color={Colors.brand.primary} />
+                      </TouchableOpacity>
+                    </View>
+
+                    <DiagramComp />
+
+                    {/* Caption box */}
+                    <View style={{ flexDirection: "row", gap: 8, alignItems: "flex-start",
+                      backgroundColor: d.color + "10", borderRadius: 10, padding: 10, width: "100%" }}>
+                      <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: d.color + "22",
+                        alignItems: "center", justifyContent: "center", flexShrink: 0, marginTop: 1 }}>
+                        <Text style={{ fontFamily: "Inter_700Bold", fontSize: 11, color: d.color }}>
+                          {"ABCDE"[designDiagIdx]}
+                        </Text>
+                      </View>
+                      <Text style={{ flex: 1, fontFamily: "Inter_400Regular", fontSize: 12, color: theme.textSecondary, lineHeight: 18 }}>
+                        {d.desc}
+                      </Text>
+                    </View>
+
+                    {/* Dot indicators */}
+                    <View style={styles.diagDots}>
+                      {DESIGN_DIAGRAMS.map((dd, i) => (
+                        <TouchableOpacity key={dd.key} onPress={() => setDesignDiagIdx(i)}>
+                          <View style={[
+                            styles.diagDot,
+                            { backgroundColor: i === designDiagIdx ? d.color : Colors.brand.primary + "30",
+                              width: i === designDiagIdx ? 16 : 6 }
+                          ]} />
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </View>
+
+                  {/* Field overview list */}
+                  <View style={{ gap: 8, marginTop: 4 }}>
+                    {DM_FIELDS.map((f) => (
+                      <View key={f.key} style={styles.guideFieldRow}>
+                        <View style={[styles.guideFieldDot, { backgroundColor: f.color + "20" }]}>
+                          <Text style={[styles.guideFieldDotText, { color: f.color, fontFamily: "Inter_700Bold", fontSize: 11 }]}>{f.icon}</Text>
+                        </View>
+                        <View style={{ flex: 1 }}>
+                          <Text style={[styles.guideFieldLabel, { color: theme.text }]}>{f.label}</Text>
+                          <Text style={[styles.guideFieldDesc, { color: theme.textSecondary }]}>{f.desc}</Text>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+
+                  {/* Tips */}
+                  <View style={[styles.guideTipBox, { backgroundColor: Colors.brand.primary + "08", borderColor: Colors.brand.primary + "25" }]}>
+                    <Text style={[styles.guideTipTitle, { color: Colors.brand.primary }]}>📏 Tips for accuracy</Text>
+                    <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Keep the tape level and snug — not tight.</Text>
+                    <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Wear a well-fitted bra, stand straight, arms relaxed.</Text>
+                    <Text style={[styles.guideTipText, { color: theme.textSecondary }]}>• Have someone help you for back and shoulder measurements.</Text>
+                  </View>
+                </Animated.View>
+              );
+            })()}
+
+            {/* ── VIEW MODE: Cube grid ── */}
+            {!measEditing && (
+              <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
+                <View style={styles.savedMeasureHeader}>
+                  <View>
+                    <Text style={[styles.sectionTitle, { color: theme.text }]}>My Measurements</Text>
+                    <Text style={[styles.savedDate, { color: theme.textMuted }]}>Saved in {unit.toUpperCase()}</Text>
+                  </View>
+                  <TouchableOpacity
+                    style={[styles.editMeasureBtn, { borderColor: Colors.brand.primary + "50" }]}
+                    onPress={() => setMeasEditing(true)}
+                  >
+                    <Feather name="edit-2" size={14} color={Colors.brand.primary} />
+                    <Text style={[styles.editMeasureBtnText, { color: Colors.brand.primary }]}>Edit</Text>
+                  </TouchableOpacity>
+                </View>
+
+                <View style={[styles.measureGrid, { borderColor: theme.border }]}>
+                  {DM_FIELDS.map((f, i) => (
+                    <View
+                      key={f.key}
+                      style={[
+                        styles.measureCell,
+                        { borderColor: theme.border },
+                        i % 2 === 0 && i !== 4 ? { borderRightWidth: 1 } : {},
+                        i < 4 ? { borderBottomWidth: 1 } : {},
+                        i === 4 ? { width: "100%" } : {},
+                      ]}
+                    >
+                      <View style={[styles.measureCellDot, { backgroundColor: f.color + "20" }]}>
+                        <Text style={[styles.measureCellDotText, { color: f.color, fontFamily: "Inter_700Bold" }]}>{f.icon}</Text>
+                      </View>
+                      <Text style={[styles.measureCellLabel, { color: theme.textSecondary }]}>{f.label}</Text>
+                      <Text style={[styles.measureCellValue, { color: f.val ? theme.text : theme.textMuted }]}>
+                        {f.val ? `${Number(f.val).toFixed(1)} ${unit}` : "—"}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </Animated.View>
+            )}
+
+            {/* ── EDIT MODE: Form inputs ── */}
+            {measEditing && (
+              <Animated.View entering={FadeInDown.springify()} style={{ gap: 14 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>
+                    Enter measurements
+                  </Text>
+                  <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    {(["cm", "in"] as const).map((u) => (
+                      <TouchableOpacity key={u} style={[styles.unitBtn, { backgroundColor: unit === u ? Colors.brand.primary : "transparent" }]}
+                        onPress={() => setUnit(u)}>
+                        <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>{u}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+
+                {DM_FIELDS.map((f) => (
+                  <View key={f.key}>
+                    <DesignMeasureRow
+                      label={`${f.icon} — ${f.label}`}
+                      value={f.val}
+                      onChange={f.set}
+                      hint={f.hint}
+                      unit={unit}
+                      theme={theme}
+                      accentColor={f.color}
+                    />
+                    {errors[f.key] && <Text style={styles.errorText}>{errors[f.key]}</Text>}
+                  </View>
+                ))}
+
+                {bust && underBust && blouseLen && (
+                  <TouchableOpacity
+                    style={[styles.logoutBtn, { borderColor: Colors.brand.primary + "50", flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" }]}
+                    onPress={() => { setMeasEditing(false); Haptics.selectionAsync(); }}
+                  >
+                    <Feather name="check" size={15} color={Colors.brand.primary} />
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 14, color: Colors.brand.primary }}>Done — show summary</Text>
+                  </TouchableOpacity>
+                )}
+              </Animated.View>
+            )}
+
+            {/* ── Next button ── */}
+            <TouchableOpacity
+              style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
+              onPress={() => { if (validateMeasures()) { setMeasEditing(false); setStep(1); Haptics.selectionAsync(); } }}
+            >
+              <Text style={styles.primaryBtnText}>Next: Choose Styles</Text>
+              <Feather name="arrow-right" size={18} color="#fff" />
+            </TouchableOpacity>
+
+          </Animated.View>
+        );
+      })()}
 
       {/* ── STEP 1: STYLES ──────────────────────────────────────── */}
       {step === 1 && (
@@ -1786,6 +2609,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
           <ChipRow label="Neckline" options={D_NECK} value={neckline} onSelect={setNeckline} color={Colors.brand.primary} theme={theme} />
           <ChipRow label="Sleeve Style" options={D_SLEEVE} value={sleeve} onSelect={setSleeve} color="#2471A3" theme={theme} />
           <ChipRow label="Back Design" options={D_BACK} value={back} onSelect={setBack} color="#8E44AD" theme={theme} />
+          <ChipRow label="Fabric Type" options={D_FABRIC} value={fabric} onSelect={setFabric} color="#C9A96E" theme={theme} />
 
           <View style={{ gap: 8 }}>
             <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>Fabric / Main Color</Text>
@@ -1801,6 +2625,24 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
               Selected: <Text style={{ fontFamily: "Inter_600SemiBold", color: fabricColor }}>{fabricColor}</Text>
             </Text>
           </View>
+
+          <PatternPickerRow
+            selected={designBorderPattern}
+            onSelect={(v) => { setDesignBorderPattern(v); setAiDesignUri(null); setAiDesignBackUri(null); }}
+            onUpload={async () => {
+              try {
+                const r = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ImagePicker.MediaTypeOptions.Images, allowsEditing: true, quality: 0.8, base64: true });
+                if (!r.canceled && r.assets[0]) {
+                  const a = r.assets[0];
+                  setDesignBorderPatternCustomUri(a.base64 ? `data:image/jpeg;base64,${a.base64}` : a.uri);
+                  setDesignBorderPattern("custom");
+                  Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+                }
+              } catch { Alert.alert("Error", "Could not load image."); }
+            }}
+            customUri={designBorderPatternCustomUri}
+            theme={theme}
+          />
 
           <View style={{ flexDirection: "row", gap: 12 }}>
             <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
@@ -1826,58 +2668,130 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
           {generating && (
             <View style={{ alignItems: "center", gap: 14, padding: 32 }}>
               <ActivityIndicator size="large" color={Colors.brand.primary} />
-              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 14, color: theme.textSecondary, textAlign: "center" }}>
-                Calculating pattern pieces and generating AI ideas…
+              <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 15, color: theme.text, textAlign: "center" }}>
+                Creating your blouse…
+              </Text>
+              <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, textAlign: "center" }}>
+                Generating your blouse preview, pattern pieces &amp; AI styling ideas all at once
               </Text>
             </View>
           )}
 
           {!generating && aiIdeas && (
             <>
-              {/* AI Ideas */}
+              {/* ── 3D AI Preview ──────────────────────────────────── */}
+              {aiDesignUri && aiDesignBackUri ? (
+                <View style={{ gap: 10 }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✦ Your AI Blouse Preview</Text>
+                  <View style={{ backgroundColor: theme.card, borderColor: Colors.brand.gold + "50", borderWidth: 1, borderRadius: 18, overflow: "hidden" }}>
+                    <BlouseFlatViewer
+                      frontUri={aiDesignUri}
+                      backUri={aiDesignBackUri}
+                      width={SCREEN_WIDTH - 40}
+                      height={SCREEN_WIDTH - 40}
+                    />
+                    <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border, gap: 4 }}>
+                      <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.gold, textAlign: "center" }}>
+                        ✦ Tap Front View / Back View to switch
+                      </Text>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
+                        {neckline} neckline · {sleeve} sleeves · {back} back
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, padding: 20, alignItems: "center", gap: 8 }]}>
+                  <Text style={{ fontSize: 22 }}>✦</Text>
+                  <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: theme.textMuted, textAlign: "center" }}>
+                    Preview could not be generated this time. Your pattern is ready below.
+                  </Text>
+                </View>
+              )}
+
+              {/* ── AI Design Ideas ────────────────────────────────── */}
               <View style={{ gap: 10 }}>
                 <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✨ AI Design Ideas</Text>
                 {aiIdeas.map((idea, i) => (
-                  <View key={i} style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1,
-                    borderRadius: 16, padding: 16, gap: 6 }]}>
+                  <View key={i} style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, padding: 16, gap: 6 }]}>
                     <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.primary + "20",
-                        alignItems: "center", justifyContent: "center" }}>
+                      <View style={{ width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.primary + "20", alignItems: "center", justifyContent: "center" }}>
                         <Text style={{ fontFamily: "Inter_700Bold", fontSize: 13, color: Colors.brand.primary }}>{i + 1}</Text>
                       </View>
                       <Text style={{ fontFamily: "Inter_700Bold", fontSize: 14, color: theme.text, flex: 1 }}>{idea.title}</Text>
                     </View>
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, lineHeight: 19 }}>
-                      {idea.description}
-                    </Text>
+                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, lineHeight: 19 }}>{idea.description}</Text>
                   </View>
                 ))}
               </View>
 
-              {/* Sewing Pattern */}
+              {/* ── Beginner Pattern Guide ─────────────────────────── */}
               <View style={{ gap: 10 }}>
-                <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>📐 Sewing Pattern</Text>
-                <View style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
-                  <ScrollView horizontal showsHorizontalScrollIndicator
-                    contentContainerStyle={{ padding: 12 }}>
-                    <BlousePatternDiagram
-                      bust={+bust || undefined}
-                      underBust={+underBust || undefined}
-                      blouseLength={+blouseLen || undefined}
-                      sleeveLength={+sleeveLen || undefined}
-                      unit={unit}
-                      width={1060}
-                    />
-                  </ScrollView>
-                  <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
-                    <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
-                      Scroll sideways to see all pieces · +1.5 cm seam allowance on all edges
-                    </Text>
-                  </View>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+                  <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✂️ Pattern Guide</Text>
+                  <TouchableOpacity
+                    onPress={() => router.push({ pathname: "/sewing-guide", params: { fabric } })}
+                    style={{ flexDirection: "row", alignItems: "center", gap: 5,
+                      backgroundColor: Colors.brand.gold + "18", borderRadius: 20,
+                      paddingHorizontal: 12, paddingVertical: 5,
+                      borderWidth: 1, borderColor: Colors.brand.gold + "40" }}
+                  >
+                    <Feather name="book-open" size={13} color={Colors.brand.gold} />
+                    <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.gold }}>Full Guide</Text>
+                  </TouchableOpacity>
                 </View>
+                <BlouseBeginnerPattern
+                  bust={+bust || 86}
+                  underBust={+underBust || 72}
+                  blouseLength={+blouseLen || 15}
+                  sleeveLength={+sleeveLen || 0}
+                  neckline={neckline}
+                  sleeve={sleeve}
+                  back={back}
+                  unit={unit}
+                  fabricKey={fabric || "Silk"}
+                  fabricColor={fabricColor}
+                  theme={theme}
+                />
               </View>
 
-              {/* Sewing Instructions */}
+              {/* ── Technical Pattern (collapsible) ───────────────── */}
+              <View style={{ gap: 8 }}>
+                <TouchableOpacity
+                  style={[styles.guideHeader, { backgroundColor: theme.card, borderColor: theme.border }]}
+                  onPress={() => setShowTechnicalPattern(!showTechnicalPattern)}
+                >
+                  <View style={[styles.guideIconWrap, { backgroundColor: Colors.brand.primary + "15" }]}>
+                    <Feather name="grid" size={18} color={Colors.brand.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.guideTitle, { color: theme.text }]}>Technical Pattern (Advanced)</Text>
+                    <Text style={[styles.guideSub, { color: theme.textMuted }]}>Full-scale pattern pieces with exact dimensions</Text>
+                  </View>
+                  <Feather name={showTechnicalPattern ? "chevron-up" : "chevron-down"} size={18} color={theme.textSecondary} />
+                </TouchableOpacity>
+                {showTechnicalPattern && (
+                  <Animated.View entering={FadeInDown.springify()} style={{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, overflow: "hidden" }}>
+                    <ScrollView horizontal showsHorizontalScrollIndicator contentContainerStyle={{ padding: 12 }}>
+                      <BlousePatternDiagram
+                        bust={+bust || undefined}
+                        underBust={+underBust || undefined}
+                        blouseLength={+blouseLen || undefined}
+                        sleeveLength={+sleeveLen || undefined}
+                        unit={unit}
+                        width={1060}
+                      />
+                    </ScrollView>
+                    <View style={{ padding: 10, borderTopWidth: 1, borderTopColor: theme.border }}>
+                      <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
+                        Scroll sideways to see all pieces · +1.5 cm seam allowance on all edges
+                      </Text>
+                    </View>
+                  </Animated.View>
+                )}
+              </View>
+
+              {/* ── Sewing Instructions ────────────────────────────── */}
               {instructions && (
                 <View style={{ gap: 8 }}>
                   <TouchableOpacity
@@ -1903,15 +2817,82 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 </View>
               )}
 
-              {/* Action buttons */}
+              {/* ── Save / Share / Add to Fits ─────────────────────── */}
+              {aiDesignUri && (
+                <View style={{ gap: 10 }}>
+                  <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: theme.textMuted, textAlign: "center", letterSpacing: 0.5 }}>
+                    WHAT WOULD YOU LIKE TO DO WITH THIS DESIGN?
+                  </Text>
+
+                  {/* Add to Fits — prominent gold CTA */}
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, {
+                      backgroundColor: fitAdded ? Colors.brand.gold + "30" : Colors.brand.gold,
+                      borderWidth: 1.5,
+                      borderColor: Colors.brand.gold,
+                    }]}
+                    onPress={() => {
+                      if (!fitAdded && !addToFitsMutation.isPending) {
+                        addToFitsMutation.mutate(aiDesignUri);
+                      }
+                      Haptics.selectionAsync();
+                    }}
+                    disabled={addToFitsMutation.isPending}
+                  >
+                    {addToFitsMutation.isPending ? (
+                      <ActivityIndicator size="small" color={Colors.brand.primaryDark} />
+                    ) : (
+                      <>
+                        <Feather name={fitAdded ? "check-circle" : "plus-circle"} size={18}
+                          color={fitAdded ? Colors.brand.gold : Colors.brand.primaryDark} />
+                        <Text style={[styles.primaryBtnText, { color: fitAdded ? Colors.brand.gold : Colors.brand.primaryDark }]}>
+                          {fitAdded ? "Added to Tailor Fits ✓" : "Add to Tailor Fits"}
+                        </Text>
+                      </>
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Save + Share row */}
+                  <View style={{ flexDirection: "row", gap: 10 }}>
+                    <TouchableOpacity
+                      style={[styles.logoutBtn, { flex: 1, borderColor: Colors.brand.primary + "60",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                      onPress={() => saveImageToGallery(aiDesignUri, "front")}
+                    >
+                      <Feather name="download" size={15} color={Colors.brand.primary} />
+                      <Text style={[styles.logoutText, { color: Colors.brand.primary }]}>Save Front</Text>
+                    </TouchableOpacity>
+                    {aiDesignBackUri && (
+                      <TouchableOpacity
+                        style={[styles.logoutBtn, { flex: 1, borderColor: Colors.brand.primary + "60",
+                          flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                        onPress={() => saveImageToGallery(aiDesignBackUri, "back")}
+                      >
+                        <Feather name="download" size={15} color={Colors.brand.primary} />
+                        <Text style={[styles.logoutText, { color: Colors.brand.primary }]}>Save Back</Text>
+                      </TouchableOpacity>
+                    )}
+                    <TouchableOpacity
+                      style={[styles.logoutBtn, { flex: 1, borderColor: Colors.brand.gold + "60",
+                        flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }]}
+                      onPress={() => shareImage(aiDesignUri)}
+                    >
+                      <Feather name="share-2" size={15} color={Colors.brand.gold} />
+                      <Text style={[styles.logoutText, { color: Colors.brand.gold }]}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                </View>
+              )}
+
+              {/* ── Edit / Regenerate ───────────────────────────────── */}
               <View style={{ flexDirection: "row", gap: 12 }}>
                 <TouchableOpacity style={[styles.logoutBtn, { flex: 1, borderColor: theme.border }]}
                   onPress={() => { setStep(1); Haptics.selectionAsync(); }}>
                   <Feather name="edit-2" size={15} color={theme.textSecondary} />
-                  <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Edit</Text>
+                  <Text style={[styles.logoutText, { color: theme.textSecondary }]}>Edit Style</Text>
                 </TouchableOpacity>
                 <TouchableOpacity style={[styles.primaryBtn, { flex: 2, backgroundColor: Colors.brand.primary }]}
-                  onPress={generate}>
+                  onPress={() => { setFitAdded(false); generate(); }}>
                   <Feather name="refresh-cw" size={16} color="#fff" />
                   <Text style={styles.primaryBtnText}>Regenerate</Text>
                 </TouchableOpacity>
@@ -1978,8 +2959,8 @@ export default function ProfileScreen() {
   const TABS: { key: Tab; label: string; icon: string }[] = [
     { key: "preferences", label: "Styles", icon: "sliders" },
     { key: "ideas", label: "Ideas", icon: "image" },
-    { key: "measurements", label: "Measures", icon: "bar-chart-2" },
-    { key: "design", label: "Design", icon: "scissors" },
+    { key: "pattern", label: "Guide", icon: "book-open" },
+    { key: "design", label: "Fit & Design", icon: "scissors" },
   ];
 
   return (
@@ -2158,7 +3139,7 @@ export default function ProfileScreen() {
 
       {user && activeTab === "preferences" && <PreferencesTab theme={theme} user={user} />}
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
-      {user && activeTab === "measurements" && <MeasurementsTab theme={theme} user={user} />}
+      {user && activeTab === "pattern" && <PatternGuideTab theme={theme} />}
       {user && activeTab === "design" && <BlouseDesignTab theme={theme} user={user} />}
     </View>
   );
@@ -2314,6 +3295,8 @@ const styles = StyleSheet.create({
   aiGenBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 16, borderWidth: 1.5, backgroundColor: "transparent" },
   aiGenBtnIcon: { fontSize: 16, color: Colors.brand.gold },
   aiGenBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  dlBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5 },
+  dlBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   aiPreviewCard: { borderRadius: 20, borderWidth: 1, overflow: "hidden" },
   aiPreviewPlaceholder: { padding: 40, alignItems: "center", gap: 14 },
   aiPreviewLoadingText: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 20 },

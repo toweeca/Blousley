@@ -39,6 +39,10 @@ function RootLayoutNav() {
         name="fit/[id]"
         options={{ presentation: "card", headerShown: false }}
       />
+      <Stack.Screen
+        name="sewing-guide"
+        options={{ presentation: "card", headerShown: false }}
+      />
     </Stack>
   );
 }

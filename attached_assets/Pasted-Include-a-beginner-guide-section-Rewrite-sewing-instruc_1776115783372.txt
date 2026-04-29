@@ -1,0 +1,44 @@
+Include a beginner guide section
+Rewrite sewing instructions into simple step-by-step language.
+Each step should include:
+•	The step title.
+•	What to do.
+•	Why it matters.
+•	Common mistakes to avoid.
+•	Which pattern pieces are involved.
+Use short, beginner-friendly wording. Do not assume the user already knows sewing terms.
+Include a fabric cut-layout preview
+Show the blouse pattern pieces laid out on top of the chosen fabric so the preview reflects how the actual fabric will look after cutting.
+The preview should:
+•	Use the selected fabric color, print, or texture.
+•	Show correct print direction.
+•	Show mirrored pieces when needed.
+•	Show lining if relevant.
+•	Show labels on each piece.
+•	Show whether each piece is cut once, twice, or on the fold.
+•	Show grainline arrows.
+•	Show match points / notches.
+•	Look realistic, not like plain white shapes.
+If the fabric has stripes, florals, or motifs, keep the print direction aligned properly in the preview.
+Include a sewing pattern explainer
+Add a section that explains the most common sewing pattern markings in very simple language:
+•	Grainline = align the pattern with the selvage.
+•	Notches = points that must match with another piece.
+•	Cut on fold = place the edge on the folded fabric.
+•	Cut 2 mirrored = cut two matching pieces, one left and one right.
+•	Seam allowance = extra fabric space for sewing.
+•	Interfacing = stiffening layer used for support.
+•	Lining = inner layer that helps finish the garment cleanly.
+Include a “Beginner Mode”
+Add a beginner mode that simplifies everything.
+When beginner mode is on:
+•	Use shorter sentences.
+•	Replace hard sewing words with simple explanations.
+•	Keep the instructions extra clear.
+•	Show a small glossary for difficult words.
+Include a “Detailed Mode”
+Add a detailed mode that keeps the original sewing words, but explains them beside the simple meaning.
+This mode should show:
+•	Original sewing term.
+•	Plain-English meaning.
+•	What it means in the actual sewing process.

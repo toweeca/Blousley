@@ -22,14 +22,19 @@ function useTotalUnread() {
     queryKey: ["chat-conversations-badge", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const r = await fetch(`${apiBase}/api/chat/conversations?userId=${user.id}`);
-      return r.json();
+      try {
+        const r = await fetch(`${apiBase}/api/chat/conversations?userId=${user.id}`);
+        if (!r.ok) return [];
+        const json = await r.json();
+        return Array.isArray(json) ? json : [];
+      } catch {
+        return [];
+      }
     },
     refetchInterval: 15000,
     enabled: !!user?.id,
-    select: (data) => data,
   });
-  return (data ?? []).reduce((s, c) => s + (c.unreadCount ?? 0), 0);
+  return (Array.isArray(data) ? data : []).reduce((s, c) => s + (c.unreadCount ?? 0), 0);
 }
 
 function NativeTabLayout() {
