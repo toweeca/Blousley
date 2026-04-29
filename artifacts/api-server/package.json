@@ -12,7 +12,6 @@
     "@workspace/db": "workspace:*",
     "@workspace/api-zod": "workspace:*",
     "@workspace/integrations-openai-ai-server": "workspace:*",
-    "@workspace/integrations-gemini-ai": "workspace:*",
     "drizzle-orm": "catalog:",
     "express": "^5",
     "cookie-parser": "^1.4.7",

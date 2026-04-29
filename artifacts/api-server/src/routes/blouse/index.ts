@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { db, blouseFitsTable } from "@workspace/db";
 import { eq, desc } from "drizzle-orm";
-import { ai } from "@workspace/integrations-gemini-ai";
+import { openai } from "@workspace/integrations-openai-ai-server";
 import designRouter from "./design";
 
 const router: IRouter = Router();
@@ -40,19 +40,30 @@ Respond ONLY with valid JSON in this exact format:
   "suggestedStyles": ["<style1>", "<style2>", "<style3>"]
 }`;
 
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [{
-        role: "user",
-        parts: [
-          { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
-          { text: prompt },
-        ],
-      }],
-      config: { maxOutputTokens: 1024 },
+    const response = await openai.chat.completions.create({
+      model: "gpt-5.2",
+      max_completion_tokens: 1024,
+      messages: [
+        {
+          role: "user",
+          content: [
+            {
+              type: "image_url",
+              image_url: {
+                url: `data:image/jpeg;base64,${imageBase64}`,
+                detail: "high",
+              },
+            },
+            {
+              type: "text",
+              text: prompt,
+            },
+          ],
+        },
+      ],
     });
 
-    const content = response.text ?? "{}";
+    const content = response.choices[0]?.message?.content ?? "{}";
 
     let parsed: {
       measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number };

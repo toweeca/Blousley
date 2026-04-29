@@ -104,12 +104,6 @@ function BlouseCarousel() {
         }}
         snapToInterval={SCREEN_WIDTH - 48 + 12}
         decelerationRate="fast"
-        getItemLayout={(_, index) => ({
-          length: SCREEN_WIDTH - 48,
-          offset: index * (SCREEN_WIDTH - 48 + 12),
-          index,
-        })}
-        onScrollToIndexFailed={() => {}}
         contentContainerStyle={{ gap: 12 }}
         renderItem={({ item }) => (
           <View style={styles.carouselCard}>
@@ -250,7 +244,7 @@ export default function HomeScreen() {
             entering={FadeInDown.delay(450).springify()}
             style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
           >
-            Explore traditional South Asian and modern neckline designs
+            Explore traditional Tamil and modern neckline designs
           </Animated.Text>
 
           <View style={styles.stylesGrid}>
