@@ -159,6 +159,18 @@ function borderPatternElement(
   return motifs.join("\n");
 }
 
+function normalizeSleeveStyle(s: string): string {
+  const l = s.toLowerCase();
+  if (l.includes("sleeveless") || l === "none") return "Sleeveless";
+  if (l.includes("cap")) return "Cap";
+  if (l.includes("puff")) return "Puff";
+  if (l.includes("bell")) return "Bell";
+  if (l.includes("full") || l.includes("long")) return "Long";
+  if (l.includes("elbow") || l.includes("3/4") || l.includes("three")) return "Elbow";
+  if (l.includes("short")) return "Short";
+  return s;
+}
+
 function generateBlouseSVG(opts: {
   neck?: string;
   sleeve?: string;
@@ -180,10 +192,9 @@ function generateBlouseSVG(opts: {
   const gold = "#C9A96E";
   const goldDark = "#9A7040";
   const bgTop = "#FDFAF4";
-  const bgBot = "#F0E8D8";
   const isBack = opts.view === "back";
   const neck = opts.neck ?? "Round";
-  const sleeve = opts.sleeve ?? "Short";
+  const sleeve = normalizeSleeveStyle(opts.sleeve ?? "Short");
   const back = opts.back ?? "Hook";
 
   // ── Shoulder & body geometry — fills most of canvas ─────────────────────
@@ -388,7 +399,7 @@ function generateBlouseSVG(opts: {
     ? `${backNkPath} L ${shR} ${shTop} L ${shL} ${shTop} Z`
     : nk.clip;
 
-  // ── Assemble SVG — transparent background so the 3D scene shows through ──────
+  // ── Assemble SVG — light canvas background for clean 2D flat-lay display ────
   return `<svg xmlns="http://www.w3.org/2000/svg" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">
   <defs>
     <linearGradient id="body" x1="0" y1="0" x2="1" y2="1">
@@ -396,14 +407,15 @@ function generateBlouseSVG(opts: {
       <stop offset="35%" stop-color="${primary}"/>
       <stop offset="100%" stop-color="${dark}"/>
     </linearGradient>
-    <filter id="drop" x="-20%" y="-10%" width="140%" height="130%">
-      <feDropShadow dx="0" dy="8" stdDeviation="14" flood-color="rgba(0,0,0,0.55)"/>
-    </filter>
+    <linearGradient id="bg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#FDFAF4"/>
+      <stop offset="100%" stop-color="#EDE6D6"/>
+    </linearGradient>
     ${fabricTexture()}
   </defs>
 
-  <!-- NO background rect — SVG is transparent so the 3D scene background shows through
-       seamlessly without the lighting mismatch that caused the dark blocked area. -->
+  <!-- Soft parchment background for 2D flat-lay — neckline cutout shows canvas not darkness -->
+  <rect width="${W}" height="${H}" fill="url(#bg)"/>
 
   <!-- Sleeves (behind body) -->
   ${sleeve_left(sleeve)}

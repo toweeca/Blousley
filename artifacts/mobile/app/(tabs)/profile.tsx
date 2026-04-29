@@ -525,6 +525,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [dlLoading, setDlLoading] = useState(false);
   const [borderPattern, setBorderPattern] = useState("None");
   const [borderPatternCustomUri, setBorderPatternCustomUri] = useState<string | null>(null);
+  const [fabricColor, setFabricColor] = useState(Colors.brand.primary);
 
   React.useEffect(() => {
     if (prefs && !initialized) {
@@ -612,12 +613,12 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
         fetch(`${domain}/api/generate-blouse-image/style`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, borderPattern: pattern, view: "front" }),
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "front" }),
         }),
         fetch(`${domain}/api/generate-blouse-image/style`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: Colors.brand.primary, borderPattern: pattern, view: "back" }),
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "back" }),
         }),
       ]);
       const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
@@ -641,7 +642,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ neck, sleeve, back, fabric, view }),
+        body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, view }),
       });
       if (!res.ok) throw new Error("Failed");
       const data = await res.json();
@@ -694,6 +695,37 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
 
       <Animated.View entering={FadeInDown.delay(260).springify()}>
         <StyleRow label="Fabric" options={FABRIC_OPTIONS} images={FABRIC_IMAGES} selected={fabric} onSelect={(v) => handleStyleChange(setFabric, v)} theme={theme} />
+      </Animated.View>
+
+      <Animated.View entering={FadeInDown.delay(280).springify()} style={{ gap: 10 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
+          <Text style={[styles.groupLabel, { color: theme.text }]}>Fabric Colour</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+            <View style={{ width: 14, height: 14, borderRadius: 7, backgroundColor: fabricColor, borderWidth: 1.5, borderColor: theme.border }} />
+            <Text style={{ fontSize: 11, color: theme.textSecondary, fontFamily: "Inter_400Regular" }}>{fabricColor}</Text>
+          </View>
+        </View>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+          {FABRIC_COLORS.map((col) => (
+            <TouchableOpacity
+              key={col}
+              onPress={() => { setFabricColor(col); setAiPreviewUri(null); setAiPreviewBackUri(null); Haptics.selectionAsync(); }}
+              style={{
+                width: 40, height: 40, borderRadius: 20,
+                backgroundColor: col,
+                borderWidth: fabricColor === col ? 3 : 1.5,
+                borderColor: fabricColor === col ? Colors.brand.gold : "rgba(0,0,0,0.15)",
+                shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+              }}
+            >
+              {fabricColor === col && (
+                <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                  <Feather name="check" size={14} color={col === "#F8F9FA" || col === "#ECF0F1" ? "#333" : "#fff"} />
+                </View>
+              )}
+            </TouchableOpacity>
+          ))}
+        </ScrollView>
       </Animated.View>
 
       <Animated.View entering={FadeInDown.delay(300).springify()}>
