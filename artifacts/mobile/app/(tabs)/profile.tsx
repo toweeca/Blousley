@@ -28,7 +28,7 @@ import Svg, { Path, Circle, Ellipse, Line, Polygon, Rect, Text as SvgText, Defs,
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
 import BlouseBeginnerPattern from "@/components/BlouseBeginnerPattern";
 import RotationViewer from "@/components/RotationViewer";
-import BlouseViewer3D from "@/components/BlouseViewer3D";
+import BlouseFlatViewer from "@/components/BlouseFlatViewer";
 import {
   HighBustDiagram, BustDiagram, UnderBustDiagram, BustPointDiagram,
   ShoulderWidthDiagram, BlouseLengthDiagram, SleeveLengthDiagram,
@@ -743,7 +743,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
             : <Text style={styles.aiGenBtnIcon}>✦</Text>
           }
           <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>
-            {aiGenerating ? "Generating…" : "Preview My Design in 3D"}
+            {aiGenerating ? "Generating…" : "Preview My Design"}
           </Text>
         </TouchableOpacity>
       </Animated.View>
@@ -759,7 +759,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
                 </Text>
               </View>
             ) : (
-              <BlouseViewer3D
+              <BlouseFlatViewer
                 frontUri={aiPreviewUri ?? ""}
                 backUri={aiPreviewBackUri ?? ""}
                 width={SCREEN_WIDTH - 48}
@@ -768,7 +768,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
             )}
             <View style={styles.aiPreviewFooter}>
               <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                ✦ 3D preview · drag to spin · {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
+                ✦ {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
               </Text>
               <TouchableOpacity onPress={() => { setShowPreview(false); setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
                 <Feather name="x" size={16} color={Colors.brand.gold} />
@@ -1317,12 +1317,12 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                   <View style={styles.aiPreviewPlaceholder}>
                     <ActivityIndicator color={Colors.brand.gold} size="large" />
                     <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                      Creating your 3D sketch design…{"\n"}Generating front &amp; back views
+                      Creating your sketch design…{"\n"}Generating front &amp; back views
                     </Text>
                   </View>
                 ) : aiSketchImageUri && aiSketchBackUri ? (
                   <>
-                    <BlouseViewer3D
+                    <BlouseFlatViewer
                       frontUri={aiSketchImageUri}
                       backUri={aiSketchBackUri}
                       width={SCREEN_WIDTH - 48}
@@ -1330,7 +1330,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                     />
                     <View style={styles.aiPreviewFooter}>
                       <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
-                        ✦ 3D preview · drag to spin · from your {sketchPaths.length} stroke sketch
+                        ✦ From your {sketchPaths.length}-stroke sketch
                       </Text>
                       <TouchableOpacity onPress={() => { setAiSketchImageUri(null); setAiSketchBackUri(null); }}>
                         <Feather name="refresh-cw" size={16} color={Colors.brand.gold} />
@@ -2640,7 +2640,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 Creating your blouse…
               </Text>
               <Text style={{ fontFamily: "Inter_400Regular", fontSize: 13, color: theme.textSecondary, textAlign: "center" }}>
-                Generating 3D preview, pattern pieces &amp; AI styling ideas all at once
+                Generating your blouse preview, pattern pieces &amp; AI styling ideas all at once
               </Text>
             </View>
           )}
@@ -2652,7 +2652,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 <View style={{ gap: 10 }}>
                   <Text style={[styles.sectionTitle, { color: theme.text, fontSize: 17 }]}>✦ Your AI Blouse Preview</Text>
                   <View style={{ backgroundColor: theme.card, borderColor: Colors.brand.gold + "50", borderWidth: 1, borderRadius: 18, overflow: "hidden" }}>
-                    <BlouseViewer3D
+                    <BlouseFlatViewer
                       frontUri={aiDesignUri}
                       backUri={aiDesignBackUri}
                       width={SCREEN_WIDTH - 40}
@@ -2660,7 +2660,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                     />
                     <View style={{ padding: 12, borderTopWidth: 1, borderTopColor: theme.border, gap: 4 }}>
                       <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.gold, textAlign: "center" }}>
-                        ✦ Drag to rotate · Pinch to zoom · See front &amp; back
+                        ✦ Tap Front View / Back View to switch
                       </Text>
                       <Text style={{ fontFamily: "Inter_400Regular", fontSize: 11, color: theme.textMuted, textAlign: "center" }}>
                         {neckline} neckline · {sleeve} sleeves · {back} back
@@ -2672,7 +2672,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                 <View style={[{ backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderRadius: 16, padding: 20, alignItems: "center", gap: 8 }]}>
                   <Text style={{ fontSize: 22 }}>✦</Text>
                   <Text style={{ fontFamily: "Inter_400Regular", fontSize: 12, color: theme.textMuted, textAlign: "center" }}>
-                    3D preview could not be generated this time. Your pattern is ready below.
+                    Preview could not be generated this time. Your pattern is ready below.
                   </Text>
                 </View>
               )}
