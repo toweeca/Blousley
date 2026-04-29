@@ -538,15 +538,58 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     }
   }, [prefs, initialized]);
 
-  // Reset preview when styles change
+  // Reset cached downloads when styles change (preview will regenerate via effect)
   const handleStyleChange = (setter: (v: string) => void, value: string) => {
     setter(value);
-    setShowPreview(false);
     setAiPreviewUri(null);
     setAiPreviewBackUri(null);
     setDlFrontUri(null);
     setDlBackUri(null);
   };
+
+  // Auto-generate AI preview whenever all four style options are set
+  React.useEffect(() => {
+    if (!neck || !sleeve || !back || !fabric) {
+      setShowPreview(false);
+      setAiPreviewUri(null);
+      setAiPreviewBackUri(null);
+      return;
+    }
+    setShowPreview(true);
+    setAiGenerating(true);
+    setAiPreviewUri(null);
+    setAiPreviewBackUri(null);
+
+    const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
+
+    const timer = setTimeout(() => {
+      Promise.all([
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "front" }),
+        }),
+        fetch(`${domain}/api/generate-blouse-image/style`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "back" }),
+        }),
+      ])
+        .then(([fr, br]) => Promise.all([fr.json(), br.json()]))
+        .then(([fData, bData]) => {
+          setAiPreviewUri(`data:${fData.mimeType};base64,${fData.b64_json}`);
+          setAiPreviewBackUri(`data:${bData.mimeType};base64,${bData.b64_json}`);
+        })
+        .catch((err) => console.error("Auto-preview error:", err))
+        .finally(() => setAiGenerating(false));
+    }, 600);
+
+    return () => {
+      clearTimeout(timer);
+      setAiGenerating(false);
+    };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [neck, sleeve, back, fabric, fabricColor, borderPattern]);
 
   const handleUploadCustomPattern = async () => {
     try {
@@ -596,42 +639,6 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     },
     onError: () => Alert.alert("Error", "Could not save preferences."),
   });
-
-  const generateAIPreview = async () => {
-    if (!neck && !sleeve && !back && !fabric) {
-      Alert.alert("Select styles first", "Choose at least one style option before previewing.");
-      return;
-    }
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setAiGenerating(true);
-    setShowPreview(true);
-    setAiPreviewUri(null);
-    setAiPreviewBackUri(null);
-    try {
-      const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
-      const [frontRes, backRes] = await Promise.all([
-        fetch(`${domain}/api/generate-blouse-image/style`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "front" }),
-        }),
-        fetch(`${domain}/api/generate-blouse-image/style`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "back" }),
-        }),
-      ]);
-      const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
-      const fUri = `data:${fData.mimeType};base64,${fData.b64_json}`;
-      const bUri = `data:${bData.mimeType};base64,${bData.b64_json}`;
-      setAiPreviewUri(fUri);
-      setAiPreviewBackUri(bUri);
-    } catch (err) {
-      console.error("generateAIPreview error:", err);
-    } finally {
-      setAiGenerating(false);
-    }
-  };
 
   // Download: fetch SVG from API only when the user explicitly requests it
   const downloadDesign = async (view: "front" | "back") => {
@@ -765,19 +772,14 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
           )}
         </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80", opacity: aiGenerating ? 0.7 : 1 }]}
-          onPress={generateAIPreview}
-          disabled={aiGenerating}
-        >
-          {aiGenerating
-            ? <ActivityIndicator size="small" color={Colors.brand.gold} />
-            : <Text style={styles.aiGenBtnIcon}>✦</Text>
-          }
-          <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>
-            {aiGenerating ? "Generating…" : "Preview My Design"}
-          </Text>
-        </TouchableOpacity>
+        {/* Hint shown until all four options are selected */}
+        {(!neck || !sleeve || !back || !fabric) && (
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6, paddingVertical: 6, opacity: 0.65 }}>
+            <Text style={{ fontSize: 13, color: Colors.brand.gold, fontFamily: "Inter_400Regular" }}>
+              ✦ Select neckline, sleeve, back & fabric to see your AI preview
+            </Text>
+          </View>
+        )}
       </Animated.View>
 
       {showPreview && (
@@ -787,7 +789,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
               <View style={styles.aiPreviewPlaceholder}>
                 <ActivityIndicator size="large" color={Colors.brand.gold} />
                 <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                  Drawing your blouse…
+                  Generating AI preview…
                 </Text>
               </View>
             ) : (
