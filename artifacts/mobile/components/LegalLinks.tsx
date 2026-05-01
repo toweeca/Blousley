@@ -1,0 +1,136 @@
+import React from "react";
+import { View, Text, TouchableOpacity, StyleSheet, Linking } from "react-native";
+import { router } from "expo-router";
+import Colors from "@/constants/colors";
+
+type Theme = { textMuted: string; border: string };
+
+export function ConsentText({
+  text,
+  theme,
+}: {
+  text: string;
+  theme: Theme;
+}) {
+  return (
+    <Text style={[styles.consentText, { color: theme.textMuted }]}>{text}</Text>
+  );
+}
+
+export function LegalFooter({ theme }: { theme: Theme }) {
+  return (
+    <View style={[styles.footer, { borderTopColor: theme.border }]}>
+      <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
+        <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Privacy Policy</Text>
+      </TouchableOpacity>
+      <Text style={[styles.footerDot, { color: theme.textMuted }]}>·</Text>
+      <TouchableOpacity onPress={() => router.push("/terms" as any)}>
+        <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Terms of Service</Text>
+      </TouchableOpacity>
+      <Text style={[styles.footerDot, { color: theme.textMuted }]}>·</Text>
+      <TouchableOpacity onPress={() => Linking.openURL("mailto:legal@yourdomain.com")}>
+        <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Contact</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export function SignupConsent({ theme }: { theme: Theme }) {
+  return (
+    <View style={styles.consentBlock}>
+      <Text style={[styles.consentText, { color: theme.textMuted }]}>
+        By creating an account, you agree to our{" "}
+      </Text>
+      <View style={styles.consentLinks}>
+        <TouchableOpacity onPress={() => router.push("/terms" as any)}>
+          <Text style={[styles.consentLink, { color: Colors.brand.primary }]}>Terms of Service</Text>
+        </TouchableOpacity>
+        <Text style={[styles.consentText, { color: theme.textMuted }]}> and </Text>
+        <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
+          <Text style={[styles.consentLink, { color: Colors.brand.primary }]}>Privacy Policy</Text>
+        </TouchableOpacity>
+        <Text style={[styles.consentText, { color: theme.textMuted }]}>.</Text>
+      </View>
+    </View>
+  );
+}
+
+export function UploadConsent({ theme }: { theme: Theme }) {
+  return (
+    <View style={styles.consentBlock}>
+      <Text style={[styles.consentText, { color: theme.textMuted }]}>
+        By uploading a photo, you consent to Blousify using it to generate blouse previews, fitting suggestions, and related design outputs. Upload only photos you have permission to use.{" "}
+      </Text>
+      <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
+        <Text style={[styles.consentLink, { color: Colors.brand.primary }]}>See our Privacy Policy.</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export function MeasurementConsent({ theme }: { theme: Theme }) {
+  return (
+    <View style={styles.consentBlock}>
+      <Text style={[styles.consentText, { color: theme.textMuted }]}>
+        By saving your measurements, you consent to Blousify using them to create sizing recommendations, blouse previews, and sewing-related outputs. We collect only the information needed for these features.{" "}
+      </Text>
+      <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
+        <Text style={[styles.consentLink, { color: Colors.brand.primary }]}>See our Privacy Policy.</Text>
+      </TouchableOpacity>
+    </View>
+  );
+}
+
+export function AiPreviewConsent({ theme }: { theme: Theme }) {
+  return (
+    <View style={[styles.consentBlock, { marginTop: 2 }]}>
+      <Text style={[styles.consentText, { color: theme.textMuted }]}>
+        AI Preview uses your selected styles, fabric choices, uploaded references, and saved measurements (if available) to generate a blouse preview. Please review results before sewing or tailoring.
+      </Text>
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    flexWrap: "wrap",
+    gap: 4,
+    paddingVertical: 16,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    marginTop: 8,
+  },
+  footerLink: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  footerDot: {
+    fontSize: 12,
+    marginHorizontal: 2,
+  },
+  consentBlock: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+    paddingHorizontal: 4,
+    marginTop: 8,
+  },
+  consentLinks: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    alignItems: "center",
+  },
+  consentText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  consentLink: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 11,
+    lineHeight: 16,
+    textDecorationLine: "underline",
+  },
+});

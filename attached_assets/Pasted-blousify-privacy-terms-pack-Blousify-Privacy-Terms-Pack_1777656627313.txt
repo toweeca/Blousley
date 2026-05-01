@@ -1,0 +1,259 @@
+blousify-privacy-terms-pack
+
+
+
+Blousify Privacy + Terms Pack
+Privacy Policy
+Last updated: May 1, 2026
+
+Blousify is a blouse design and preview application that helps users save measurements, choose blouse styles, upload reference images, and generate blouse design previews and related outputs.
+
+1. Information we collect
+We may collect the following information when you use Blousify:
+
+Account information: name, email address, login credentials, and profile details.
+
+Measurement information: bust, under bust, blouse length, sleeve length, bust point-to-point, fit preferences, and related tailoring details.
+
+Uploaded content: photos, blouse reference images, sketches, inspiration images, and other files you choose to upload.
+
+Design selections: neckline, sleeve style, back design, fabric, pattern, color, and related preferences.
+
+Generated outputs: blouse previews, AI-generated previews, fitting suggestions, sewing templates, measurement diagrams, and saved design history.
+
+Technical data: device type, app/browser information, logs, approximate usage analytics, and error/debug information.
+
+2. Why we collect this information
+We collect personal information to:
+
+create and manage your account;
+
+save your profile, measurements, and preferences;
+
+generate blouse previews and design results based on your selections;
+
+analyze uploaded photos or inputs when you choose features that depend on them;
+
+provide fitting guidance, style suggestions, templates, or sewing-related outputs;
+
+improve app performance, security, and reliability;
+
+respond to support requests and user questions.
+
+We aim to collect only the information reasonably needed for these purposes.
+
+3. Consent
+By creating an account, uploading photos, saving measurements, or using AI preview features, you consent to the collection, use, and disclosure of your information as described in this Privacy Policy.
+
+Where appropriate, Blousify presents additional consent text at the point of collection, such as when you upload an image or save body measurements.
+
+You should upload only photos and content you have permission to use.
+
+4. How uploaded photos and measurements are used
+If you upload a photo or enter body measurements, Blousify may use that information to:
+
+generate blouse previews;
+
+provide fitting recommendations;
+
+create templates, diagrams, or sewing-related outputs;
+
+save results to your account for later access.
+
+Blousify does not ask for more sensitive information than necessary for these features.
+
+5. Sharing with service providers
+We may use third-party providers to operate Blousify. Depending on the final production setup, these providers may include:
+
+hosting and deployment providers;
+
+database and authentication providers;
+
+cloud storage providers;
+
+analytics and monitoring providers;
+
+AI, image generation, or image processing providers;
+
+payment providers, if paid features are added later.
+
+These providers may process information on our behalf only to help us operate the app.
+
+6. Data retention
+We keep information only as long as needed for the purposes described in this policy, to maintain your account, provide features, meet legal requirements, resolve disputes, and enforce agreements.
+
+Uploaded content, saved measurements, and generated designs may remain in your account until deleted by you or removed by us according to our retention practices.
+
+7. Access, correction, deletion, and withdrawal
+You may request access to your personal information, ask us to correct inaccurate information, or request deletion of your account data, uploaded files, saved measurements, or generated outputs, subject to legal or operational limits.
+
+You may also withdraw consent for future use of your information, although some features may stop working if that happens.
+
+8. Safeguards
+We use reasonable administrative, technical, and organizational safeguards designed to protect personal information against loss, unauthorized access, misuse, or disclosure. No method of storage or transmission is completely secure.
+
+9. Children
+Blousify is not intended for children under the age required by applicable law to consent on their own.
+
+10. International processing
+Some service providers may store or process information outside your province or country. When that happens, your information may be subject to the laws of those jurisdictions.
+
+11. Changes to this policy
+We may update this Privacy Policy from time to time. If we make material changes, we may update the date above and provide notice within the app or website where appropriate.
+
+12. Contact
+For privacy requests or questions, contact:
+
+Blousify Privacy Contact
+Email: privacy@yourdomain.com
+Replace this email before launch.
+
+Terms of Service
+Last updated: May 1, 2026
+
+These Terms of Service govern your use of Blousify.
+
+1. Acceptance of terms
+By accessing or using Blousify, you agree to these Terms of Service and the Privacy Policy.
+
+2. Services
+Blousify provides blouse design, measurement, preview, AI-assisted visualization, and related tailoring or sewing support features.
+
+3. Account responsibility
+You are responsible for keeping your login credentials secure and for activity that occurs under your account.
+
+4. User content
+You retain responsibility for the photos, measurements, sketches, design choices, and other content you submit.
+
+By uploading content to Blousify, you confirm that:
+
+you own it or have permission to use it;
+
+it does not violate another person’s rights;
+
+it does not contain unlawful, abusive, or harmful material.
+
+You grant Blousify a limited license to use submitted content only as needed to operate, display, process, and improve the requested app features.
+
+5. AI and design output disclaimer
+Blousify may provide AI-generated previews, fitting ideas, templates, or sewing guidance. These outputs are for informational and design assistance purposes only and may not always be exact, complete, or suitable for every body type, fabric, or tailoring situation.
+
+Users should verify critical measurements and sewing decisions before cutting fabric or producing garments.
+
+6. Acceptable use
+You agree not to:
+
+misuse the service;
+
+upload content you do not have rights to use;
+
+attempt unauthorized access to the app or its systems;
+
+interfere with security, availability, or other users’ experience;
+
+use the app for unlawful or abusive purposes.
+
+7. Availability
+We may change, suspend, or discontinue features at any time. We do not guarantee uninterrupted availability.
+
+8. Limitation of liability
+To the fullest extent allowed by law, Blousify is provided on an “as is” and “as available” basis. Blousify is not liable for indirect, incidental, special, consequential, or business losses arising from use of the service.
+
+9. Termination
+We may suspend or terminate access if these terms are violated or if needed to protect the app, users, or business.
+
+10. Governing law
+These terms will generally be governed by the laws applicable in Ontario, Canada, unless another law is required.
+
+11. Contact
+For legal questions, contact:
+
+Blousify Legal Contact
+Email: legal@yourdomain.com
+Replace this email before launch.
+
+Consent Blocks
+Use these as in-app text near your forms and upload buttons.
+
+1. Signup consent
+By creating an account, you agree to the Terms of Service and Privacy Policy.
+
+2. Upload photo consent
+By uploading a photo, you consent to Blousify using it to generate blouse previews, fitting suggestions, and related design outputs. Upload only photos you have permission to use.
+
+3. Measurement save consent
+By saving your measurements, you consent to Blousify using them to create sizing recommendations, blouse previews, and sewing-related outputs. We collect only the measurement information needed for these features.
+
+4. AI preview consent
+AI Preview uses your selected style options, uploaded images, and saved measurements (if available) to generate a blouse preview. Results may vary and should be reviewed before tailoring or sewing.
+
+5. Saved designs consent
+Saved designs, uploaded references, and generated previews may be stored in your account so you can view or reuse them later.
+
+UI Placement Guide
+Based on your current app screens, place the text here:
+
+Upload Photo page
+Place directly under the Camera / Gallery buttons:
+
+By uploading a photo, you consent to Blousify using it to generate blouse previews, fitting suggestions, and related design outputs. Upload only photos you have permission to use. See our Privacy Policy.
+
+Measurements page
+Place above the save / continue button:
+
+By saving your measurements, you consent to Blousify using them to create sizing recommendations, blouse previews, and sewing-related outputs. We collect only the information needed for these features. See our Privacy Policy.
+
+AI Preview button area
+Place below the "AI Preview from Selections" button:
+
+AI Preview uses your selected styles, fabric choices, uploaded references, and saved measurements (if available) to generate a blouse preview. Please review results before sewing or tailoring.
+
+Footer / menu
+Add links:
+
+Privacy Policy
+
+Terms of Service
+
+Contact
+
+Replit Agent Prompt
+Paste this into Replit Agent:
+
+Add legal and trust pages to Blousify.
+
+Create:
+
+A public Privacy Policy page
+
+A public Terms of Service page
+
+Footer links to both pages plus Contact
+
+Consent text blocks on signup, upload photo, measurements, and AI preview screens
+
+Use the provided Blousify-specific policy and terms text exactly, unless a route/component naming change is needed.
+
+Requirements:
+
+Add Privacy Policy and Terms links in the footer and signup screen
+
+Add upload consent below the Camera/Gallery buttons
+
+Add measurement consent above the save/continue button on the measurements page
+
+Add AI preview consent below the “AI Preview from Selections” button
+
+Keep the app’s current styling
+
+Make the legal pages mobile-friendly
+
+Do not break existing flows
+
+Also add placeholder emails:
+
+privacy@yourdomain.com
+
+legal@yourdomain.com
+
+I will replace those before launch.

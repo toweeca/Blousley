@@ -1,4 +1,5 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { UploadConsent, MeasurementConsent } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import { LinearGradient } from "expo-linear-gradient";
@@ -323,6 +324,8 @@ export default function AnalyzeScreen() {
                   </TouchableOpacity>
                 </View>
 
+                <UploadConsent theme={theme} />
+
                 <View style={styles.tipsBox}>
                   <Text style={[styles.tipsTitle, { color: theme.textSecondary }]}>
                     Tips for best results:
@@ -490,6 +493,8 @@ export default function AnalyzeScreen() {
                 </Text>
               </View>
             </View>
+
+            <MeasurementConsent theme={theme} />
 
             <TouchableOpacity
               style={[styles.saveBtn, { backgroundColor: Colors.brand.primary }]}

@@ -43,6 +43,14 @@ function RootLayoutNav() {
         name="sewing-guide"
         options={{ presentation: "card", headerShown: false }}
       />
+      <Stack.Screen
+        name="privacy"
+        options={{ presentation: "card", headerShown: false }}
+      />
+      <Stack.Screen
+        name="terms"
+        options={{ presentation: "card", headerShown: false }}
+      />
     </Stack>
   );
 }

@@ -25,6 +25,7 @@ import {
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import Svg, { Path, Circle, Ellipse, Line, Polygon, Rect, Text as SvgText, Defs, LinearGradient as SvgGradient, Stop } from "react-native-svg";
+import { SignupConsent, AiPreviewConsent, LegalFooter } from "@/components/LegalLinks";
 import BlousePatternDiagram from "@/components/BlousePatternDiagram";
 import BlouseBeginnerPattern from "@/components/BlouseBeginnerPattern";
 import RotationViewer from "@/components/RotationViewer";
@@ -794,6 +795,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
             </Text>
           </View>
         )}
+        {allSelected && <AiPreviewConsent theme={theme} />}
       </Animated.View>
 
       {showPreview && (
@@ -3077,6 +3079,8 @@ export default function ProfileScreen() {
               <Feather name="check" size={20} color="#fff" />
               <Text style={styles.primaryBtnText}>Create Profile</Text>
             </TouchableOpacity>
+            <SignupConsent theme={theme} />
+            <LegalFooter theme={theme} />
           </Animated.View>
         </ScrollView>
       )}

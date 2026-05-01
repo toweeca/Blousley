@@ -112,6 +112,20 @@ Generated React Query hooks and fetch client from the OpenAPI spec (e.g. `useHea
 - `conversations`: id, title, customerId, tailorId, lastMessageAt, createdAt
 - `messages`: id, conversationId, senderId, role, content, isRead, createdAt
 
+### Legal Pages & Consent
+
+- `app/privacy.tsx` — Full Privacy Policy screen (registered in root Stack as `presentation: card`)
+- `app/terms.tsx` — Full Terms of Service screen (registered in root Stack as `presentation: card`)
+- `components/LegalLinks.tsx` — Reusable consent/legal components:
+  - `LegalFooter` — Privacy Policy · Terms of Service · Contact footer row (used on home screen)
+  - `SignupConsent` — Consent line below Create Profile button
+  - `UploadConsent` — Consent below Camera/Gallery buttons in analyze.tsx
+  - `MeasurementConsent` — Consent above Save & Share button in analyze.tsx
+  - `AiPreviewConsent` — Disclosure below AI Preview from Selections button in profile.tsx
+- Consent blocks placed at all four key points: signup, photo upload, measurement save, AI preview
+- Footer links placed on home screen (index.tsx); legal pages navigable via `router.push("/privacy")` / `router.push("/terms")`
+- Contact email: legal@yourdomain.com / privacy@yourdomain.com (update before launch)
+
 ### `scripts` (`@workspace/scripts`)
 
 Utility scripts package. Each script is a `.ts` file in `src/` with a corresponding npm script in `package.json`. Run scripts via `pnpm --filter @workspace/scripts run <script>`. Scripts can import any workspace package (e.g., `@workspace/db`) by adding it as a dependency in `scripts/package.json`.

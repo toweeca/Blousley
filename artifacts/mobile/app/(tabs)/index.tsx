@@ -1,4 +1,5 @@
 import { Feather } from "@expo/vector-icons";
+import { LegalFooter } from "@/components/LegalLinks";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useRef, useState, useEffect } from "react";
@@ -300,6 +301,7 @@ export default function HomeScreen() {
             </Animated.View>
           ))}
         </View>
+        <LegalFooter theme={theme} />
       </ScrollView>
     </View>
   );
