@@ -1,4 +1,5 @@
 import { Router, type IRouter } from "express";
+import { generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
 
 const router: IRouter = Router();
 
@@ -465,32 +466,13 @@ function generateBlouseSVG(opts: {
 </svg>`;
 }
 
-// ─── AI image generation via Pollinations.ai (no API key required) ──────────
-
-const NEGATIVE =
-  "long top, tunic, kurta, full-length garment, knee-length, floor-length, midi, maxi, western blouse, shirt, dress, skirt, dupatta, saree drape, sari draped, full outfit, lehenga, jewelry, accessories, model, person, body parts, background clutter, dark background, collage, multiple garments, logo, watermark, text, blurry, low quality, flat lay, lying flat, wrinkled";
+// ─── AI image generation via Replit AI (gpt-image-1) ────────────────────────
 
 async function generateBlousePhoto(
   prompt: string,
-  seed?: number,
 ): Promise<{ b64_json: string; mimeType: string }> {
-  const encoded = encodeURIComponent(prompt);
-  const neg = encodeURIComponent(NEGATIVE);
-  const seedParam = seed !== undefined ? `&seed=${seed}` : "";
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&nologo=true&negative=${neg}${seedParam}`;
-
-  // Retry up to 3 times on 429 rate-limit
-  for (let attempt = 0; attempt < 3; attempt++) {
-    if (attempt > 0) await new Promise((r) => setTimeout(r, 8_000));
-    const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
-    if (res.status === 429) continue;
-    if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
-    const arrayBuf = await res.arrayBuffer();
-    const b64 = Buffer.from(arrayBuf).toString("base64");
-    const ct = res.headers.get("content-type") ?? "image/jpeg";
-    return { b64_json: b64, mimeType: ct.split(";")[0].trim() };
-  }
-  throw new Error("Pollinations rate limited after retry");
+  const buffer = await generateImageBuffer(prompt, "1024x1024");
+  return { b64_json: buffer.toString("base64"), mimeType: "image/png" };
 }
 
 // Maps UI option names → vivid descriptive phrases the AI model can render faithfully
@@ -596,16 +578,10 @@ router.post("/style", async (req, res) => {
       return;
     }
 
-    // Stable seed so same selections always produce the same image; front/back get different seeds
-    const seedBase = [neck, sleeve, back, fabric, color].filter(Boolean).join("-");
-    let seed = 0;
-    for (let i = 0; i < seedBase.length; i++) seed = (seed * 31 + seedBase.charCodeAt(i)) & 0x7fffffff;
-    if (view === "back") seed = (seed + 99991) & 0x7fffffff; // distinct seed for back view
-
     const prompt = buildBlousePrompt({ neck, sleeve, back, fabric, color, borderPattern, view: view ?? "front" });
 
     try {
-      const result = await generateBlousePhoto(prompt, seed);
+      const result = await generateBlousePhoto(prompt);
       res.json(result);
     } catch (aiErr) {
       console.error("[generate-blouse-image/style] AI generation failed, falling back to SVG:", aiErr);
@@ -631,9 +607,10 @@ router.post("/sketch", async (req, res) => {
     const colorDesc = colors?.[0] ? `in ${colors[0]}` : "in rich maroon";
     const styleDesc = description ?? "traditional style";
 
+    const garmentCore = `traditional Indian saree blouse choli, short cropped bodice ending at the waist, structured fitted silhouette, standalone garment piece, no model or body`;
     const prompt = isBack
-      ? `flat lay product photograph of a single Indian saree blouse, back view only, ${styleDesc}, ${colorDesc} fabric, gold zari border trim, neatly spread on a pure white surface, crisp studio lighting, ultra-detailed fabric texture, photorealistic, only the blouse garment visible, nothing else`
-      : `flat lay product photograph of a single Indian saree blouse, front view only, ${styleDesc}, ${colorDesc} fabric, gold zari border trim, neatly spread on a pure white surface, crisp studio lighting, ultra-detailed fabric texture, photorealistic, only the blouse garment visible, nothing else`;
+      ? `professional studio product photo of a ${garmentCore}, back view, ${styleDesc}, ${colorDesc} fabric, delicate gold zari border trim, garment displayed upright on invisible form or ghost mannequin, pure white background, soft even studio lighting, ultra sharp detail, photorealistic, high-end fashion e-commerce style`
+      : `professional studio product photo of a ${garmentCore}, front view, ${styleDesc}, ${colorDesc} fabric, delicate gold zari border trim, garment displayed upright on invisible form or ghost mannequin, pure white background, soft even studio lighting, ultra sharp detail, photorealistic, high-end fashion e-commerce style`;
 
     try {
       const result = await generateBlousePhoto(prompt);
