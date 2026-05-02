@@ -32,6 +32,17 @@ const ROLES: { label: string; value: UserRole; icon: string; desc: string }[] = 
   { label: "Tailor", value: "tailor", icon: "scissors-cutting", desc: "View customer profiles & add notes" },
 ];
 
+const MEAS_FIELDS = [
+  { key: "aboveBust",     label: "Above Bust",    icon: "①", color: "#D63031" },
+  { key: "bust",          label: "Bust",           icon: "②", color: "#C0392B" },
+  { key: "underBust",     label: "Under Bust",     icon: "③", color: "#E74C3C" },
+  { key: "waist",         label: "Waist",          icon: "④", color: "#27AE60" },
+  { key: "hip",           label: "Hip",            icon: "⑤", color: "#2980B9" },
+  { key: "shoulderWidth", label: "Shoulder Width", icon: "⑥", color: "#8E44AD" },
+  { key: "armhole",       label: "Armhole",        icon: "⑦", color: "#E67E22" },
+  { key: "blouseLength",  label: "Blouse Length",  icon: "⑧", color: "#F39C12" },
+] as const;
+
 export default function AccountScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -637,6 +648,22 @@ const styles = StyleSheet.create({
   measTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 5 },
   measSub: { fontFamily: "Inter_400Regular", fontSize: 12 },
   chipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  measModalHeader: { flexDirection: "row", alignItems: "flex-start", justifyContent: "space-between" },
+  measModalTitle: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  measModalDate: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 3 },
+  editMeasBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 12, paddingVertical: 7, borderRadius: 10, borderWidth: 1 },
+  editMeasBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 13 },
+  measGrid: { borderRadius: 16, borderWidth: 1, flexDirection: "row", flexWrap: "wrap" },
+  measCell: { width: "50%", padding: 16, alignItems: "center", gap: 6 },
+  measCellDot: { width: 36, height: 36, borderRadius: 10, alignItems: "center", justifyContent: "center" },
+  measCellIcon: { fontSize: 16, fontFamily: "Inter_700Bold" },
+  measCellLabel: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center" },
+  measCellValue: { fontFamily: "Inter_700Bold", fontSize: 16, textAlign: "center" },
+  notesBox: { padding: 14, borderRadius: 14, borderWidth: 1 },
+  notesLabel: { fontFamily: "Inter_500Medium", fontSize: 12, marginBottom: 4 },
+  notesText: { fontFamily: "Inter_400Regular", fontSize: 14, lineHeight: 20 },
+  infoHint: { flexDirection: "row", alignItems: "flex-start", gap: 10, padding: 14, borderRadius: 12, borderWidth: 1 },
+  infoHintText: { fontFamily: "Inter_400Regular", fontSize: 13, flex: 1, lineHeight: 18 },
   chip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
   chipText: { fontFamily: "Inter_500Medium", fontSize: 11 },
   editPill: {
