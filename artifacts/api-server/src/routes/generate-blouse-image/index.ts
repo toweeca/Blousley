@@ -467,15 +467,71 @@ function generateBlouseSVG(opts: {
 
 // ─── AI image generation via Pollinations.ai (no API key required) ──────────
 
-async function generateBlousePhoto(prompt: string): Promise<{ b64_json: string; mimeType: string }> {
+const NEGATIVE =
+  "mannequin, dress form, model, person, body, saree drape, sari, full outfit, lehenga, skirt, dupatta, jewelry, accessories, background clutter, dark background, collage, multiple garments, logo, watermark, text";
+
+async function generateBlousePhoto(
+  prompt: string,
+  seed?: number,
+): Promise<{ b64_json: string; mimeType: string }> {
   const encoded = encodeURIComponent(prompt);
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&nologo=true&enhance=true`;
-  const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
-  if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
-  const arrayBuf = await res.arrayBuffer();
-  const b64 = Buffer.from(arrayBuf).toString("base64");
-  const ct = res.headers.get("content-type") ?? "image/jpeg";
-  return { b64_json: b64, mimeType: ct.split(";")[0].trim() };
+  const neg = encodeURIComponent(NEGATIVE);
+  const seedParam = seed !== undefined ? `&seed=${seed}` : "";
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&nologo=true&negative=${neg}${seedParam}`;
+
+  // Retry once on 429 rate-limit
+  for (let attempt = 0; attempt < 2; attempt++) {
+    if (attempt > 0) await new Promise((r) => setTimeout(r, 8_000));
+    const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
+    if (res.status === 429) continue;
+    if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
+    const arrayBuf = await res.arrayBuffer();
+    const b64 = Buffer.from(arrayBuf).toString("base64");
+    const ct = res.headers.get("content-type") ?? "image/jpeg";
+    return { b64_json: b64, mimeType: ct.split(";")[0].trim() };
+  }
+  throw new Error("Pollinations rate limited after retry");
+}
+
+function buildBlousePrompt(opts: {
+  neck?: string;
+  sleeve?: string;
+  back?: string;
+  fabric?: string;
+  color?: string;
+  borderPattern?: string;
+  view: "front" | "back";
+}): string {
+  const { neck, sleeve, back, fabric, color, borderPattern, view } = opts;
+  const isBack = view === "back";
+
+  const fabricDesc = fabric ? fabric.toLowerCase() : "silk";
+  const colorDesc = color ?? "deep maroon";
+  const border = borderPattern && borderPattern !== "None" && borderPattern !== "custom"
+    ? `${borderPattern} gold zari border trim`
+    : "gold zari border trim";
+
+  if (isBack) {
+    const backDesc = back ? back.toLowerCase() : "hook closure";
+    return (
+      `flat lay product photograph of a single Indian saree blouse, back view only, ` +
+      `${backDesc} back, ${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
+      `neatly spread on a pure white surface, top-down or slight angle, ` +
+      `crisp studio lighting, ultra-detailed fabric texture, photorealistic, ` +
+      `only the blouse garment visible, nothing else`
+    );
+  } else {
+    const neckDesc = neck ? neck.toLowerCase() : "round";
+    const sleeveDesc = sleeve ? sleeve.toLowerCase() : "short";
+    return (
+      `flat lay product photograph of a single Indian saree blouse, front view only, ` +
+      `${neckDesc} neckline, ${sleeveDesc} sleeves, ` +
+      `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
+      `neatly spread on a pure white surface, top-down or slight angle, ` +
+      `crisp studio lighting, ultra-detailed fabric texture, photorealistic, ` +
+      `only the blouse garment visible, nothing else`
+    );
+  }
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -498,19 +554,15 @@ router.post("/style", async (req, res) => {
       return;
     }
 
-    const isBack = view === "back";
-    const colorDesc = color ? `in ${color}` : "in rich maroon";
-    const fabricDesc = fabric ?? "silk";
-    const neckDesc = neck ?? "round";
-    const sleeveDesc = sleeve ?? "short";
-    const backDesc = back ?? "hook closure";
+    // Stable seed so front/back renders look visually consistent for same options
+    const seedBase = [neck, sleeve, back, fabric, color].filter(Boolean).join("-");
+    let seed = 0;
+    for (let i = 0; i < seedBase.length; i++) seed = (seed * 31 + seedBase.charCodeAt(i)) & 0x7fffffff;
 
-    const prompt = isBack
-      ? `Professional studio fashion photography, ${backDesc} back of a traditional South Indian saree blouse, ${colorDesc} ${fabricDesc} fabric, intricate gold zari border embroidery along hem and edges, displayed flat on a clean white background, soft studio lighting, highly detailed, photorealistic, no mannequin, no model, isolated garment`
-      : `Professional studio fashion photography, ${neckDesc} neckline saree blouse with ${sleeveDesc} sleeves, traditional South Indian style, ${colorDesc} ${fabricDesc} fabric, intricate gold zari border embroidery along neckline and hem, displayed flat on a clean white background, soft studio lighting, highly detailed, photorealistic, no mannequin, no model, isolated garment`;
+    const prompt = buildBlousePrompt({ neck, sleeve, back, fabric, color, borderPattern, view: view ?? "front" });
 
     try {
-      const result = await generateBlousePhoto(prompt);
+      const result = await generateBlousePhoto(prompt, seed);
       res.json(result);
     } catch (aiErr) {
       console.error("[generate-blouse-image/style] AI generation failed, falling back to SVG:", aiErr);
@@ -537,8 +589,8 @@ router.post("/sketch", async (req, res) => {
     const styleDesc = description ?? "traditional style";
 
     const prompt = isBack
-      ? `Professional studio fashion photography, back view of a traditional South Indian saree blouse based on this design: ${styleDesc}, ${colorDesc} fabric, gold zari embroidery details, displayed flat on a clean white background, soft studio lighting, photorealistic, no mannequin`
-      : `Professional studio fashion photography, front view of a traditional South Indian saree blouse based on this design: ${styleDesc}, ${colorDesc} fabric, gold zari embroidery details, displayed flat on a clean white background, soft studio lighting, photorealistic, no mannequin`;
+      ? `flat lay product photograph of a single Indian saree blouse, back view only, ${styleDesc}, ${colorDesc} fabric, gold zari border trim, neatly spread on a pure white surface, crisp studio lighting, ultra-detailed fabric texture, photorealistic, only the blouse garment visible, nothing else`
+      : `flat lay product photograph of a single Indian saree blouse, front view only, ${styleDesc}, ${colorDesc} fabric, gold zari border trim, neatly spread on a pure white surface, crisp studio lighting, ultra-detailed fabric texture, photorealistic, only the blouse garment visible, nothing else`;
 
     try {
       const result = await generateBlousePhoto(prompt);
