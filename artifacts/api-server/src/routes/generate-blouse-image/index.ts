@@ -468,7 +468,7 @@ function generateBlouseSVG(opts: {
 // ─── AI image generation via Pollinations.ai (no API key required) ──────────
 
 const NEGATIVE =
-  "mannequin, dress form, model, person, body, saree drape, sari, full outfit, lehenga, skirt, dupatta, jewelry, accessories, background clutter, dark background, collage, multiple garments, logo, watermark, text";
+  "mannequin, dress form, model, person, body, saree drape, sari, full outfit, lehenga, skirt, dupatta, jewelry, accessories, background clutter, dark background, collage, multiple garments, logo, watermark, text, v-neck, round neck, generic neckline, blurry, low quality";
 
 async function generateBlousePhoto(
   prompt: string,
@@ -479,8 +479,8 @@ async function generateBlousePhoto(
   const seedParam = seed !== undefined ? `&seed=${seed}` : "";
   const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&nologo=true&negative=${neg}${seedParam}`;
 
-  // Retry once on 429 rate-limit
-  for (let attempt = 0; attempt < 2; attempt++) {
+  // Retry up to 3 times on 429 rate-limit
+  for (let attempt = 0; attempt < 3; attempt++) {
     if (attempt > 0) await new Promise((r) => setTimeout(r, 8_000));
     const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
     if (res.status === 429) continue;
@@ -492,6 +492,41 @@ async function generateBlousePhoto(
   }
   throw new Error("Pollinations rate limited after retry");
 }
+
+// Maps UI option names → vivid descriptive phrases the AI model can render faithfully
+const NECK_PHRASES: Record<string, string> = {
+  "Round":        "classic round neckline",
+  "V":            "V-shaped neckline",
+  "Deep V":       "very deep V-shaped plunging neckline",
+  "Sweetheart":   "sweetheart neckline with a curved heart-shaped cutout across the bust top, no straps between the shoulders",
+  "Boat Neck":    "wide horizontal boat neckline stretching shoulder to shoulder",
+  "Square":       "square-cut neckline with straight horizontal and vertical edges",
+  "Halter":       "halter neckline with straps that go up to the neck, bare shoulders",
+  "Keyhole":      "round neckline with a small keyhole cutout and button at centre front",
+  "Off-Shoulder": "off-shoulder neckline sitting below the shoulders exposing both shoulders",
+};
+
+const SLEEVE_PHRASES: Record<string, string> = {
+  "Sleeveless":   "sleeveless, no sleeves at all, bare armholes",
+  "Cap":          "tiny cap sleeves, just small fabric caps covering the shoulder tops only, very short",
+  "Short":        "short sleeves ending mid-upper-arm",
+  "Elbow":        "elbow-length sleeves reaching to the elbow",
+  "3/4":          "three-quarter length sleeves ending below the elbow",
+  "Long":         "full-length long sleeves reaching the wrist",
+  "Puff":         "puffed sleeves with gathered fabric ballooning at the shoulder",
+  "Bell":         "bell sleeves that flare out wide at the hem",
+};
+
+const BACK_PHRASES: Record<string, string> = {
+  "Hook":        "traditional hook-and-eye closure at centre back, high closed back",
+  "High Back":   "high closed back with button closure",
+  "Deep Back":   "deeply scooped open back, very low deep backline revealing the back, open low back",
+  "Open Back":   "fully open back with string/tie closure, very exposed back",
+  "Tie Back":    "tie-string closure at back with dangling strings",
+  "Mid Back":    "mid-level open back with hook closure",
+  "Saree Back":  "traditional saree back with simple closure",
+  "Mirror Work": "back decorated with small mirror embroidery embellishments",
+};
 
 function buildBlousePrompt(opts: {
   neck?: string;
@@ -509,27 +544,31 @@ function buildBlousePrompt(opts: {
   const colorDesc = color ?? "deep maroon";
   const border = borderPattern && borderPattern !== "None" && borderPattern !== "custom"
     ? `${borderPattern} gold zari border trim`
-    : "gold zari border trim";
+    : "delicate gold zari border trim";
+
+  const neckPhrase  = NECK_PHRASES[neck ?? ""]   ?? (neck   ? neck.toLowerCase()   : "round neckline");
+  const sleevePhrase = SLEEVE_PHRASES[normalizeSleeveStyle(sleeve ?? "")] ?? (sleeve ? sleeve.toLowerCase() + " sleeves" : "short sleeves");
+  const backPhrase  = BACK_PHRASES[back ?? ""]   ?? (back   ? back.toLowerCase() + " back" : "hook closure back");
 
   if (isBack) {
-    const backDesc = back ? back.toLowerCase() : "hook closure";
     return (
-      `flat lay product photograph of a single Indian saree blouse, back view only, ` +
-      `${backDesc} back, ${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
-      `neatly spread on a pure white surface, top-down or slight angle, ` +
-      `crisp studio lighting, ultra-detailed fabric texture, photorealistic, ` +
-      `only the blouse garment visible, nothing else`
+      `flat lay product photograph of a single traditional Indian saree blouse, ` +
+      `BACK VIEW, showing the back side of the blouse only, ` +
+      `${backPhrase}, ${sleevePhrase}, ` +
+      `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
+      `garment neatly spread flat on a pure white surface, top-down studio shot, ` +
+      `crisp even lighting, ultra-detailed fabric texture, sharp focus, photorealistic, ` +
+      `only the back of the blouse garment on white background, nothing else`
     );
   } else {
-    const neckDesc = neck ? neck.toLowerCase() : "round";
-    const sleeveDesc = sleeve ? sleeve.toLowerCase() : "short";
     return (
-      `flat lay product photograph of a single Indian saree blouse, front view only, ` +
-      `${neckDesc} neckline, ${sleeveDesc} sleeves, ` +
+      `flat lay product photograph of a single traditional Indian saree blouse, ` +
+      `FRONT VIEW, showing the front side of the blouse only, ` +
+      `featuring ${neckPhrase}, ${sleevePhrase}, ` +
       `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
-      `neatly spread on a pure white surface, top-down or slight angle, ` +
-      `crisp studio lighting, ultra-detailed fabric texture, photorealistic, ` +
-      `only the blouse garment visible, nothing else`
+      `garment neatly spread flat on a pure white surface, top-down studio shot, ` +
+      `crisp even lighting, ultra-detailed fabric texture, sharp focus, photorealistic, ` +
+      `only the front of the blouse garment on white background, nothing else`
     );
   }
 }
@@ -554,10 +593,11 @@ router.post("/style", async (req, res) => {
       return;
     }
 
-    // Stable seed so front/back renders look visually consistent for same options
+    // Stable seed so same selections always produce the same image; front/back get different seeds
     const seedBase = [neck, sleeve, back, fabric, color].filter(Boolean).join("-");
     let seed = 0;
     for (let i = 0; i < seedBase.length; i++) seed = (seed * 31 + seedBase.charCodeAt(i)) & 0x7fffffff;
+    if (view === "back") seed = (seed + 99991) & 0x7fffffff; // distinct seed for back view
 
     const prompt = buildBlousePrompt({ neck, sleeve, back, fabric, color, borderPattern, view: view ?? "front" });
 
