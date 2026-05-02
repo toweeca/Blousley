@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
 
 const router: IRouter = Router();
 
@@ -466,13 +465,38 @@ function generateBlouseSVG(opts: {
 </svg>`;
 }
 
-// ─── AI image generation via Replit AI (gpt-image-1) ────────────────────────
+// ─── AI image generation via Pollinations.ai (free, no key required) ────────
+
+const NEGATIVE =
+  "long top, tunic, kurta, full-length garment, floor-length, western blouse, shirt, dress, skirt, saree drape, sari, full outfit, lehenga, jewelry, accessories, model, person, body parts, background clutter, collage, multiple garments, logo, watermark, text, blurry, low quality, flat lay, lying flat, wrinkled, mannequin";
 
 async function generateBlousePhoto(
   prompt: string,
+  seed?: number,
 ): Promise<{ b64_json: string; mimeType: string }> {
-  const buffer = await generateImageBuffer(prompt, "1024x1024");
-  return { b64_json: buffer.toString("base64"), mimeType: "image/png" };
+  const encoded = encodeURIComponent(prompt);
+  const neg = encodeURIComponent(NEGATIVE);
+  const seedParam = seed !== undefined ? `&seed=${seed}` : "";
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=1024&height=1024&model=flux&nologo=true&negative=${neg}${seedParam}&enhance=true`;
+
+  // Up to 5 attempts with increasing back-off to handle transient rate limits
+  const delays = [0, 6_000, 12_000, 18_000, 24_000];
+  for (let attempt = 0; attempt < delays.length; attempt++) {
+    if (delays[attempt] > 0) await new Promise((r) => setTimeout(r, delays[attempt]));
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
+      if (res.status === 429) continue; // rate-limited — retry after delay
+      if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
+      const arrayBuf = await res.arrayBuffer();
+      if (arrayBuf.byteLength < 5_000) continue; // suspiciously small — retry
+      const b64 = Buffer.from(arrayBuf).toString("base64");
+      const ct = res.headers.get("content-type") ?? "image/jpeg";
+      return { b64_json: b64, mimeType: ct.split(";")[0].trim() };
+    } catch (e: any) {
+      if (attempt === delays.length - 1) throw e;
+    }
+  }
+  throw new Error("Image generation failed after all retries");
 }
 
 // Maps UI option names → vivid descriptive phrases the AI model can render faithfully
@@ -578,10 +602,16 @@ router.post("/style", async (req, res) => {
       return;
     }
 
+    // Stable seed per selection combo; front/back get distinct seeds
+    const seedBase = [neck, sleeve, back, fabric, color].filter(Boolean).join("-");
+    let seed = 0;
+    for (let i = 0; i < seedBase.length; i++) seed = (seed * 31 + seedBase.charCodeAt(i)) & 0x7fffffff;
+    if (view === "back") seed = (seed + 99991) & 0x7fffffff;
+
     const prompt = buildBlousePrompt({ neck, sleeve, back, fabric, color, borderPattern, view: view ?? "front" });
 
     try {
-      const result = await generateBlousePhoto(prompt);
+      const result = await generateBlousePhoto(prompt, seed);
       res.json(result);
     } catch (aiErr) {
       console.error("[generate-blouse-image/style] AI generation failed, falling back to SVG:", aiErr);
