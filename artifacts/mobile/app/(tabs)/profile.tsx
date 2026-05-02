@@ -524,6 +524,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [dlFrontUri, setDlFrontUri] = useState<string | null>(null);
   const [dlBackUri, setDlBackUri] = useState<string | null>(null);
   const [dlLoading, setDlLoading] = useState(false);
+  const [savingToFits, setSavingToFits] = useState(false);
   const [borderPattern, setBorderPattern] = useState("None");
   const [borderPatternCustomUri, setBorderPatternCustomUri] = useState<string | null>(null);
   const [fabricColor, setFabricColor] = useState(Colors.brand.primary);
@@ -653,6 +654,35 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       Alert.alert("Download failed", "Could not generate the design file. Please try again.");
     } finally {
       setDlLoading(false);
+    }
+  };
+
+  const saveToFits = async () => {
+    if (!aiPreviewUri) return;
+    setSavingToFits(true);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    try {
+      const res = await fetch(`${domain}/api/blouse/fits`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: user.id,
+          imageUrl: aiPreviewUri,
+          stylePrefs: { neckline: neck, sleeves: sleeve, back, fabric },
+          aiAnalysis: `AI style preview — ${[neck, sleeve, back, fabric].filter(Boolean).join(", ")}`,
+        }),
+      });
+      if (!res.ok) throw new Error("Save failed");
+      await qc.invalidateQueries({ queryKey: ["blouse-fits"] });
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      Alert.alert("Saved to My Fits!", "Your AI preview has been saved.", [
+        { text: "View My Fits", onPress: () => router.push("/(tabs)/history" as any) },
+        { text: "Done" },
+      ]);
+    } catch {
+      Alert.alert("Save Failed", "Could not save to My Fits. Please try again.");
+    } finally {
+      setSavingToFits(false);
     }
   };
 
@@ -866,6 +896,25 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
                 <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share</Text>
               </TouchableOpacity>
             </View>
+            {/* Save to My Fits */}
+            <TouchableOpacity
+              style={[
+                styles.saveToFitsBtn,
+                { backgroundColor: Colors.brand.primary, opacity: savingToFits ? 0.7 : 1 },
+              ]}
+              onPress={saveToFits}
+              disabled={savingToFits || !aiPreviewUri}
+              testID="save-to-fits-button"
+            >
+              {savingToFits ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <Feather name="bookmark" size={15} color="#fff" />
+              )}
+              <Text style={styles.saveToFitsBtnText}>
+                {savingToFits ? "Saving…" : "Save to My Fits"}
+              </Text>
+            </TouchableOpacity>
           </View>
         </Animated.View>
       )}
@@ -3316,6 +3365,8 @@ const styles = StyleSheet.create({
   aiGenBtnIcon: { fontSize: 16, color: Colors.brand.gold },
   aiGenBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
   dlBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 9, borderRadius: 10, borderWidth: 1.5 },
+  saveToFitsBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginHorizontal: 12, marginBottom: 14, paddingVertical: 12, borderRadius: 12 },
+  saveToFitsBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   dlBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   aiPreviewCard: { borderRadius: 20, borderWidth: 1, overflow: "hidden" },
   aiPreviewPlaceholder: { padding: 40, alignItems: "center", gap: 14 },
