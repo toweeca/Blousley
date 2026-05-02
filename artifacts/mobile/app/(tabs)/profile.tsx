@@ -1865,7 +1865,7 @@ function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
   );
 }
 
-function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
+function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]>; onSaved?: () => void }) {
   const qc = useQueryClient();
   const domain = API_BASE;
 
@@ -1955,6 +1955,7 @@ function MeasurementsTab({ theme, user }: { theme: typeof Colors.light; user: No
       qc.invalidateQueries({ queryKey: ["measurements", user.id] });
       setEditing(false);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      onSaved?.();
       Alert.alert("Saved!", "Your measurements have been stored.");
     },
     onError: () => Alert.alert("Error", "Could not save measurements."),
@@ -3000,9 +3001,20 @@ export default function ProfileScreen() {
 
   const [activeTab, setActiveTab] = useState<Tab>("preferences");
   const [showAccountModal, setShowAccountModal] = useState(false);
+  const [showMeasModal, setShowMeasModal] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState<UserRole>(user?.role ?? "customer");
+
+  const { data: savedMeasurements } = useQuery({
+    queryKey: ["measurements", user?.id],
+    queryFn: async () => {
+      const domain = API_BASE;
+      const r = await fetch(`${domain}/api/measurements/me?userId=${user?.id}`);
+      return r.ok ? r.json() : null;
+    },
+    enabled: !!user,
+  });
 
   const { data: fitsCount } = useQuery({
     queryKey: ["blouse-fits-count", user?.id],
@@ -3097,6 +3109,49 @@ export default function ProfileScreen() {
           </View>
         )}
       </LinearGradient>
+
+      {/* ── Saved Measurements Card ── */}
+      {user && user.role === "customer" && (
+        <TouchableOpacity
+          activeOpacity={0.85}
+          onPress={() => { setShowMeasModal(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+          style={[styles.measCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          <View style={styles.measCardLeft}>
+            <View style={[styles.measCardIcon, { backgroundColor: Colors.brand.primary + "15" }]}>
+              <MaterialCommunityIcons name="human-female" size={18} color={Colors.brand.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.measCardTitle, { color: theme.text }]}>My Measurements</Text>
+              {savedMeasurements ? (
+                <View style={styles.measChipRow}>
+                  {[
+                    { label: "Bust", val: savedMeasurements.bust },
+                    { label: "Waist", val: savedMeasurements.waist },
+                    { label: "Hip", val: savedMeasurements.hip },
+                    { label: "Length", val: savedMeasurements.blouseLength },
+                  ].filter(c => c.val).map(c => (
+                    <View key={c.label} style={[styles.measChip, { backgroundColor: Colors.brand.primary + "12", borderColor: Colors.brand.primary + "30" }]}>
+                      <Text style={[styles.measChipText, { color: Colors.brand.primary }]}>
+                        {c.label} {Number(c.val).toFixed(0)}{savedMeasurements.unit ?? "cm"}
+                      </Text>
+                    </View>
+                  ))}
+                  {![savedMeasurements.bust, savedMeasurements.waist, savedMeasurements.hip, savedMeasurements.blouseLength].some(Boolean) && (
+                    <Text style={[styles.measChipText, { color: theme.textMuted }]}>Saved — tap to view</Text>
+                  )}
+                </View>
+              ) : (
+                <Text style={[styles.measCardSub, { color: theme.textMuted }]}>Tap to add your measurements</Text>
+              )}
+            </View>
+          </View>
+          <View style={[styles.measEditPill, { borderColor: Colors.brand.primary + "40" }]}>
+            <Feather name={savedMeasurements ? "edit-2" : "plus"} size={12} color={Colors.brand.primary} />
+            <Text style={[styles.measEditPillText, { color: Colors.brand.primary }]}>{savedMeasurements ? "Edit" : "Add"}</Text>
+          </View>
+        </TouchableOpacity>
+      )}
 
       {user && (
         <View style={[styles.tabBar, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
@@ -3226,6 +3281,27 @@ export default function ProfileScreen() {
       {user && activeTab === "ideas" && <IdeasTab theme={theme} user={user} />}
       {user && activeTab === "pattern" && <PatternGuideTab theme={theme} />}
       {user && activeTab === "design" && <BlouseDesignTab theme={theme} user={user} />}
+
+      {/* ── Measurements Modal ── */}
+      {user && (
+        <Modal
+          visible={showMeasModal}
+          animationType="slide"
+          presentationStyle="formSheet"
+          onRequestClose={() => setShowMeasModal(false)}
+        >
+          <View style={[styles.modalContainer, { backgroundColor: theme.background }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
+              <TouchableOpacity onPress={() => setShowMeasModal(false)} style={styles.modalCloseBtn}>
+                <Feather name="x" size={20} color={theme.text} />
+              </TouchableOpacity>
+              <Text style={[styles.modalTitle, { color: theme.text }]}>My Measurements</Text>
+              <View style={{ width: 36 }} />
+            </View>
+            <MeasurementsTab theme={theme} user={user} onSaved={() => setShowMeasModal(false)} />
+          </View>
+        </Modal>
+      )}
     </View>
   );
 }
@@ -3384,6 +3460,16 @@ const styles = StyleSheet.create({
   saveToFitsBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 7, marginHorizontal: 12, marginBottom: 14, paddingVertical: 12, borderRadius: 12 },
   saveToFitsBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 14, color: "#fff" },
   dlBtnText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
+  measCard: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginHorizontal: 16, marginTop: 12, marginBottom: 2, paddingHorizontal: 14, paddingVertical: 12, borderRadius: 16, borderWidth: 1 },
+  measCardLeft: { flexDirection: "row", alignItems: "center", gap: 12, flex: 1 },
+  measCardIcon: { width: 36, height: 36, borderRadius: 18, alignItems: "center", justifyContent: "center" },
+  measCardTitle: { fontFamily: "Inter_600SemiBold", fontSize: 13, marginBottom: 5 },
+  measCardSub: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  measChipRow: { flexDirection: "row", flexWrap: "wrap", gap: 5 },
+  measChip: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: 10, borderWidth: 1 },
+  measChipText: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  measEditPill: { flexDirection: "row", alignItems: "center", gap: 4, paddingHorizontal: 10, paddingVertical: 5, borderRadius: 12, borderWidth: 1 },
+  measEditPillText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   aiPreviewCard: { borderRadius: 20, borderWidth: 1, overflow: "hidden" },
   aiPreviewPlaceholder: { padding: 40, alignItems: "center", gap: 14 },
   aiPreviewLoadingText: { fontFamily: "Inter_400Regular", fontSize: 13, textAlign: "center", lineHeight: 20 },
