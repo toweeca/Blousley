@@ -7,12 +7,14 @@ import {
   StyleSheet,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   useColorScheme,
   Platform,
   RefreshControl,
   TextInput,
   Alert,
   Modal,
+  Image,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -30,6 +32,16 @@ interface BlouseFit {
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  createdAt: string;
+}
+
+interface CustomerIdea {
+  id: number;
+  userId: string;
+  title?: string | null;
+  notes?: string | null;
+  imageUrl?: string | null;
+  sharedWithTailors: boolean;
   createdAt: string;
 }
 
@@ -149,6 +161,64 @@ function MeasureItem({ label, value }: { label: string; value?: number }) {
   );
 }
 
+function IdeaRequestCard({
+  idea,
+  onMakeOffer,
+  delay,
+}: {
+  idea: CustomerIdea;
+  onMakeOffer: (idea: CustomerIdea) => void;
+  delay: number;
+}) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+  const date = new Date(idea.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
+
+  return (
+    <Animated.View entering={FadeInDown.delay(delay).springify()}>
+      <View style={[styles.ideaReqCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
+        <View style={styles.ideaReqTop}>
+          {idea.imageUrl ? (
+            <Image source={{ uri: idea.imageUrl }} style={styles.ideaReqThumb} resizeMode="cover" />
+          ) : (
+            <View style={[styles.ideaReqThumb, { backgroundColor: Colors.brand.primary + "10", alignItems: "center", justifyContent: "center" }]}>
+              <Feather name="edit-3" size={22} color={Colors.brand.primary + "60"} />
+            </View>
+          )}
+          <View style={{ flex: 1, gap: 4 }}>
+            <View style={styles.ideaReqBadgeRow}>
+              <View style={[styles.ideaReqBadge, { backgroundColor: Colors.brand.gold + "20" }]}>
+                <Feather name="zap" size={11} color={Colors.brand.goldDark} />
+                <Text style={[styles.ideaReqBadgeText, { color: Colors.brand.goldDark }]}>Design Request</Text>
+              </View>
+            </View>
+            <Text style={[styles.ideaReqTitle, { color: theme.text }]} numberOfLines={1}>
+              {idea.title ?? "Untitled Design"}
+            </Text>
+            <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>
+              Customer #{idea.userId.slice(-6)} · {date}
+            </Text>
+            {idea.notes ? (
+              <Text style={[styles.ideaReqNotes, { color: theme.textMuted }]} numberOfLines={2}>
+                {idea.notes}
+              </Text>
+            ) : null}
+          </View>
+        </View>
+        <TouchableOpacity
+          style={[styles.makeOfferBtn, { backgroundColor: Colors.brand.primary }]}
+          onPress={() => onMakeOffer(idea)}
+          activeOpacity={0.8}
+        >
+          <Feather name="scissors" size={15} color="#fff" />
+          <Text style={styles.makeOfferBtnText}>I Can Make This — Send Offer</Text>
+        </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function TailorScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -167,26 +237,43 @@ export default function TailorScreen() {
   const [chatPartnerName, setChatPartnerName] = useState("");
   const [chatVisible, setChatVisible] = useState(false);
 
+  // Design request offer modal
+  const [offerModalVisible, setOfferModalVisible] = useState(false);
+  const [selectedIdea, setSelectedIdea] = useState<CustomerIdea | null>(null);
+  const [offerText, setOfferText] = useState("");
+  const [offerSending, setOfferSending] = useState(false);
+
+  const apiBase = (() => {
+    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+    return d.startsWith("http") ? d : `https://${d}`;
+  })();
+
   const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["tailor-customers"],
     queryFn: async () => {
-      const _d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-      const domain = _d.startsWith("http") ? _d : `https://${_d}`;
       const endpoint =
         user?.role === "tailor"
-          ? `${domain}/api/tailor/customers`
-          : `${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`;
+          ? `${apiBase}/api/tailor/customers`
+          : `${apiBase}/api/blouse/fits?userId=${user?.id ?? "guest"}`;
       const res = await fetch(endpoint);
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
   });
 
+  const { data: designRequests = [], isLoading: ideasLoading, refetch: refetchIdeas } = useQuery<CustomerIdea[]>({
+    queryKey: ["tailor-design-requests"],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase}/api/ideas?userId=${user?.id ?? "guest"}&tailorView=true`);
+      return res.ok ? res.json() : [];
+    },
+    enabled: user?.role === "tailor",
+    refetchInterval: 30000,
+  });
+
   const noteMutation = useMutation({
     mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
-      const _d2 = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-      const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
-      const res = await fetch(`${domain}/api/blouse/fits/${id}/notes`, {
+      const res = await fetch(`${apiBase}/api/blouse/fits/${id}/notes`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ notes }),
@@ -208,22 +295,13 @@ export default function TailorScreen() {
     setNoteModalVisible(true);
   };
 
-  const apiBase = (() => {
-    const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-    return d.startsWith("http") ? d : `https://${d}`;
-  })();
-
   const handleMessage = async (fit: BlouseFit) => {
     if (!user?.id) return;
     try {
       const res = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerId: fit.userId,
-          tailorId: user.id,
-          title: `Customer #${fit.userId.slice(-6)}`,
-        }),
+        body: JSON.stringify({ customerId: fit.userId, tailorId: user.id, title: `Customer #${fit.userId.slice(-6)}` }),
       });
       const convo = await res.json();
       setChatConvoId(convo.id);
@@ -234,6 +312,45 @@ export default function TailorScreen() {
     }
   };
 
+  const handleOpenOffer = (idea: CustomerIdea) => {
+    setSelectedIdea(idea);
+    setOfferText(`Hi! I can make your "${idea.title ?? "blouse design"}".\n\nHere are my details:\n• Price: ₹\n• Turnaround: days\n• Fabric: \n\nLet me know if you'd like to proceed!`);
+    setOfferModalVisible(true);
+  };
+
+  const handleSendOffer = async () => {
+    if (!user?.id || !selectedIdea || !offerText.trim()) return;
+    setOfferSending(true);
+    try {
+      const convoRes = await fetch(`${apiBase}/api/chat/conversations`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: selectedIdea.userId,
+          tailorId: user.id,
+          title: `Design: ${selectedIdea.title ?? "Blouse Request"}`,
+        }),
+      });
+      const convo = await convoRes.json();
+      await fetch(`${apiBase}/api/chat/messages`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId: convo.id, senderId: user.id, content: offerText.trim() }),
+      });
+      qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      setOfferModalVisible(false);
+      setChatConvoId(convo.id);
+      setChatPartnerName(`Customer #${selectedIdea.userId.slice(-6)}`);
+      setChatVisible(true);
+    } catch {
+      Alert.alert("Error", "Could not send offer. Please try again.");
+    } finally {
+      setOfferSending(false);
+    }
+  };
+
+  const isRefreshing = isLoading || ideasLoading;
+
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <LinearGradient
@@ -243,10 +360,10 @@ export default function TailorScreen() {
         <View style={styles.headerRow}>
           <View>
             <Text style={styles.headerTitle}>
-              {user?.role === "tailor" ? "Customer Fits" : "Tailor View"}
+              {user?.role === "tailor" ? "Tailor Hub" : "Tailor View"}
             </Text>
             <Text style={styles.headerSubtitle}>
-              {fits?.length ?? 0} {fits?.length === 1 ? "profile" : "profiles"} available
+              {fits?.length ?? 0} fit{fits?.length === 1 ? "" : "s"} · {designRequests.length} design request{designRequests.length === 1 ? "" : "s"}
             </Text>
           </View>
           <View style={[styles.tailorBadge, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
@@ -267,13 +384,53 @@ export default function TailorScreen() {
             delay={index * 60}
           />
         )}
+        ListHeaderComponent={user?.role === "tailor" ? (
+          <View style={{ gap: 16 }}>
+            {/* ── Design Requests section ── */}
+            <View style={styles.sectionHeader}>
+              <View style={[styles.sectionIconWrap, { backgroundColor: Colors.brand.gold + "20" }]}>
+                <Feather name="zap" size={15} color={Colors.brand.goldDark} />
+              </View>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Design Requests</Text>
+              <View style={[styles.sectionBadge, { backgroundColor: Colors.brand.gold + "25" }]}>
+                <Text style={[styles.sectionBadgeText, { color: Colors.brand.goldDark }]}>{designRequests.length}</Text>
+              </View>
+            </View>
+            {designRequests.length === 0 ? (
+              <View style={[styles.sectionEmpty, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <Feather name="inbox" size={28} color={theme.textMuted} />
+                <Text style={[styles.sectionEmptyText, { color: theme.textMuted }]}>
+                  No design requests yet — customers share ideas from their Ideas tab
+                </Text>
+              </View>
+            ) : (
+              designRequests.map((idea, i) => (
+                <IdeaRequestCard
+                  key={idea.id}
+                  idea={idea}
+                  onMakeOffer={handleOpenOffer}
+                  delay={i * 60}
+                />
+              ))
+            )}
+            {/* ── Customer Fits section header ── */}
+            <View style={[styles.sectionHeader, { marginTop: 4 }]}>
+              <View style={[styles.sectionIconWrap, { backgroundColor: Colors.brand.primary + "20" }]}>
+                <MaterialCommunityIcons name="scissors-cutting" size={15} color={Colors.brand.primary} />
+              </View>
+              <Text style={[styles.sectionTitle, { color: theme.text }]}>Customer Fits</Text>
+              <View style={[styles.sectionBadge, { backgroundColor: Colors.brand.primary + "15" }]}>
+                <Text style={[styles.sectionBadgeText, { color: Colors.brand.primary }]}>{fits?.length ?? 0}</Text>
+              </View>
+            </View>
+          </View>
+        ) : null}
         contentContainerStyle={[styles.list, { paddingBottom: 120 + bottomPad }]}
-        scrollEnabled={!!(fits && fits.length > 0)}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
-            onRefresh={refetch}
+            refreshing={isRefreshing}
+            onRefresh={() => { refetch(); refetchIdeas(); }}
             tintColor={Colors.brand.primary}
           />
         }
@@ -281,15 +438,11 @@ export default function TailorScreen() {
           !isLoading ? (
             <Animated.View entering={FadeInDown.springify()} style={styles.emptyState}>
               <View style={[styles.emptyIcon, { backgroundColor: Colors.brand.primary + "10" }]}>
-                <MaterialCommunityIcons
-                  name="scissors-cutting"
-                  size={48}
-                  color={Colors.brand.primary + "60"}
-                />
+                <MaterialCommunityIcons name="scissors-cutting" size={48} color={Colors.brand.primary + "60"} />
               </View>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>No customer fits</Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Customer fit profiles shared with you will appear here
+                Customer fit profiles will appear here
               </Text>
             </Animated.View>
           ) : null
@@ -307,6 +460,60 @@ export default function TailorScreen() {
           apiBase={apiBase}
         />
       )}
+
+      {/* "I Can Make This" Offer Modal */}
+      <Modal
+        visible={offerModalVisible}
+        animationType="slide"
+        transparent
+        onRequestClose={() => setOfferModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <View style={{ flex: 1, gap: 2 }}>
+                <Text style={[styles.modalTitle, { color: theme.text }]}>Send Offer to Customer</Text>
+                <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
+                  Customer #{selectedIdea?.userId.slice(-6)} · "{selectedIdea?.title ?? "Design Request"}"
+                </Text>
+              </View>
+              <TouchableOpacity onPress={() => setOfferModalVisible(false)}>
+                <Feather name="x" size={22} color={theme.textSecondary} />
+              </TouchableOpacity>
+            </View>
+
+            {selectedIdea?.imageUrl && (
+              <Image source={{ uri: selectedIdea.imageUrl }} style={styles.offerPreviewImage} resizeMode="cover" />
+            )}
+
+            <Text style={[styles.offerInputLabel, { color: theme.textSecondary }]}>
+              Your message with pricing & details:
+            </Text>
+            <TextInput
+              style={[styles.noteInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+              placeholder="Add your pricing, timeline, fabric options..."
+              placeholderTextColor={theme.textMuted}
+              value={offerText}
+              onChangeText={setOfferText}
+              multiline
+              numberOfLines={7}
+              textAlignVertical="top"
+              autoFocus
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalBtn, { backgroundColor: Colors.brand.primary, opacity: offerSending ? 0.6 : 1 }]}
+                onPress={handleSendOffer}
+                disabled={offerSending || !offerText.trim()}
+              >
+                <Feather name="send" size={16} color="#fff" />
+                <Text style={styles.modalBtnText}>{offerSending ? "Sending…" : "Send Offer"}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Note Modal */}
       <Modal
@@ -617,5 +824,117 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: "#fff",
+  },
+  // Section headers
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    marginBottom: 4,
+  },
+  sectionIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  sectionTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    flex: 1,
+  },
+  sectionBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 20,
+  },
+  sectionBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+  },
+  sectionEmpty: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 20,
+    alignItems: "center",
+    gap: 10,
+    borderStyle: "dashed",
+  },
+  sectionEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  // Idea request card
+  ideaReqCard: {
+    borderRadius: 20,
+    borderWidth: 1.5,
+    padding: 16,
+    gap: 14,
+  },
+  ideaReqTop: {
+    flexDirection: "row",
+    gap: 14,
+    alignItems: "flex-start",
+  },
+  ideaReqThumb: {
+    width: 80,
+    height: 80,
+    borderRadius: 12,
+  },
+  ideaReqBadgeRow: { flexDirection: "row" },
+  ideaReqBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  ideaReqBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    textTransform: "uppercase",
+    letterSpacing: 0.5,
+  },
+  ideaReqTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  ideaReqCustomer: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+  },
+  ideaReqNotes: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    fontStyle: "italic",
+  },
+  makeOfferBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    paddingVertical: 12,
+    borderRadius: 14,
+  },
+  makeOfferBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: "#fff",
+  },
+  // Offer modal extras
+  offerPreviewImage: {
+    width: "100%",
+    height: 140,
+    borderRadius: 14,
+  },
+  offerInputLabel: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 13,
+    marginBottom: -8,
   },
 });
