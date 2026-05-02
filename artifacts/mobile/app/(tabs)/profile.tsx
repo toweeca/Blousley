@@ -3090,25 +3090,49 @@ export default function ProfileScreen() {
             <Text style={styles.roleBadgeText}>{user.role === "tailor" ? "Tailor" : "Customer"}</Text>
           </View>
         )}
-        {user && user.role === "customer" && (
-          <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{Array.isArray(fitsCount) ? fitsCount.length : 0}</Text>
-              <Text style={styles.statLabel}>Fits</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{Array.isArray(ideasCount) ? ideasCount.length : 0}</Text>
-              <Text style={styles.statLabel}>Ideas</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{Array.isArray(ideasCount) ? ideasCount.filter((i: any) => i.sharedWithTailors).length : 0}</Text>
-              <Text style={styles.statLabel}>Shared</Text>
-            </View>
-          </View>
-        )}
       </LinearGradient>
+
+      {/* ── Big stat tiles (customer only) ── */}
+      {user && user.role === "customer" && (
+        <View style={[styles.statTileRow, { backgroundColor: theme.background }]}>
+          {[
+            {
+              label: "My Fits",
+              count: Array.isArray(fitsCount) ? fitsCount.length : 0,
+              icon: "heart",
+              color: Colors.brand.primary,
+              tab: "fits",
+            },
+            {
+              label: "Ideas",
+              count: Array.isArray(ideasCount) ? ideasCount.length : 0,
+              icon: "zap",
+              color: "#E67E22",
+              tab: "ideas",
+            },
+            {
+              label: "Shared",
+              count: Array.isArray(ideasCount) ? ideasCount.filter((i: any) => i.sharedWithTailors).length : 0,
+              icon: "send",
+              color: "#2980B9",
+              tab: "fits",
+            },
+          ].map((tile) => (
+            <TouchableOpacity
+              key={tile.label}
+              style={[styles.statTile, { backgroundColor: theme.card, borderColor: theme.border }]}
+              activeOpacity={0.75}
+              onPress={() => { setActiveTab(tile.tab); Haptics.selectionAsync(); }}
+            >
+              <View style={[styles.statTileIcon, { backgroundColor: tile.color + "18" }]}>
+                <Feather name={tile.icon as any} size={18} color={tile.color} />
+              </View>
+              <Text style={[styles.statTileNum, { color: theme.text }]}>{tile.count}</Text>
+              <Text style={[styles.statTileLabel, { color: theme.textSecondary }]}>{tile.label}</Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
 
       {user && (
         <View style={[styles.tabBar, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
@@ -3322,11 +3346,19 @@ const styles = StyleSheet.create({
   modalContent: { padding: 20, gap: 14, paddingBottom: 60 },
   roleBadge: { flexDirection: "row", alignItems: "center", gap: 6, backgroundColor: "rgba(255,255,255,0.15)", paddingHorizontal: 14, paddingVertical: 5, borderRadius: 20 },
   roleBadgeText: { fontFamily: "Inter_500Medium", fontSize: 12, color: Colors.brand.goldLight },
-  statsRow: { flexDirection: "row", alignItems: "center", backgroundColor: "rgba(255,255,255,0.12)", borderRadius: 16, paddingVertical: 10, paddingHorizontal: 24, marginTop: 4 },
-  statItem: { flex: 1, alignItems: "center", gap: 2 },
-  statNum: { fontFamily: "Inter_700Bold", fontSize: 20, color: "#fff" },
-  statLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.7)" },
-  statDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.25)" },
+  statTileRow: { flexDirection: "row", gap: 10, paddingHorizontal: 16, paddingVertical: 12 },
+  statTile: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 6,
+  },
+  statTileIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  statTileNum: { fontFamily: "Inter_700Bold", fontSize: 28 },
+  statTileLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
   tabBar: { flexDirection: "row", borderBottomWidth: 1, paddingHorizontal: 8 },
   tabBtn: { flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 5, paddingVertical: 12, position: "relative" },
   tabBtnActive: {},
