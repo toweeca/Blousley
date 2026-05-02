@@ -468,7 +468,7 @@ function generateBlouseSVG(opts: {
 // ─── AI image generation via Pollinations.ai (no API key required) ──────────
 
 const NEGATIVE =
-  "mannequin, dress form, model, person, body, saree drape, sari, full outfit, lehenga, skirt, dupatta, jewelry, accessories, background clutter, dark background, collage, multiple garments, logo, watermark, text, v-neck, round neck, generic neckline, blurry, low quality";
+  "long top, tunic, kurta, full-length garment, knee-length, floor-length, midi, maxi, western blouse, shirt, dress, saree drape, sari, full outfit, lehenga, skirt, dupatta, jewelry, accessories, mannequin, dress form, model, person, body, background clutter, dark background, collage, multiple garments, logo, watermark, text, blurry, low quality";
 
 async function generateBlousePhoto(
   prompt: string,
@@ -550,25 +550,26 @@ function buildBlousePrompt(opts: {
   const sleevePhrase = SLEEVE_PHRASES[normalizeSleeveStyle(sleeve ?? "")] ?? (sleeve ? sleeve.toLowerCase() + " sleeves" : "short sleeves");
   const backPhrase  = BACK_PHRASES[back ?? ""]   ?? (back   ? back.toLowerCase() + " back" : "hook closure back");
 
+  // Core garment descriptor — repeated twice so the model cannot ignore it
+  const garmentCore = `SHORT CROPPED Indian saree choli blouse, waist-length only, ends at the waist, fitted bodice, traditional Indian choli`;
+
   if (isBack) {
     return (
-      `flat lay product photograph of a single traditional Indian saree blouse, ` +
-      `BACK VIEW, showing the back side of the blouse only, ` +
-      `${backPhrase}, ${sleevePhrase}, ` +
+      `flat lay product photograph, ${garmentCore}, ` +
+      `BACK VIEW only, ${backPhrase}, ${sleevePhrase}, ` +
       `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
-      `garment neatly spread flat on a pure white surface, top-down studio shot, ` +
-      `crisp even lighting, ultra-detailed fabric texture, sharp focus, photorealistic, ` +
-      `only the back of the blouse garment on white background, nothing else`
+      `short cropped waist-length garment spread flat on pure white surface, ` +
+      `top-down studio lighting, ultra-detailed fabric texture, sharp photorealistic, ` +
+      `only this single short choli blouse, nothing else, white background`
     );
   } else {
     return (
-      `flat lay product photograph of a single traditional Indian saree blouse, ` +
-      `FRONT VIEW, showing the front side of the blouse only, ` +
-      `featuring ${neckPhrase}, ${sleevePhrase}, ` +
+      `flat lay product photograph, ${garmentCore}, ` +
+      `FRONT VIEW only, ${neckPhrase}, ${sleevePhrase}, ` +
       `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
-      `garment neatly spread flat on a pure white surface, top-down studio shot, ` +
-      `crisp even lighting, ultra-detailed fabric texture, sharp focus, photorealistic, ` +
-      `only the front of the blouse garment on white background, nothing else`
+      `short cropped waist-length garment spread flat on pure white surface, ` +
+      `top-down studio lighting, ultra-detailed fabric texture, sharp photorealistic, ` +
+      `only this single short choli blouse, nothing else, white background`
     );
   }
 }
