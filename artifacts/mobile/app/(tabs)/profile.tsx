@@ -2006,6 +2006,15 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
 
         {guideOpen && (
           <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {/* ── Reference Chart Photo ── */}
+            <View style={[styles.refChartWrap, { borderColor: theme.border }]}>
+              <Text style={[styles.refChartLabel, { color: Colors.brand.primary }]}>📐 Quick Reference Chart</Text>
+              <Image
+                source={require("@/assets/images/measurement_diagram.jpg")}
+                style={styles.refChartImage}
+                resizeMode="contain"
+              />
+            </View>
             {/* ── Measurement Diagram Carousel ── */}
             {(() => {
               const d = MEASURE_DIAGRAMS[diagramIdx];
@@ -3444,6 +3453,9 @@ const styles = StyleSheet.create({
   guideTitle: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
   guideSub: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
   guideBody: { padding: 16, borderRadius: 16, borderWidth: 1, marginTop: 8, gap: 16, alignItems: "stretch" },
+  refChartWrap: { borderRadius: 12, borderWidth: 1, overflow: "hidden", alignItems: "center", gap: 8, paddingBottom: 8 },
+  refChartLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, paddingTop: 10 },
+  refChartImage: { width: "100%", height: 200 },
   diagCarousel: { gap: 12, alignItems: "center" },
   diagHeader: { flexDirection: "row", alignItems: "center", width: "100%", paddingHorizontal: 4 },
   diagNavBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
