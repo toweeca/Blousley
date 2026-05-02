@@ -468,7 +468,7 @@ function generateBlouseSVG(opts: {
 // ─── AI image generation via Pollinations.ai (no API key required) ──────────
 
 const NEGATIVE =
-  "long top, tunic, kurta, full-length garment, knee-length, floor-length, midi, maxi, western blouse, shirt, dress, saree drape, sari, full outfit, lehenga, skirt, dupatta, jewelry, accessories, mannequin, dress form, model, person, body, background clutter, dark background, collage, multiple garments, logo, watermark, text, blurry, low quality";
+  "long top, tunic, kurta, full-length garment, knee-length, floor-length, midi, maxi, western blouse, shirt, dress, skirt, dupatta, saree drape, sari draped, full outfit, lehenga, jewelry, accessories, model, person, body parts, background clutter, dark background, collage, multiple garments, logo, watermark, text, blurry, low quality, flat lay, lying flat, wrinkled";
 
 async function generateBlousePhoto(
   prompt: string,
@@ -550,26 +550,28 @@ function buildBlousePrompt(opts: {
   const sleevePhrase = SLEEVE_PHRASES[normalizeSleeveStyle(sleeve ?? "")] ?? (sleeve ? sleeve.toLowerCase() + " sleeves" : "short sleeves");
   const backPhrase  = BACK_PHRASES[back ?? ""]   ?? (back   ? back.toLowerCase() + " back" : "hook closure back");
 
-  // Core garment descriptor — repeated twice so the model cannot ignore it
-  const garmentCore = `SHORT CROPPED Indian saree choli blouse, waist-length only, ends at the waist, fitted bodice, traditional Indian choli`;
+  // Core garment descriptor — clear and repeated so the model renders the right silhouette
+  const garmentCore =
+    `traditional Indian saree blouse choli, short cropped bodice ending at the waist, ` +
+    `structured fitted silhouette, standalone garment piece, no model or body`;
 
   if (isBack) {
     return (
-      `flat lay product photograph, ${garmentCore}, ` +
-      `BACK VIEW only, ${backPhrase}, ${sleevePhrase}, ` +
-      `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
-      `short cropped waist-length garment spread flat on pure white surface, ` +
-      `top-down studio lighting, ultra-detailed fabric texture, sharp photorealistic, ` +
-      `only this single short choli blouse, nothing else, white background`
+      `professional studio product photo of a ${garmentCore}, ` +
+      `back view, ${backPhrase}, ${sleevePhrase}, ` +
+      `${fabricDesc} fabric in ${colorDesc}, ${border}, ` +
+      `garment displayed upright on invisible form or ghost mannequin, ` +
+      `pure white background, soft even studio lighting, ` +
+      `ultra sharp detail, photorealistic, high-end fashion e-commerce style`
     );
   } else {
     return (
-      `flat lay product photograph, ${garmentCore}, ` +
-      `FRONT VIEW only, ${neckPhrase}, ${sleevePhrase}, ` +
-      `${fabricDesc} fabric, ${colorDesc} colour, ${border}, ` +
-      `short cropped waist-length garment spread flat on pure white surface, ` +
-      `top-down studio lighting, ultra-detailed fabric texture, sharp photorealistic, ` +
-      `only this single short choli blouse, nothing else, white background`
+      `professional studio product photo of a ${garmentCore}, ` +
+      `front view, ${neckPhrase}, ${sleevePhrase}, ` +
+      `${fabricDesc} fabric in ${colorDesc}, ${border}, ` +
+      `garment displayed upright on invisible form or ghost mannequin, ` +
+      `pure white background, soft even studio lighting, ` +
+      `ultra sharp detail, photorealistic, high-end fashion e-commerce style`
     );
   }
 }
