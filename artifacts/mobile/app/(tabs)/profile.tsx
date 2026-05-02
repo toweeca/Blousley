@@ -3110,49 +3110,6 @@ export default function ProfileScreen() {
         )}
       </LinearGradient>
 
-      {/* ── Saved Measurements Card ── */}
-      {user && user.role === "customer" && (
-        <TouchableOpacity
-          activeOpacity={0.85}
-          onPress={() => { setShowMeasModal(true); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
-          style={[styles.measCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-        >
-          <View style={styles.measCardLeft}>
-            <View style={[styles.measCardIcon, { backgroundColor: Colors.brand.primary + "15" }]}>
-              <MaterialCommunityIcons name="human-female" size={18} color={Colors.brand.primary} />
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.measCardTitle, { color: theme.text }]}>My Measurements</Text>
-              {savedMeasurements ? (
-                <View style={styles.measChipRow}>
-                  {[
-                    { label: "Bust", val: savedMeasurements.bust },
-                    { label: "Waist", val: savedMeasurements.waist },
-                    { label: "Hip", val: savedMeasurements.hip },
-                    { label: "Length", val: savedMeasurements.blouseLength },
-                  ].filter(c => c.val).map(c => (
-                    <View key={c.label} style={[styles.measChip, { backgroundColor: Colors.brand.primary + "12", borderColor: Colors.brand.primary + "30" }]}>
-                      <Text style={[styles.measChipText, { color: Colors.brand.primary }]}>
-                        {c.label} {Number(c.val).toFixed(0)}{savedMeasurements.unit ?? "cm"}
-                      </Text>
-                    </View>
-                  ))}
-                  {![savedMeasurements.bust, savedMeasurements.waist, savedMeasurements.hip, savedMeasurements.blouseLength].some(Boolean) && (
-                    <Text style={[styles.measChipText, { color: theme.textMuted }]}>Saved — tap to view</Text>
-                  )}
-                </View>
-              ) : (
-                <Text style={[styles.measCardSub, { color: theme.textMuted }]}>Tap to add your measurements</Text>
-              )}
-            </View>
-          </View>
-          <View style={[styles.measEditPill, { borderColor: Colors.brand.primary + "40" }]}>
-            <Feather name={savedMeasurements ? "edit-2" : "plus"} size={12} color={Colors.brand.primary} />
-            <Text style={[styles.measEditPillText, { color: Colors.brand.primary }]}>{savedMeasurements ? "Edit" : "Add"}</Text>
-          </View>
-        </TouchableOpacity>
-      )}
-
       {user && (
         <View style={[styles.tabBar, { backgroundColor: theme.card, borderBottomColor: theme.border }]}>
           {TABS.map((t) => (
@@ -3238,6 +3195,49 @@ export default function ProfileScreen() {
                   </View>
                 ))}
               </View>
+            )}
+
+            {/* Measurements card inside profile modal */}
+            {user?.role === "customer" && (
+              <TouchableOpacity
+                activeOpacity={0.85}
+                onPress={() => { setShowAccountModal(false); setTimeout(() => setShowMeasModal(true), 350); Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light); }}
+                style={[styles.measCard, { backgroundColor: theme.background, borderColor: theme.border, marginHorizontal: 0, marginTop: 0, marginBottom: 12 }]}
+              >
+                <View style={styles.measCardLeft}>
+                  <View style={[styles.measCardIcon, { backgroundColor: Colors.brand.primary + "15" }]}>
+                    <MaterialCommunityIcons name="human-female" size={18} color={Colors.brand.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.measCardTitle, { color: theme.text }]}>My Measurements</Text>
+                    {savedMeasurements ? (
+                      <View style={styles.measChipRow}>
+                        {[
+                          { label: "Bust", val: savedMeasurements.bust },
+                          { label: "Waist", val: savedMeasurements.waist },
+                          { label: "Hip", val: savedMeasurements.hip },
+                          { label: "Length", val: savedMeasurements.blouseLength },
+                        ].filter(c => c.val).map(c => (
+                          <View key={c.label} style={[styles.measChip, { backgroundColor: Colors.brand.primary + "12", borderColor: Colors.brand.primary + "30" }]}>
+                            <Text style={[styles.measChipText, { color: Colors.brand.primary }]}>
+                              {c.label} {Number(c.val).toFixed(0)}{savedMeasurements.unit ?? "cm"}
+                            </Text>
+                          </View>
+                        ))}
+                        {![savedMeasurements.bust, savedMeasurements.waist, savedMeasurements.hip, savedMeasurements.blouseLength].some(Boolean) && (
+                          <Text style={[styles.measChipText, { color: theme.textMuted }]}>Saved — tap to edit</Text>
+                        )}
+                      </View>
+                    ) : (
+                      <Text style={[styles.measCardSub, { color: theme.textMuted }]}>Tap to add your measurements</Text>
+                    )}
+                  </View>
+                </View>
+                <View style={[styles.measEditPill, { borderColor: Colors.brand.primary + "40" }]}>
+                  <Feather name={savedMeasurements ? "edit-2" : "plus"} size={12} color={Colors.brand.primary} />
+                  <Text style={[styles.measEditPillText, { color: Colors.brand.primary }]}>{savedMeasurements ? "Edit" : "Add"}</Text>
+                </View>
+              </TouchableOpacity>
             )}
 
             <Text style={[styles.sectionTitle, { color: theme.text, marginTop: 8 }]}>Edit Details</Text>
