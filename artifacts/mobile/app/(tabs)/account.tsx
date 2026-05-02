@@ -442,46 +442,81 @@ export default function AccountScreen() {
               <View style={{ width: 36 }} />
             </View>
             <ScrollView contentContainerStyle={{ padding: 20, paddingBottom: 60 }}>
-              <Text style={[styles.sectionSub, { color: theme.textSecondary, marginBottom: 16 }]}>
-                Go to the Design tab → Guide section to view and edit your full measurement profile.
-              </Text>
               {savedMeasurements ? (
-                <View style={{ gap: 10 }}>
-                  {[
-                    { label: "Above Bust", val: savedMeasurements.aboveBust },
-                    { label: "Bust", val: savedMeasurements.bust },
-                    { label: "Under Bust", val: savedMeasurements.underBust },
-                    { label: "Waist", val: savedMeasurements.waist },
-                    { label: "Hip", val: savedMeasurements.hip },
-                    { label: "Shoulder Width", val: savedMeasurements.shoulderWidth },
-                    { label: "Armhole", val: savedMeasurements.armhole },
-                    { label: "Blouse Length", val: savedMeasurements.blouseLength },
-                  ].map((f) => (
-                    <View
-                      key={f.label}
-                      style={[styles.measRow, { backgroundColor: theme.card, borderColor: theme.border }]}
-                    >
-                      <Text style={[styles.measLabel, { color: theme.textSecondary }]}>{f.label}</Text>
-                      <Text style={[styles.measVal, { color: f.val ? theme.text : theme.textMuted }]}>
-                        {f.val ? `${Number(f.val).toFixed(1)} ${savedMeasurements.unit ?? "cm"}` : "—"}
+                <View style={{ gap: 16 }}>
+                  {/* Header row */}
+                  <View style={styles.measModalHeader}>
+                    <View>
+                      <Text style={[styles.measModalTitle, { color: theme.text }]}>My Measurements</Text>
+                      <Text style={[styles.measModalDate, { color: theme.textMuted }]}>
+                        Saved in {savedMeasurements.unit?.toUpperCase() ?? "CM"}
+                        {savedMeasurements.updatedAt
+                          ? ` · ${new Date(savedMeasurements.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}`
+                          : ""}
                       </Text>
                     </View>
-                  ))}
+                    <TouchableOpacity
+                      style={[styles.editMeasBtn, { borderColor: Colors.brand.primary + "50" }]}
+                      onPress={() => { setShowMeasModal(false); router.push("/(tabs)/profile"); }}
+                    >
+                      <Feather name="edit-2" size={14} color={Colors.brand.primary} />
+                      <Text style={[styles.editMeasBtnText, { color: Colors.brand.primary }]}>Edit</Text>
+                    </TouchableOpacity>
+                  </View>
+
+                  {/* 2-column grid — identical to Design tab */}
+                  <View style={[styles.measGrid, { borderColor: theme.border }]}>
+                    {MEAS_FIELDS.map((f, i) => {
+                      const val = savedMeasurements[f.key];
+                      return (
+                        <View
+                          key={f.key}
+                          style={[
+                            styles.measCell,
+                            { borderColor: theme.border },
+                            i % 2 === 0 && { borderRightWidth: 1 },
+                            i < MEAS_FIELDS.length - 2 && { borderBottomWidth: 1 },
+                          ]}
+                        >
+                          <View style={[styles.measCellDot, { backgroundColor: f.color + "20" }]}>
+                            <Text style={[styles.measCellIcon, { color: f.color }]}>{f.icon}</Text>
+                          </View>
+                          <Text style={[styles.measCellLabel, { color: theme.textSecondary }]}>{f.label}</Text>
+                          <Text style={[styles.measCellValue, { color: val ? theme.text : theme.textMuted }]}>
+                            {val ? `${Number(val).toFixed(1)} ${savedMeasurements.unit ?? "cm"}` : "—"}
+                          </Text>
+                        </View>
+                      );
+                    })}
+                  </View>
+
                   {savedMeasurements.notes ? (
-                    <View style={[styles.measRow, { backgroundColor: theme.card, borderColor: theme.border, flexDirection: "column", alignItems: "flex-start", gap: 4 }]}>
-                      <Text style={[styles.measLabel, { color: theme.textSecondary }]}>Notes</Text>
-                      <Text style={[styles.measVal, { color: theme.text }]}>{savedMeasurements.notes}</Text>
+                    <View style={[styles.notesBox, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                      <Text style={[styles.notesLabel, { color: theme.textSecondary }]}>Notes</Text>
+                      <Text style={[styles.notesText, { color: theme.text }]}>{savedMeasurements.notes}</Text>
                     </View>
                   ) : null}
+
+                  <View style={[styles.infoHint, { backgroundColor: Colors.brand.gold + "12", borderColor: Colors.brand.gold + "30" }]}>
+                    <Feather name="info" size={14} color={Colors.brand.gold} />
+                    <Text style={[styles.infoHintText, { color: theme.textSecondary }]}>
+                      These measurements are shared with your tailor when you send a fit profile.
+                    </Text>
+                  </View>
                 </View>
               ) : (
-                <TouchableOpacity
-                  style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
-                  onPress={() => { setShowMeasModal(false); router.push("/(tabs)/profile"); }}
-                >
-                  <Feather name="plus" size={16} color="#fff" />
-                  <Text style={styles.primaryBtnText}>Add Measurements in Design Tab</Text>
-                </TouchableOpacity>
+                <View style={{ gap: 16 }}>
+                  <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
+                    No measurements saved yet. Add them in the Design tab so your tailor has your exact sizing.
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
+                    onPress={() => { setShowMeasModal(false); router.push("/(tabs)/profile"); }}
+                  >
+                    <Feather name="plus" size={16} color="#fff" />
+                    <Text style={styles.primaryBtnText}>Add Measurements</Text>
+                  </TouchableOpacity>
+                </View>
               )}
             </ScrollView>
           </View>
