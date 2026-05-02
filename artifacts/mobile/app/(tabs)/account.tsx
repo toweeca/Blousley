@@ -138,15 +138,10 @@ export default function AccountScreen() {
         )}
         {user && user.role === "customer" && (
           <View style={styles.statsRow}>
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{Array.isArray(fitsCount) ? fitsCount.length : 0}</Text>
-              <Text style={styles.statLabel}>Saved Fits</Text>
-            </View>
-            <View style={styles.statDivider} />
-            <View style={styles.statItem}>
-              <Text style={styles.statNum}>{savedMeasurements ? "✓" : "—"}</Text>
-              <Text style={styles.statLabel}>Measurements</Text>
-            </View>
+            <View style={styles.statDot} />
+            <Text style={styles.statSummaryText}>
+              {Array.isArray(fitsCount) ? fitsCount.length : 0} saves · {savedMeasurements ? "Measured" : "No measurements"}
+            </Text>
           </View>
         )}
       </LinearGradient>
@@ -235,6 +230,52 @@ export default function AccountScreen() {
         ) : (
           /* ── Signed in ── */
           <Animated.View entering={FadeInDown.delay(100).springify()} style={{ gap: 14 }}>
+
+            {/* Activity tiles */}
+            {user.role === "customer" && (
+              <View style={styles.statTileRow}>
+                {[
+                  {
+                    label: "My Fits",
+                    count: Array.isArray(fitsCount) ? fitsCount.length : 0,
+                    icon: "heart" as const,
+                    color: Colors.brand.primary,
+                    route: "/(tabs)/history" as const,
+                  },
+                  {
+                    label: "Ideas",
+                    count: 0,
+                    icon: "zap" as const,
+                    color: "#E67E22",
+                    route: "/(tabs)/profile" as const,
+                  },
+                  {
+                    label: "Shares",
+                    count: 0,
+                    icon: "send" as const,
+                    color: "#2980B9",
+                    route: "/(tabs)/chat" as const,
+                  },
+                ].map((tile) => (
+                  <TouchableOpacity
+                    key={tile.label}
+                    style={[styles.statTile, { backgroundColor: theme.card, borderColor: theme.border }]}
+                    activeOpacity={0.75}
+                    onPress={() => {
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push(tile.route as any);
+                    }}
+                  >
+                    <View style={[styles.statTileIcon, { backgroundColor: tile.color + "15" }]}>
+                      <Feather name={tile.icon} size={18} color={tile.color} />
+                    </View>
+                    <Text style={[styles.statTileNum, { color: theme.text }]}>{tile.count}</Text>
+                    <Text style={[styles.statTileLabel, { color: theme.textSecondary }]}>{tile.label}</Text>
+                    <Feather name="chevron-right" size={12} color={theme.textMuted} style={{ marginTop: 2 }} />
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Measurements quick-access */}
             {user.role === "customer" && (
@@ -570,11 +611,22 @@ const styles = StyleSheet.create({
     borderRadius: 20,
   },
   roleBadgeText: { fontFamily: "Inter_600SemiBold", fontSize: 12, color: Colors.brand.goldLight },
-  statsRow: { flexDirection: "row", alignItems: "center", gap: 24, marginTop: 4 },
-  statItem: { alignItems: "center", gap: 2 },
-  statNum: { fontFamily: "Inter_700Bold", fontSize: 18, color: "#fff" },
-  statLabel: { fontFamily: "Inter_400Regular", fontSize: 11, color: "rgba(255,255,255,0.7)" },
-  statDivider: { width: 1, height: 28, backgroundColor: "rgba(255,255,255,0.25)" },
+  statsRow: { flexDirection: "row", alignItems: "center", gap: 6, marginTop: 4 },
+  statDot: { width: 5, height: 5, borderRadius: 3, backgroundColor: "rgba(255,255,255,0.5)" },
+  statSummaryText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.75)" },
+  statTileRow: { flexDirection: "row", gap: 10 },
+  statTile: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 18,
+    paddingHorizontal: 8,
+    borderRadius: 18,
+    borderWidth: 1,
+    gap: 6,
+  },
+  statTileIcon: { width: 42, height: 42, borderRadius: 12, alignItems: "center", justifyContent: "center" },
+  statTileNum: { fontFamily: "Inter_700Bold", fontSize: 28 },
+  statTileLabel: { fontFamily: "Inter_500Medium", fontSize: 12 },
   content: { padding: 20, gap: 16 },
   sectionTitle: { fontFamily: "Inter_700Bold", fontSize: 17 },
   sectionSub: { fontFamily: "Inter_400Regular", fontSize: 13, lineHeight: 20 },
