@@ -54,11 +54,24 @@ function isSvgUri(uri: string) {
   return uri.startsWith("data:image/svg") || uri.endsWith(".svg");
 }
 
+function mimeFromDataUri(uri: string): { mimeType: string; ext: string } {
+  if (uri.startsWith("data:")) {
+    const m = uri.match(/^data:([^;,]+)/);
+    const mime = m?.[1] ?? "image/jpeg";
+    const extMap: Record<string, string> = {
+      "image/jpeg": "jpg", "image/png": "png",
+      "image/svg+xml": "svg", "image/webp": "webp",
+    };
+    return { mimeType: mime, ext: extMap[mime] ?? "jpg" };
+  }
+  if (uri.endsWith(".svg")) return { mimeType: "image/svg+xml", ext: "svg" };
+  return { mimeType: "image/jpeg", ext: "jpg" };
+}
+
 async function saveImageUtil(uri: string, label = "blouse") {
   try {
     const isSvg = isSvgUri(uri);
-    const ext = isSvg ? "svg" : "png";
-    const mimeType = isSvg ? "image/svg+xml" : "image/png";
+    const { mimeType, ext } = mimeFromDataUri(uri);
 
     if (Platform.OS === "web") {
       const a = document.createElement("a");
@@ -91,11 +104,11 @@ async function saveImageUtil(uri: string, label = "blouse") {
     let localUri = uri;
     if (uri.startsWith("data:")) {
       const b64 = uri.split(",")[1];
-      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.png`;
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
       await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
       localUri = path;
     } else if (uri.startsWith("http")) {
-      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.png`;
+      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
       const { uri: downloaded } = await FileSystem.downloadAsync(uri, path);
       localUri = downloaded;
     }
@@ -115,9 +128,7 @@ async function saveImageUtil(uri: string, label = "blouse") {
 
 async function shareImageUtil(uri: string) {
   try {
-    const isSvg = isSvgUri(uri);
-    const ext = isSvg ? "svg" : "png";
-    const mimeType = isSvg ? "image/svg+xml" : "image/png";
+    const { mimeType, ext } = mimeFromDataUri(uri);
 
     if (Platform.OS === "web") {
       if (navigator.share) {
@@ -559,25 +570,30 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     setAiPreviewBackUri(null);
     try {
       const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
-      const [frontRes, backRes] = await Promise.all([
-        fetch(`${domain}/api/generate-blouse-image/style`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "front" }),
-        }),
-        fetch(`${domain}/api/generate-blouse-image/style`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern, view: "back" }),
-        }),
-      ]);
-      const [fData, bData] = await Promise.all([frontRes.json(), backRes.json()]);
+      const payload = { neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern };
+
+      // Fetch front first — show it as soon as it arrives
+      const frontRes = await fetch(`${domain}/api/generate-blouse-image/style`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, view: "front" }),
+      });
+      const fData = await frontRes.json();
       setAiPreviewUri(`data:${fData.mimeType};base64,${fData.b64_json}`);
-      setAiPreviewBackUri(`data:${bData.mimeType};base64,${bData.b64_json}`);
+      setAiGenerating(false);
+
+      // Fetch back view in background — fills in when ready, no spinner
+      fetch(`${domain}/api/generate-blouse-image/style`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ ...payload, view: "back" }),
+      })
+        .then((r) => r.json())
+        .then((bData) => setAiPreviewBackUri(`data:${bData.mimeType};base64,${bData.b64_json}`))
+        .catch(() => {/* back view unavailable — front is shown, silently skip */});
     } catch (err) {
       console.error("generateAIPreview error:", err);
       Alert.alert("Preview failed", "Could not generate the preview. Please try again.");
-    } finally {
       setAiGenerating(false);
     }
   };

@@ -1,5 +1,4 @@
 import { Router, type IRouter } from "express";
-import { generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
 
 const router: IRouter = Router();
 
@@ -466,11 +465,17 @@ function generateBlouseSVG(opts: {
 </svg>`;
 }
 
-// ─── AI image generation via Replit AI Integrations proxy ───────────────────
+// ─── AI image generation via Pollinations.ai (no API key required) ──────────
 
 async function generateBlousePhoto(prompt: string): Promise<{ b64_json: string; mimeType: string }> {
-  const buffer = await generateImageBuffer(prompt, "1024x1024");
-  return { b64_json: buffer.toString("base64"), mimeType: "image/png" };
+  const encoded = encodeURIComponent(prompt);
+  const url = `https://image.pollinations.ai/prompt/${encoded}?width=768&height=768&model=flux&nologo=true&enhance=true`;
+  const res = await fetch(url, { signal: AbortSignal.timeout(90_000) });
+  if (!res.ok) throw new Error(`Pollinations returned ${res.status}`);
+  const arrayBuf = await res.arrayBuffer();
+  const b64 = Buffer.from(arrayBuf).toString("base64");
+  const ct = res.headers.get("content-type") ?? "image/jpeg";
+  return { b64_json: b64, mimeType: ct.split(";")[0].trim() };
 }
 
 // ─── Routes ──────────────────────────────────────────────────────────────────
@@ -507,7 +512,8 @@ router.post("/style", async (req, res) => {
     try {
       const result = await generateBlousePhoto(prompt);
       res.json(result);
-    } catch {
+    } catch (aiErr) {
+      console.error("[generate-blouse-image/style] AI generation failed, falling back to SVG:", aiErr);
       const svg = generateBlouseSVG({ neck, sleeve, back, fabric, color, view, borderPattern });
       const b64 = Buffer.from(svg).toString("base64");
       res.json({ b64_json: b64, mimeType: "image/svg+xml" });
