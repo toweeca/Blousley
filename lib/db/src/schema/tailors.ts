@@ -8,6 +8,10 @@ export const tailorsTable = pgTable("tailors", {
   name: text("name").notNull(),
   phone: text("phone"),
   specialization: text("specialization"),
+  bio: text("bio"),
+  skills: text("skills"),
+  location: text("location"),
+  experience: text("experience"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 

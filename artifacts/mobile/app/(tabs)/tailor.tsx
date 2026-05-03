@@ -1,4 +1,5 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
 import {
@@ -219,6 +220,270 @@ function IdeaRequestCard({
   );
 }
 
+const SUGGESTED_SKILLS = [
+  "Blouse Stitching", "Embroidery", "Zari Work", "Mirror Work", "Smocking",
+  "Aari Work", "Kutch Work", "Patch Work", "Hand Stitching", "Saree Draping",
+  "Designer Blouse", "Bridal Wear", "Alteration", "Machine Embroidery",
+];
+
+function TailorProfileCard({
+  user,
+  apiBase,
+  customerCount,
+}: {
+  user: NonNullable<ReturnType<typeof useApp>["user"]>;
+  apiBase: string;
+  customerCount: number;
+}) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+  const qc = useQueryClient();
+
+  const [editingBio, setEditingBio] = useState(false);
+  const [bioText, setBioText] = useState("");
+  const [editingSkills, setEditingSkills] = useState(false);
+  const [newSkill, setNewSkill] = useState("");
+  const [showSuggestions, setShowSuggestions] = useState(false);
+
+  const { data: profile, isLoading } = useQuery({
+    queryKey: ["tailor-profile", user.id],
+    queryFn: async () => {
+      const r = await fetch(`${apiBase}/api/tailor/profile?tailorId=${user.id}`);
+      return r.ok ? r.json() : { skills: [], acceptedJobs: 0, bio: null };
+    },
+  });
+
+  const saveMutation = useMutation({
+    mutationFn: async (payload: { bio?: string; skills?: string[] }) => {
+      const r = await fetch(`${apiBase}/api/tailor/profile`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tailorId: user.id, name: user.name, ...payload }),
+      });
+      if (!r.ok) throw new Error("Save failed");
+      return r.json();
+    },
+    onSuccess: () => qc.invalidateQueries({ queryKey: ["tailor-profile", user.id] }),
+  });
+
+  const skills: string[] = profile?.skills ?? [];
+  const acceptedJobs: number = profile?.acceptedJobs ?? 0;
+  const bio: string = profile?.bio ?? "";
+
+  const handleSaveBio = () => {
+    saveMutation.mutate({ bio: bioText, skills });
+    setEditingBio(false);
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  };
+
+  const handleAddSkill = (skill: string) => {
+    const trimmed = skill.trim();
+    if (!trimmed || skills.includes(trimmed)) return;
+    const updated = [...skills, trimmed];
+    saveMutation.mutate({ bio, skills: updated });
+    setNewSkill("");
+    setShowSuggestions(false);
+    Haptics.selectionAsync();
+  };
+
+  const handleRemoveSkill = (skill: string) => {
+    const updated = skills.filter((s) => s !== skill);
+    saveMutation.mutate({ bio, skills: updated });
+    Haptics.selectionAsync();
+  };
+
+  const filteredSuggestions = SUGGESTED_SKILLS.filter(
+    (s) => !skills.includes(s) && s.toLowerCase().includes(newSkill.toLowerCase())
+  );
+
+  if (isLoading) return null;
+
+  return (
+    <Animated.View entering={FadeInDown.delay(60).springify()}>
+      <View style={[styles.profileCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+
+        {/* ── Header row ── */}
+        <View style={styles.profileCardHeader}>
+          <View style={[styles.profileAvatar, { backgroundColor: Colors.brand.primary + "20" }]}>
+            <Text style={[styles.profileAvatarText, { color: Colors.brand.primary }]}>
+              {user.name.slice(0, 2).toUpperCase()}
+            </Text>
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={[styles.profileName, { color: theme.text }]}>{user.name}</Text>
+            <View style={styles.profileBadgeRow}>
+              <MaterialCommunityIcons name="scissors-cutting" size={12} color={Colors.brand.gold} />
+              <Text style={[styles.profileBadgeText, { color: Colors.brand.gold }]}>
+                {profile?.specialization ?? "Professional Tailor"}
+              </Text>
+            </View>
+          </View>
+        </View>
+
+        {/* ── Stat tiles ── */}
+        <View style={styles.profileStats}>
+          {[
+            { label: "Jobs Accepted", value: acceptedJobs, icon: "check-circle" as const, color: "#27AE60" },
+            { label: "Customers", value: customerCount, icon: "users" as const, color: Colors.brand.primary },
+            { label: "Skills", value: skills.length, icon: "star" as const, color: Colors.brand.goldDark },
+          ].map((stat) => (
+            <View
+              key={stat.label}
+              style={[styles.profileStatTile, { backgroundColor: stat.color + "10", borderColor: stat.color + "30" }]}
+            >
+              <Feather name={stat.icon} size={16} color={stat.color} />
+              <Text style={[styles.profileStatNum, { color: stat.color }]}>{stat.value}</Text>
+              <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>{stat.label}</Text>
+            </View>
+          ))}
+        </View>
+
+        {/* ── Bio / About ── */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileSectionHeader}>
+            <Text style={[styles.profileSectionTitle, { color: theme.text }]}>About Me</Text>
+            <TouchableOpacity
+              onPress={() => { setEditingBio(!editingBio); setBioText(bio); Haptics.selectionAsync(); }}
+              style={[styles.profileEditBtn, { borderColor: Colors.brand.primary + "40" }]}
+            >
+              <Feather name={editingBio ? "x" : "edit-2"} size={13} color={Colors.brand.primary} />
+              <Text style={[styles.profileEditBtnText, { color: Colors.brand.primary }]}>
+                {editingBio ? "Cancel" : "Edit"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          {editingBio ? (
+            <View style={{ gap: 8 }}>
+              <TextInput
+                style={[styles.profileBioInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                value={bioText}
+                onChangeText={setBioText}
+                placeholder="Tell customers about yourself — your experience, specialties, style of work..."
+                placeholderTextColor={theme.textMuted}
+                multiline
+                numberOfLines={4}
+                textAlignVertical="top"
+                autoFocus
+              />
+              <TouchableOpacity
+                style={[styles.profileSaveBtn, { backgroundColor: Colors.brand.primary, opacity: saveMutation.isPending ? 0.6 : 1 }]}
+                onPress={handleSaveBio}
+                disabled={saveMutation.isPending}
+              >
+                <Feather name="check" size={15} color="#fff" />
+                <Text style={styles.profileSaveBtnText}>Save Bio</Text>
+              </TouchableOpacity>
+            </View>
+          ) : (
+            bio ? (
+              <Text style={[styles.profileBioText, { color: theme.textSecondary }]}>{bio}</Text>
+            ) : (
+              <TouchableOpacity onPress={() => { setEditingBio(true); setBioText(""); }} activeOpacity={0.7}>
+                <View style={[styles.profileBioEmpty, { borderColor: theme.border }]}>
+                  <Feather name="edit-3" size={16} color={theme.textMuted} />
+                  <Text style={[styles.profileBioEmptyText, { color: theme.textMuted }]}>
+                    Add a bio to attract customers — describe your specialties and experience
+                  </Text>
+                </View>
+              </TouchableOpacity>
+            )
+          )}
+        </View>
+
+        {/* ── Skillsets ── */}
+        <View style={styles.profileSection}>
+          <View style={styles.profileSectionHeader}>
+            <Text style={[styles.profileSectionTitle, { color: theme.text }]}>My Skillsets</Text>
+            <TouchableOpacity
+              onPress={() => { setEditingSkills(!editingSkills); setNewSkill(""); setShowSuggestions(false); Haptics.selectionAsync(); }}
+              style={[styles.profileEditBtn, { borderColor: Colors.brand.primary + "40" }]}
+            >
+              <Feather name={editingSkills ? "check" : "plus"} size={13} color={Colors.brand.primary} />
+              <Text style={[styles.profileEditBtnText, { color: Colors.brand.primary }]}>
+                {editingSkills ? "Done" : "Add Skill"}
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Current skill tags */}
+          {skills.length > 0 ? (
+            <View style={styles.skillTagsRow}>
+              {skills.map((skill) => (
+                <TouchableOpacity
+                  key={skill}
+                  onPress={() => editingSkills && handleRemoveSkill(skill)}
+                  style={[
+                    styles.skillTag,
+                    {
+                      backgroundColor: editingSkills ? Colors.brand.primary + "18" : Colors.brand.primary + "12",
+                      borderColor: editingSkills ? Colors.brand.primary + "60" : Colors.brand.primary + "30",
+                    },
+                  ]}
+                  activeOpacity={editingSkills ? 0.7 : 1}
+                >
+                  <Text style={[styles.skillTagText, { color: Colors.brand.primary }]}>{skill}</Text>
+                  {editingSkills && (
+                    <Feather name="x" size={11} color={Colors.brand.primary} />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          ) : (
+            !editingSkills && (
+              <View style={[styles.profileBioEmpty, { borderColor: theme.border }]}>
+                <Feather name="star" size={16} color={theme.textMuted} />
+                <Text style={[styles.profileBioEmptyText, { color: theme.textMuted }]}>
+                  Add your skills to help customers find you — embroidery, aari work, bridal, etc.
+                </Text>
+              </View>
+            )
+          )}
+
+          {/* Skill input + suggestions */}
+          {editingSkills && (
+            <View style={{ gap: 10, marginTop: 8 }}>
+              <View style={styles.skillInputRow}>
+                <TextInput
+                  style={[styles.skillInput, { backgroundColor: theme.backgroundSecondary, color: theme.text, borderColor: theme.border }]}
+                  value={newSkill}
+                  onChangeText={(t) => { setNewSkill(t); setShowSuggestions(true); }}
+                  placeholder="e.g. Aari Work, Embroidery..."
+                  placeholderTextColor={theme.textMuted}
+                  onFocus={() => setShowSuggestions(true)}
+                  returnKeyType="done"
+                  onSubmitEditing={() => { if (newSkill.trim()) handleAddSkill(newSkill); }}
+                />
+                <TouchableOpacity
+                  style={[styles.skillAddBtn, { backgroundColor: Colors.brand.primary }]}
+                  onPress={() => { if (newSkill.trim()) handleAddSkill(newSkill); }}
+                >
+                  <Feather name="plus" size={18} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              {showSuggestions && filteredSuggestions.length > 0 && (
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
+                  {filteredSuggestions.slice(0, 8).map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      onPress={() => handleAddSkill(s)}
+                      style={[styles.skillSuggestion, { backgroundColor: theme.card, borderColor: theme.border }]}
+                    >
+                      <Feather name="plus" size={11} color={Colors.brand.gold} />
+                      <Text style={[styles.skillSuggestionText, { color: theme.text }]}>{s}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </ScrollView>
+              )}
+            </View>
+          )}
+        </View>
+
+      </View>
+    </Animated.View>
+  );
+}
+
 export default function TailorScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -386,6 +651,12 @@ export default function TailorScreen() {
         )}
         ListHeaderComponent={user?.role === "tailor" ? (
           <View style={{ gap: 16 }}>
+            {/* ── Tailor Profile Card ── */}
+            <TailorProfileCard
+              user={user}
+              apiBase={apiBase}
+              customerCount={fits?.length ?? 0}
+            />
             {/* ── Design Requests section ── */}
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIconWrap, { backgroundColor: Colors.brand.gold + "20" }]}>
@@ -824,6 +1095,184 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_600SemiBold",
     fontSize: 15,
     color: "#fff",
+  },
+  // ── Tailor Profile Card ────────────────────────────────────────────────────
+  profileCard: {
+    borderRadius: 20,
+    borderWidth: 1,
+    padding: 18,
+    gap: 18,
+  },
+  profileCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 14,
+  },
+  profileAvatar: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  profileAvatarText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 18,
+    textTransform: "uppercase",
+  },
+  profileName: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 17,
+    marginBottom: 2,
+  },
+  profileBadgeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  profileBadgeText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  profileStats: {
+    flexDirection: "row",
+    gap: 10,
+  },
+  profileStatTile: {
+    flex: 1,
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    alignItems: "center",
+    gap: 4,
+  },
+  profileStatNum: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+  },
+  profileStatLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 10,
+    textAlign: "center",
+    lineHeight: 14,
+  },
+  profileSection: {
+    gap: 10,
+  },
+  profileSectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  profileSectionTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  profileEditBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 20,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+  },
+  profileEditBtnText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  profileBioText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 20,
+  },
+  profileBioEmpty: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    borderWidth: 1,
+    borderRadius: 12,
+    padding: 12,
+    borderStyle: "dashed",
+  },
+  profileBioEmptyText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 18,
+    flex: 1,
+  },
+  profileBioInput: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+    minHeight: 90,
+  },
+  profileSaveBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 6,
+    borderRadius: 12,
+    paddingVertical: 10,
+  },
+  profileSaveBtnText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+    color: "#fff",
+  },
+  skillTagsRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  skillTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  skillTagText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
+  skillInputRow: {
+    flexDirection: "row",
+    gap: 8,
+    alignItems: "center",
+  },
+  skillInput: {
+    flex: 1,
+    borderRadius: 12,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
+    fontSize: 13,
+    fontFamily: "Inter_400Regular",
+  },
+  skillAddBtn: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  skillSuggestion: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 20,
+    borderWidth: 1,
+  },
+  skillSuggestionText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
   },
   // Section headers
   sectionHeader: {
