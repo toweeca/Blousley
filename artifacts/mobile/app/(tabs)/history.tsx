@@ -34,7 +34,17 @@ interface BlouseFit {
   updatedAt: string;
 }
 
-function FitCard({ fit, onDelete, delay }: { fit: BlouseFit; onDelete: () => void; delay: number }) {
+function FitCard({
+  fit,
+  onDelete,
+  isDeleting,
+  delay,
+}: {
+  fit: BlouseFit;
+  onDelete: () => void;
+  isDeleting: boolean;
+  delay: number;
+}) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
@@ -44,6 +54,19 @@ function FitCard({ fit, onDelete, delay }: { fit: BlouseFit; onDelete: () => voi
     year: "numeric",
   });
   const hasImage = !!fit.imageUrl;
+
+  const handleDeletePress = (e: any) => {
+    // Stop the card navigation from firing on web
+    if (e?.stopPropagation) e.stopPropagation();
+    if (Platform.OS === "web") {
+      if (window.confirm("Remove this fit from your history?")) onDelete();
+    } else {
+      Alert.alert("Delete Fit", "Remove this fit from your history?", [
+        { text: "Cancel", style: "cancel" },
+        { text: "Delete", style: "destructive", onPress: onDelete },
+      ]);
+    }
+  };
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).springify()}>
@@ -71,16 +94,12 @@ function FitCard({ fit, onDelete, delay }: { fit: BlouseFit; onDelete: () => voi
               <Text style={styles.fitImageDate}>{date}</Text>
             </View>
             <TouchableOpacity
-              onPress={() => {
-                Alert.alert("Delete Fit", "Remove this fit from your history?", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: onDelete },
-                ]);
-              }}
-              style={styles.deleteBtnFloat}
+              onPress={handleDeletePress}
+              style={[styles.deleteBtnFloat, isDeleting && { opacity: 0.5 }]}
               hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+              disabled={isDeleting}
             >
-              <Feather name="trash-2" size={15} color="#fff" />
+              <Feather name={isDeleting ? "loader" : "trash-2"} size={15} color="#fff" />
             </TouchableOpacity>
           </View>
         ) : (
@@ -95,15 +114,11 @@ function FitCard({ fit, onDelete, delay }: { fit: BlouseFit; onDelete: () => voi
               <Text style={[styles.fitCardDate, { color: theme.textMuted }]}>{date}</Text>
             </View>
             <TouchableOpacity
-              onPress={() => {
-                Alert.alert("Delete Fit", "Remove this fit from your history?", [
-                  { text: "Cancel", style: "cancel" },
-                  { text: "Delete", style: "destructive", onPress: onDelete },
-                ]);
-              }}
-              style={styles.deleteBtn}
+              onPress={handleDeletePress}
+              style={[styles.deleteBtn, isDeleting && { opacity: 0.5 }]}
+              disabled={isDeleting}
             >
-              <Feather name="trash-2" size={16} color={Colors.brand.primary + "80"} />
+              <Feather name={isDeleting ? "loader" : "trash-2"} size={16} color={Colors.brand.primary + "80"} />
             </TouchableOpacity>
           </View>
         )}
@@ -210,6 +225,7 @@ export default function HistoryScreen() {
       if (!res.ok) throw new Error("Delete failed");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blouse-fits"] }),
+    onError: () => Alert.alert("Error", "Could not delete this fit. Please try again."),
   });
 
   const renderItem = useCallback(
@@ -217,6 +233,7 @@ export default function HistoryScreen() {
       <FitCard
         fit={item}
         delay={index * 60}
+        isDeleting={deleteMutation.isPending && deleteMutation.variables === item.id}
         onDelete={() => deleteMutation.mutate(item.id)}
       />
     ),
