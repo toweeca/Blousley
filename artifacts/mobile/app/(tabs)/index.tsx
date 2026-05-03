@@ -273,31 +273,39 @@ export default function HomeScreen() {
             <Animated.View
               key={step.title}
               entering={FadeInDown.delay(750 + i * 80).springify()}
-              style={[
-                styles.stepCard,
-                {
-                  backgroundColor: theme.card,
-                  borderColor: theme.border,
-                },
-              ]}
             >
-              <View
+              <TouchableOpacity
                 style={[
-                  styles.stepNumber,
-                  { backgroundColor: Colors.brand.primary + "20" },
+                  styles.stepCard,
+                  {
+                    backgroundColor: theme.card,
+                    borderColor: theme.border,
+                  },
                 ]}
+                activeOpacity={0.7}
+                onPress={() => router.push(step.route as any)}
               >
-                <Text style={[styles.stepNumberText, { color: Colors.brand.primary }]}>
-                  {i + 1}
-                </Text>
-              </View>
-              <View style={styles.stepContent}>
-                <Text style={[styles.stepTitle, { color: theme.text }]}>{step.title}</Text>
-                <Text style={[styles.stepDesc, { color: theme.textSecondary }]}>
-                  {step.desc}
-                </Text>
-              </View>
-              <Feather name={step.icon as any} size={18} color={Colors.brand.gold} />
+                <View
+                  style={[
+                    styles.stepNumber,
+                    { backgroundColor: Colors.brand.primary + "20" },
+                  ]}
+                >
+                  <Text style={[styles.stepNumberText, { color: Colors.brand.primary }]}>
+                    {i + 1}
+                  </Text>
+                </View>
+                <View style={styles.stepContent}>
+                  <Text style={[styles.stepTitle, { color: theme.text }]}>{step.title}</Text>
+                  <Text style={[styles.stepDesc, { color: theme.textSecondary }]}>
+                    {step.desc}
+                  </Text>
+                </View>
+                <View style={styles.stepIconRow}>
+                  <Feather name={step.icon as any} size={16} color={Colors.brand.gold} />
+                  <Feather name="chevron-right" size={15} color={theme.textMuted} />
+                </View>
+              </TouchableOpacity>
             </Animated.View>
           ))}
         </View>
@@ -308,10 +316,10 @@ export default function HomeScreen() {
 }
 
 const HOW_IT_WORKS = [
-  { title: "Upload Photo", desc: "Take or upload a photo showing your shoulders", icon: "upload" },
-  { title: "AI Analysis", desc: "Our AI detects body measurements & shape", icon: "zap" },
-  { title: "Customize", desc: "Choose neckline, sleeves, back & fabric", icon: "sliders" },
-  { title: "Share", desc: "Send your fit profile to your tailor", icon: "send" },
+  { title: "Upload Photo", desc: "Take or upload a photo showing your shoulders", icon: "upload", route: "/analyze" },
+  { title: "AI Analysis", desc: "Our AI detects body measurements & shape", icon: "zap", route: "/analyze" },
+  { title: "Customize", desc: "Choose neckline, sleeves, back & fabric", icon: "sliders", route: "/(tabs)/profile" },
+  { title: "Share", desc: "Send your fit profile to your tailor", icon: "send", route: "/(tabs)/tailor" },
 ];
 
 const CARD_WIDTH = SCREEN_WIDTH - 48;
@@ -520,4 +528,5 @@ const styles = StyleSheet.create({
     fontSize: 12,
     lineHeight: 18,
   },
+  stepIconRow: { flexDirection: "row", alignItems: "center", gap: 6 },
 });
