@@ -53,11 +53,48 @@ interface StylePrefs {
   fit: string;
 }
 
-const NECKLINES = ["Sweetheart", "Boat Neck", "Deep V", "Halter", "Round", "Square"];
-const SLEEVES = ["Cap", "Puff", "Elbow", "Full", "Sleeveless", "Bell"];
-const BACKS = ["Open Back", "Tie Back", "Closed", "Keyhole", "Backless", "Bow"];
-const FABRICS = ["Silk", "Cotton", "Net", "Velvet", "Georgette", "Brocade"];
+const NECKLINES = ["Sweetheart", "Boat Neck", "Deep V", "Halter", "Square", "Round", "Keyhole", "Off-Shoulder"];
+const SLEEVES = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Bell Sleeve", "Puff Sleeve"];
+const BACKS = ["Deep Back", "Mid Back", "High Back", "Tie Back", "Saree Back", "Mirror Work"];
+const FABRICS = ["Silk", "Cotton", "Georgette", "Chiffon", "Brocade", "Velvet", "Net", "Linen"];
 const FITS = ["Regular", "Slim Fit", "Loose", "Fitted Waist"];
+
+const NECK_IMAGES: Record<string, any> = {
+  "Sweetheart": require("@/assets/images/styles/neck_sweetheart.png"),
+  "Boat Neck": require("@/assets/images/styles/neck_boat.png"),
+  "Deep V": require("@/assets/images/styles/neck_deepv.png"),
+  "Halter": require("@/assets/images/styles/neck_halter.png"),
+  "Square": require("@/assets/images/styles/neck_square.png"),
+  "Round": require("@/assets/images/styles/neck_round.png"),
+  "Keyhole": require("@/assets/images/styles/neck_keyhole.png"),
+  "Off-Shoulder": require("@/assets/images/styles/neck_offshoulder.png"),
+};
+const SLEEVE_IMAGES: Record<string, any> = {
+  "Sleeveless": require("@/assets/images/styles/sleeve_sleeveless.png"),
+  "Cap Sleeve": require("@/assets/images/styles/sleeve_cap.png"),
+  "Elbow Length": require("@/assets/images/styles/sleeve_elbow.png"),
+  "Full Sleeve": require("@/assets/images/styles/sleeve_full.png"),
+  "Bell Sleeve": require("@/assets/images/styles/sleeve_bell.png"),
+  "Puff Sleeve": require("@/assets/images/styles/sleeve_puff.png"),
+};
+const BACK_IMAGES: Record<string, any> = {
+  "Deep Back": require("@/assets/images/styles/back_deep.png"),
+  "Mid Back": require("@/assets/images/styles/back_mid.png"),
+  "High Back": require("@/assets/images/styles/back_high.png"),
+  "Tie Back": require("@/assets/images/styles/back_tie.png"),
+  "Saree Back": require("@/assets/images/styles/back_saree.png"),
+  "Mirror Work": require("@/assets/images/styles/back_mirror.png"),
+};
+const FABRIC_IMAGES: Record<string, any> = {
+  "Silk": require("@/assets/images/styles/fabric_silk.png"),
+  "Cotton": require("@/assets/images/styles/fabric_cotton.png"),
+  "Georgette": require("@/assets/images/styles/fabric_georgette.png"),
+  "Chiffon": require("@/assets/images/styles/fabric_chiffon.png"),
+  "Brocade": require("@/assets/images/styles/fabric_brocade.png"),
+  "Velvet": require("@/assets/images/styles/fabric_velvet.png"),
+  "Net": require("@/assets/images/styles/fabric_net.png"),
+  "Linen": require("@/assets/images/styles/fabric_linen.png"),
+};
 
 function PulsingDot() {
   const scale = useSharedValue(1);
@@ -129,6 +166,60 @@ function MeasurementBadge({ label, value, unit }: { label: string; value?: numbe
   );
 }
 
+function StyleImageCard({
+  label, image, selected, onPress,
+}: { label: string; image: any; selected: boolean; onPress: () => void }) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+  return (
+    <TouchableOpacity
+      onPress={onPress}
+      style={[
+        styles.styleCard,
+        {
+          backgroundColor: selected ? Colors.brand.primary + "12" : theme.card,
+          borderColor: selected ? Colors.brand.primary : theme.border,
+          borderWidth: selected ? 2 : 1,
+        },
+      ]}
+    >
+      <View style={[styles.styleCardImgWrap, selected && { borderColor: Colors.brand.primary, borderWidth: 2 }]}>
+        <Image source={image} style={styles.styleCardImg} resizeMode="cover" />
+        {selected && (
+          <View style={styles.styleCardCheck}>
+            <Feather name="check" size={12} color="#fff" />
+          </View>
+        )}
+      </View>
+      <Text style={[styles.styleCardLabel, { color: selected ? Colors.brand.primary : theme.text }]} numberOfLines={2}>
+        {label}
+      </Text>
+    </TouchableOpacity>
+  );
+}
+
+function StyleImageRow({
+  label, options, images, selected, onSelect, theme,
+}: { label: string; options: string[]; images: Record<string, any>; selected: string; onSelect: (v: string) => void; theme: any }) {
+  return (
+    <View style={{ gap: 10 }}>
+      <Text style={[styles.styleGroupLabel, { color: theme.text }]}>{label}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 4 }}>
+        {options.map((opt) => (
+          <StyleImageCard
+            key={opt}
+            label={opt}
+            image={images[opt]}
+            selected={selected === opt}
+            onPress={() => { Haptics.selectionAsync(); onSelect(opt); }}
+          />
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
 export default function AnalyzeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -145,8 +236,8 @@ export default function AnalyzeScreen() {
   const [analysis, setAnalysis] = useState<AnalysisResult | null>(null);
   const [prefs, setPrefs] = useState<StylePrefs>({
     neckline: "Sweetheart",
-    sleeves: "Cap",
-    back: "Closed",
+    sleeves: "Cap Sleeve",
+    back: "Mid Back",
     fabric: "Silk",
     fit: "Regular",
   });
@@ -441,30 +532,34 @@ export default function AnalyzeScreen() {
             )}
 
             {/* Customization Options */}
-            <CustomizeSection
+            <StyleImageRow
               label="Neckline"
               options={NECKLINES}
+              images={NECK_IMAGES}
               selected={prefs.neckline}
               onSelect={(v) => setPrefs((p) => ({ ...p, neckline: v }))}
               theme={theme}
             />
-            <CustomizeSection
+            <StyleImageRow
               label="Sleeves"
               options={SLEEVES}
+              images={SLEEVE_IMAGES}
               selected={prefs.sleeves}
               onSelect={(v) => setPrefs((p) => ({ ...p, sleeves: v }))}
               theme={theme}
             />
-            <CustomizeSection
+            <StyleImageRow
               label="Back Style"
               options={BACKS}
+              images={BACK_IMAGES}
               selected={prefs.back}
               onSelect={(v) => setPrefs((p) => ({ ...p, back: v }))}
               theme={theme}
             />
-            <CustomizeSection
+            <StyleImageRow
               label="Fabric"
               options={FABRICS}
+              images={FABRIC_IMAGES}
               selected={prefs.fabric}
               onSelect={(v) => setPrefs((p) => ({ ...p, fabric: v }))}
               theme={theme}
@@ -817,6 +912,12 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_500Medium",
     fontSize: 13,
   },
+  styleGroupLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  styleCard: { width: 100, borderRadius: 14, padding: 8, alignItems: "center", gap: 8 },
+  styleCardImgWrap: { width: 80, height: 80, borderRadius: 12, overflow: "hidden", position: "relative" },
+  styleCardImg: { width: "100%", height: "100%" },
+  styleCardCheck: { position: "absolute", top: 4, right: 4, width: 20, height: 20, borderRadius: 10, backgroundColor: Colors.brand.primary, alignItems: "center", justifyContent: "center" },
+  styleCardLabel: { fontFamily: "Inter_500Medium", fontSize: 11, textAlign: "center", lineHeight: 14 },
   customizeSection: { gap: 10 },
   customizeLabel: {
     fontFamily: "Inter_600SemiBold",

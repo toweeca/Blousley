@@ -2234,10 +2234,10 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
 // My Blouse Design Tab
 // ────────────────────────────────────────────────────────────────────────────
 
-const D_NECK = ["Sweetheart", "Boat Neck", "Deep V", "Round", "Halter", "Square"];
-const D_SLEEVE = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Puff Sleeve"];
-const D_BACK = ["Hook", "Tie Back", "Mid Back", "High Back", "Deep Back", "Open Back"];
-const D_FABRIC = ["Silk", "Georgette", "Chiffon", "Cotton", "Velvet", "Brocade", "Net", "Linen"];
+const D_NECK = ["Sweetheart", "Boat Neck", "Deep V", "Halter", "Square", "Round", "Keyhole", "Off-Shoulder"];
+const D_SLEEVE = ["Sleeveless", "Cap Sleeve", "Elbow Length", "Full Sleeve", "Bell Sleeve", "Puff Sleeve"];
+const D_BACK = ["Deep Back", "Mid Back", "High Back", "Tie Back", "Saree Back", "Mirror Work"];
+const D_FABRIC = ["Silk", "Cotton", "Georgette", "Chiffon", "Brocade", "Velvet", "Net", "Linen"];
 
 function ChipRow({ label, options, value, onSelect, color, theme }: {
   label: string; options: string[]; value: string;
@@ -2699,10 +2699,10 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       {/* ── STEP 1: STYLES ──────────────────────────────────────── */}
       {step === 1 && (
         <Animated.View entering={FadeInDown.springify()} style={{ gap: 18 }}>
-          <ChipRow label="Neckline" options={D_NECK} value={neckline} onSelect={setNeckline} color={Colors.brand.primary} theme={theme} />
-          <ChipRow label="Sleeve Style" options={D_SLEEVE} value={sleeve} onSelect={setSleeve} color="#2471A3" theme={theme} />
-          <ChipRow label="Back Design" options={D_BACK} value={back} onSelect={setBack} color="#8E44AD" theme={theme} />
-          <ChipRow label="Fabric Type" options={D_FABRIC} value={fabric} onSelect={setFabric} color="#C9A96E" theme={theme} />
+          <StyleRow label="Neckline" options={D_NECK} images={NECK_IMAGES} selected={neckline} onSelect={(v) => { setNeckline(v || neckline); Haptics.selectionAsync(); }} theme={theme} />
+          <StyleRow label="Sleeve Style" options={D_SLEEVE} images={SLEEVE_IMAGES} selected={sleeve} onSelect={(v) => { setSleeve(v || sleeve); Haptics.selectionAsync(); }} theme={theme} />
+          <StyleRow label="Back Design" options={D_BACK} images={BACK_IMAGES} selected={back} onSelect={(v) => { setBack(v || back); Haptics.selectionAsync(); }} theme={theme} />
+          <StyleRow label="Fabric Type" options={D_FABRIC} images={FABRIC_IMAGES} selected={fabric} onSelect={(v) => { setFabric(v || fabric); Haptics.selectionAsync(); }} theme={theme} />
 
           <View style={{ gap: 8 }}>
             <Text style={{ fontFamily: "Inter_600SemiBold", fontSize: 13, color: theme.textSecondary }}>Fabric / Main Color</Text>
