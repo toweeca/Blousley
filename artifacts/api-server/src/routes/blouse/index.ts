@@ -115,17 +115,22 @@ router.post("/fits", async (req, res) => {
     const body = req.body as {
       userId: string;
       imageUrl?: string;
+      imageBase64?: string;
       measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number };
       bodyShape?: string;
       stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string };
       aiAnalysis?: string;
     };
 
+    const imageUrl = body.imageBase64
+      ? `data:image/jpeg;base64,${body.imageBase64}`
+      : (body.imageUrl ?? null);
+
     const [fit] = await db
       .insert(blouseFitsTable)
       .values({
         userId: body.userId,
-        imageUrl: body.imageUrl ?? null,
+        imageUrl,
         measurements: body.measurements ?? null,
         bodyShape: body.bodyShape ?? null,
         stylePrefs: body.stylePrefs ?? null,

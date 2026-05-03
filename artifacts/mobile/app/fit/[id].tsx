@@ -12,6 +12,7 @@ import {
   Platform,
   Share,
   ActivityIndicator,
+  Image,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -135,27 +136,46 @@ export default function FitDetailScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ paddingBottom: 60 + bottomPad, padding: 20, gap: 16 }}
+        contentContainerStyle={{ paddingBottom: 60 + bottomPad, gap: 16, paddingHorizontal: 20 }}
       >
+        {/* ── Photo banner ── */}
+        {!!fit.imageUrl && (
+          <Animated.View entering={FadeInDown.delay(60).springify()} style={[styles.photoBannerWrap, { marginHorizontal: -20 }]}>
+            <Image source={{ uri: fit.imageUrl }} style={styles.photoBanner} resizeMode="cover" />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.6)"]}
+              style={styles.photoBannerGradient}
+            />
+            <View style={styles.photoBannerOverlay}>
+              <Text style={styles.photoBannerShape}>
+                {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
+              </Text>
+              <Text style={styles.photoBannerDate}>{date}</Text>
+            </View>
+          </Animated.View>
+        )}
+
         {/* Body Shape Card */}
         <Animated.View
           entering={FadeInDown.delay(100).springify()}
           style={[styles.shapeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
         >
-          <View style={styles.shapeRow}>
-            <View style={[styles.shapeIconCircle, { backgroundColor: Colors.brand.primary + "15" }]}>
-              <MaterialCommunityIcons name="human-female" size={36} color={Colors.brand.primary} />
+          {!fit.imageUrl && (
+            <View style={styles.shapeRow}>
+              <View style={[styles.shapeIconCircle, { backgroundColor: Colors.brand.primary + "15" }]}>
+                <MaterialCommunityIcons name="human-female" size={36} color={Colors.brand.primary} />
+              </View>
+              <View style={styles.shapeInfo}>
+                <Text style={[styles.shapeLabel, { color: theme.textSecondary }]}>Body Shape</Text>
+                <Text style={[styles.shapeValue, { color: theme.text }]}>
+                  {fit.bodyShape
+                    ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1)
+                    : "Unknown"}
+                </Text>
+                <Text style={[styles.shapeDate, { color: theme.textMuted }]}>{date}</Text>
+              </View>
             </View>
-            <View style={styles.shapeInfo}>
-              <Text style={[styles.shapeLabel, { color: theme.textSecondary }]}>Body Shape</Text>
-              <Text style={[styles.shapeValue, { color: theme.text }]}>
-                {fit.bodyShape
-                  ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1)
-                  : "Unknown"}
-              </Text>
-              <Text style={[styles.shapeDate, { color: theme.textMuted }]}>{date}</Text>
-            </View>
-          </View>
+          )}
 
           {fit.measurements && (
             <View style={styles.measRow}>
@@ -236,6 +256,40 @@ export default function FitDetailScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1 },
   centered: { alignItems: "center", justifyContent: "center" },
+  // ── Photo banner ──────────────────────────────────────────────────────────
+  photoBannerWrap: {
+    width: "100%",
+    height: 260,
+    position: "relative",
+  },
+  photoBanner: {
+    width: "100%",
+    height: "100%",
+  },
+  photoBannerGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  photoBannerOverlay: {
+    position: "absolute",
+    bottom: 16,
+    left: 20,
+    gap: 4,
+  },
+  photoBannerShape: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: "#fff",
+    textTransform: "capitalize",
+  },
+  photoBannerDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.8)",
+  },
   notFoundText: { fontFamily: "Inter_400Regular", fontSize: 16 },
   topBar: {
     flexDirection: "row",

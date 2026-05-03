@@ -322,7 +322,7 @@ export default function AnalyzeScreen() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user?.id ?? "guest",
-          imageUrl: imageUri,
+          imageBase64: imageBase64 ?? null,
           measurements: analysis.measurements,
           bodyShape: analysis.bodyShape,
           stylePrefs: prefs,

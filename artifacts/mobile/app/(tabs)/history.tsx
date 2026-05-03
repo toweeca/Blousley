@@ -12,6 +12,7 @@ import {
   Platform,
   RefreshControl,
   Alert,
+  Image,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -42,32 +43,79 @@ function FitCard({ fit, onDelete, delay }: { fit: BlouseFit; onDelete: () => voi
     month: "short",
     year: "numeric",
   });
+  const hasImage = !!fit.imageUrl;
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).springify()}>
       <TouchableOpacity
         style={[styles.fitCard, { backgroundColor: theme.card, borderColor: theme.border }]}
         onPress={() => router.push({ pathname: "/fit/[id]", params: { id: fit.id } })}
-        activeOpacity={0.8}
+        activeOpacity={0.85}
         testID={`fit-card-${fit.id}`}
       >
-        <View style={styles.fitCardLeft}>
-          <View style={[styles.fitIcon, { backgroundColor: Colors.brand.primary + "15" }]}>
-            <MaterialCommunityIcons name="human-female" size={28} color={Colors.brand.primary} />
+        {/* ── Photo / placeholder banner ── */}
+        {hasImage ? (
+          <View style={styles.fitImageWrap}>
+            <Image source={{ uri: fit.imageUrl! }} style={styles.fitImage} resizeMode="cover" />
+            <LinearGradient
+              colors={["transparent", "rgba(0,0,0,0.55)"]}
+              style={styles.fitImageGradient}
+            />
+            <View style={styles.fitImageOverlay}>
+              <View style={[styles.fitShapeBadge, { backgroundColor: Colors.brand.primary }]}>
+                <MaterialCommunityIcons name="human-female" size={12} color="#fff" />
+                <Text style={styles.fitShapeBadgeText}>
+                  {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
+                </Text>
+              </View>
+              <Text style={styles.fitImageDate}>{date}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert("Delete Fit", "Remove this fit from your history?", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: onDelete },
+                ]);
+              }}
+              style={styles.deleteBtnFloat}
+              hitSlop={{ top: 8, right: 8, bottom: 8, left: 8 }}
+            >
+              <Feather name="trash-2" size={15} color="#fff" />
+            </TouchableOpacity>
           </View>
-        </View>
-        <View style={styles.fitCardContent}>
-          <View style={styles.fitCardHeader}>
-            <Text style={[styles.fitCardShape, { color: theme.text }]}>
-              {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
-            </Text>
-            <Text style={[styles.fitCardDate, { color: theme.textMuted }]}>{date}</Text>
+        ) : (
+          <View style={[styles.fitNoImageBanner, { backgroundColor: Colors.brand.primary + "10", borderBottomColor: theme.border }]}>
+            <View style={[styles.fitIcon, { backgroundColor: Colors.brand.primary + "15" }]}>
+              <MaterialCommunityIcons name="human-female" size={28} color={Colors.brand.primary} />
+            </View>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.fitCardShape, { color: theme.text }]}>
+                {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
+              </Text>
+              <Text style={[styles.fitCardDate, { color: theme.textMuted }]}>{date}</Text>
+            </View>
+            <TouchableOpacity
+              onPress={() => {
+                Alert.alert("Delete Fit", "Remove this fit from your history?", [
+                  { text: "Cancel", style: "cancel" },
+                  { text: "Delete", style: "destructive", onPress: onDelete },
+                ]);
+              }}
+              style={styles.deleteBtn}
+            >
+              <Feather name="trash-2" size={16} color={Colors.brand.primary + "80"} />
+            </TouchableOpacity>
           </View>
+        )}
 
+        {/* ── Details section ── */}
+        <View style={styles.fitCardBody}>
+          {/* Style preference tags */}
           {fit.stylePrefs && (
             <View style={styles.fitTags}>
               {fit.stylePrefs.neckline && (
                 <View style={[styles.fitTag, { backgroundColor: Colors.brand.primary + "15" }]}>
+                  <Feather name="circle" size={9} color={Colors.brand.primary} />
                   <Text style={[styles.fitTagText, { color: Colors.brand.primary }]}>
                     {fit.stylePrefs.neckline}
                   </Text>
@@ -76,47 +124,56 @@ function FitCard({ fit, onDelete, delay }: { fit: BlouseFit; onDelete: () => voi
               {fit.stylePrefs.sleeves && (
                 <View style={[styles.fitTag, { backgroundColor: Colors.brand.gold + "20" }]}>
                   <Text style={[styles.fitTagText, { color: Colors.brand.goldDark }]}>
-                    {fit.stylePrefs.sleeves} sleeves
+                    {fit.stylePrefs.sleeves}
                   </Text>
                 </View>
               )}
               {fit.stylePrefs.fabric && (
-                <View style={[styles.fitTag, { backgroundColor: Colors.dark.backgroundTertiary + "30" }]}>
+                <View style={[styles.fitTag, { backgroundColor: theme.backgroundSecondary }]}>
                   <Text style={[styles.fitTagText, { color: theme.textSecondary }]}>
                     {fit.stylePrefs.fabric}
                   </Text>
                 </View>
               )}
+              {fit.stylePrefs.back && (
+                <View style={[styles.fitTag, { backgroundColor: theme.backgroundSecondary }]}>
+                  <Text style={[styles.fitTagText, { color: theme.textSecondary }]}>
+                    {fit.stylePrefs.back}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
 
+          {/* Measurements row */}
           {fit.measurements && (
-            <Text style={[styles.fitMeasure, { color: theme.textMuted }]}>
-              B: {fit.measurements.bust ?? "—"} · W: {fit.measurements.waist ?? "—"} · S: {fit.measurements.shoulder ?? "—"}cm
-            </Text>
+            <View style={styles.measRow}>
+              {[
+                { label: "Bust", val: fit.measurements.bust },
+                { label: "Waist", val: fit.measurements.waist },
+                { label: "Shoulder", val: fit.measurements.shoulder },
+                { label: "Hip", val: fit.measurements.hip },
+              ].map(({ label, val }) => (
+                <View key={label} style={styles.measItem}>
+                  <Text style={[styles.measVal, { color: Colors.brand.primary }]}>
+                    {val ?? "—"}{val ? "cm" : ""}
+                  </Text>
+                  <Text style={[styles.measLabel, { color: theme.textMuted }]}>{label}</Text>
+                </View>
+              ))}
+            </View>
           )}
 
+          {/* Tailor note */}
           {fit.notes && (
             <View style={[styles.noteRow, { borderTopColor: theme.border }]}>
               <Feather name="scissors" size={12} color={Colors.brand.gold} />
-              <Text style={[styles.noteText, { color: theme.textSecondary }]} numberOfLines={1}>
+              <Text style={[styles.noteText, { color: theme.textSecondary }]} numberOfLines={2}>
                 {fit.notes}
               </Text>
             </View>
           )}
         </View>
-
-        <TouchableOpacity
-          onPress={() => {
-            Alert.alert("Delete Fit", "Remove this fit from your history?", [
-              { text: "Cancel", style: "cancel" },
-              { text: "Delete", style: "destructive", onPress: onDelete },
-            ]);
-          }}
-          style={styles.deleteBtn}
-        >
-          <Feather name="trash-2" size={16} color={Colors.brand.primary + "80"} />
-        </TouchableOpacity>
       </TouchableOpacity>
     </Animated.View>
   );
@@ -238,28 +295,82 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "rgba(255,255,255,0.75)",
   },
-  list: { padding: 20, gap: 12 },
+  list: { padding: 20, gap: 14 },
   fitCard: {
     borderRadius: 20,
     borderWidth: 1,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "flex-start",
-    gap: 12,
+    overflow: "hidden",
   },
-  fitCardLeft: {},
-  fitIcon: {
-    width: 52,
-    height: 52,
-    borderRadius: 26,
+  // ── Image banner (when photo saved) ────────────────────────────────────────
+  fitImageWrap: {
+    width: "100%",
+    height: 210,
+    position: "relative",
+  },
+  fitImage: {
+    width: "100%",
+    height: "100%",
+  },
+  fitImageGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
+  },
+  fitImageOverlay: {
+    position: "absolute",
+    bottom: 12,
+    left: 14,
+    right: 44,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  fitShapeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+  },
+  fitShapeBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    color: "#fff",
+    textTransform: "capitalize",
+  },
+  fitImageDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    color: "rgba(255,255,255,0.85)",
+  },
+  deleteBtnFloat: {
+    position: "absolute",
+    top: 10,
+    right: 10,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(0,0,0,0.4)",
     alignItems: "center",
     justifyContent: "center",
   },
-  fitCardContent: { flex: 1, gap: 8 },
-  fitCardHeader: {
+  // ── No-image banner (placeholder) ──────────────────────────────────────────
+  fitNoImageBanner: {
     flexDirection: "row",
-    justifyContent: "space-between",
     alignItems: "center",
+    gap: 12,
+    padding: 14,
+    borderBottomWidth: 1,
+  },
+  fitIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: "center",
+    justifyContent: "center",
   },
   fitCardShape: {
     fontFamily: "Inter_600SemiBold",
@@ -269,37 +380,56 @@ const styles = StyleSheet.create({
   fitCardDate: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
+    marginTop: 2,
+  },
+  deleteBtn: { padding: 6 },
+  // ── Details body ────────────────────────────────────────────────────────────
+  fitCardBody: {
+    padding: 14,
+    gap: 10,
   },
   fitTags: { flexDirection: "row", flexWrap: "wrap", gap: 6 },
   fitTag: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
     paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
+    paddingVertical: 5,
+    borderRadius: 10,
   },
   fitTagText: {
     fontFamily: "Inter_500Medium",
     fontSize: 11,
   },
-  fitMeasure: {
+  measRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+  },
+  measItem: {
+    alignItems: "center",
+    gap: 2,
+  },
+  measVal: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+  },
+  measLabel: {
     fontFamily: "Inter_400Regular",
-    fontSize: 12,
-    letterSpacing: 0.3,
+    fontSize: 10,
   },
   noteRow: {
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
     paddingTop: 8,
-    marginTop: 4,
+    marginTop: 2,
     borderTopWidth: 1,
   },
   noteText: {
     fontFamily: "Inter_400Regular",
     fontSize: 12,
     flex: 1,
-  },
-  deleteBtn: {
-    padding: 4,
+    lineHeight: 18,
   },
   emptyState: {
     alignItems: "center",
