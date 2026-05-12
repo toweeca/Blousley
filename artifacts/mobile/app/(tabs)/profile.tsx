@@ -529,12 +529,6 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [notes, setNotes] = useState("");
   const [initialized, setInitialized] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
-  const [aiGenerating, setAiGenerating] = useState(false);
-  const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
-  const [aiPreviewBackUri, setAiPreviewBackUri] = useState<string | null>(null);
-  const [dlFrontUri, setDlFrontUri] = useState<string | null>(null);
-  const [dlBackUri, setDlBackUri] = useState<string | null>(null);
-  const [dlLoading, setDlLoading] = useState(false);
   const [savingToFits, setSavingToFits] = useState(false);
   const [borderPattern, setBorderPattern] = useState("None");
   const [borderPatternCustomUri, setBorderPatternCustomUri] = useState<string | null>(null);
@@ -551,51 +545,17 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     }
   }, [prefs, initialized]);
 
-  // Reset cached downloads when styles change (preview will regenerate via effect)
+  // Hide preview when selections change so user must re-trigger it
   const handleStyleChange = (setter: (v: string) => void, value: string) => {
     setter(value);
-    setAiPreviewUri(null);
-    setAiPreviewBackUri(null);
-    setDlFrontUri(null);
-    setDlBackUri(null);
+    setShowPreview(false);
   };
 
   const allSelected = !!(neck && sleeve && back && fabric);
 
-  const generateAIPreview = async () => {
+  const generateAIPreview = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-    setAiGenerating(true);
     setShowPreview(true);
-    setAiPreviewUri(null);
-    setAiPreviewBackUri(null);
-    try {
-      const pattern = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
-      const payload = { neck, sleeve, back, fabric, color: fabricColor, borderPattern: pattern };
-
-      // Fetch front first — show it as soon as it arrives
-      const frontRes = await fetch(`${domain}/api/generate-blouse-image/style`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, view: "front" }),
-      });
-      const fData = await frontRes.json();
-      setAiPreviewUri(`data:${fData.mimeType};base64,${fData.b64_json}`);
-      setAiGenerating(false);
-
-      // Fetch back view in background — fills in when ready, no spinner
-      fetch(`${domain}/api/generate-blouse-image/style`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ ...payload, view: "back" }),
-      })
-        .then((r) => r.json())
-        .then((bData) => setAiPreviewBackUri(`data:${bData.mimeType};base64,${bData.b64_json}`))
-        .catch(() => {/* back view unavailable — front is shown, silently skip */});
-    } catch (err) {
-      console.error("generateAIPreview error:", err);
-      Alert.alert("Preview failed", "Could not generate the preview. Please try again.");
-      setAiGenerating(false);
-    }
   };
 
   const handleUploadCustomPattern = async () => {
@@ -647,34 +607,8 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     onError: () => Alert.alert("Error", "Could not save preferences."),
   });
 
-  // Download: fetch SVG from API only when the user explicitly requests it
-  const downloadDesign = async (view: "front" | "back") => {
-    const cached = view === "front" ? dlFrontUri : dlBackUri;
-    if (cached) { saveImageUtil(cached, `styles-${view}`); return; }
-    setDlLoading(true);
-    try {
-      const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, view }),
-      });
-      if (!res.ok) throw new Error("Failed");
-      const data = await res.json();
-      if (data.b64_json) {
-        const uri = `data:${data.mimeType ?? "image/svg+xml"};base64,${data.b64_json}`;
-        if (view === "front") setDlFrontUri(uri);
-        else setDlBackUri(uri);
-        saveImageUtil(uri, `styles-${view}`);
-      }
-    } catch {
-      Alert.alert("Download failed", "Could not generate the design file. Please try again.");
-    } finally {
-      setDlLoading(false);
-    }
-  };
-
   const saveToFits = async () => {
-    if (!aiPreviewUri) return;
+    if (!showPreview) return;
     setSavingToFits(true);
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     try {
@@ -683,15 +617,14 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          imageUrl: aiPreviewUri,
           stylePrefs: { neckline: neck, sleeves: sleeve, back, fabric },
-          aiAnalysis: `AI style preview — ${[neck, sleeve, back, fabric].filter(Boolean).join(", ")}`,
+          aiAnalysis: `Style selection — ${[neck, sleeve, back, fabric].filter(Boolean).join(", ")}`,
         }),
       });
       if (!res.ok) throw new Error("Save failed");
       await qc.invalidateQueries({ queryKey: ["blouse-fits"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Saved to My Fits!", "Your AI preview has been saved.", [
+      Alert.alert("Saved to My Fits!", "Your style selection has been saved.", [
         { text: "View My Fits", onPress: () => router.push("/(tabs)/history" as any) },
         { text: "Done" },
       ]);
@@ -817,21 +750,15 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
                 borderColor: Colors.brand.gold,
                 borderWidth: 1.5,
                 backgroundColor: "#1A0A12",
-                opacity: aiGenerating ? 0.7 : 1,
                 paddingVertical: 14,
               },
             ]}
             onPress={generateAIPreview}
-            disabled={aiGenerating}
             activeOpacity={0.8}
           >
-            {aiGenerating ? (
-              <ActivityIndicator size="small" color={Colors.brand.gold} />
-            ) : (
-              <Text style={{ fontSize: 18, color: Colors.brand.gold }}>✦</Text>
-            )}
+            <Text style={{ fontSize: 18, color: Colors.brand.gold }}>✦</Text>
             <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold, fontSize: 15, fontFamily: "Inter_600SemiBold" }]}>
-              {aiGenerating ? "Generating AI Preview…" : "AI Preview from Selections"}
+              Preview Selections
             </Text>
           </TouchableOpacity>
         ) : (
@@ -847,71 +774,42 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       {showPreview && (
         <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
           <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
-            {aiGenerating || (!aiPreviewUri && !aiPreviewBackUri) ? (
-              <View style={styles.aiPreviewPlaceholder}>
-                <ActivityIndicator size="large" color={Colors.brand.gold} />
-                <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
-                  Generating AI preview…
-                </Text>
-              </View>
-            ) : (
-              <BlouseFlatViewer
-                frontUri={aiPreviewUri ?? ""}
-                backUri={aiPreviewBackUri ?? ""}
-                width={SCREEN_WIDTH - 48}
-                height={SCREEN_WIDTH - 48}
-              />
-            )}
+            {/* ── 2×2 grid of selected style images ── */}
+            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2, borderRadius: 12, overflow: "hidden" }}>
+              {[
+                { label: "Neckline", key: neck, src: NECK_IMAGES[neck] },
+                { label: "Sleeve", key: sleeve, src: SLEEVE_IMAGES[sleeve] },
+                { label: "Back", key: back, src: BACK_IMAGES[back] },
+                { label: "Fabric", key: fabric, src: FABRIC_IMAGES[fabric] },
+              ].map(({ label, key, src }) => (
+                <View
+                  key={label}
+                  style={{ width: (SCREEN_WIDTH - 52) / 2, height: (SCREEN_WIDTH - 52) / 2, backgroundColor: theme.backgroundSecondary, position: "relative" }}
+                >
+                  {src ? (
+                    <Image source={src} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                  ) : (
+                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
+                      <MaterialCommunityIcons name="hanger" size={32} color={theme.border} />
+                    </View>
+                  )}
+                  <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.45)", paddingVertical: 5, paddingHorizontal: 8 }}>
+                    <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular" }}>{label}</Text>
+                    <Text style={{ fontSize: 12, color: "#fff", fontFamily: "Inter_600SemiBold" }} numberOfLines={1}>{key || "—"}</Text>
+                  </View>
+                </View>
+              ))}
+            </View>
+
             <View style={styles.aiPreviewFooter}>
               <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
                 ✦ {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
               </Text>
-              <TouchableOpacity onPress={() => { setShowPreview(false); setAiPreviewUri(null); setAiPreviewBackUri(null); }}>
+              <TouchableOpacity onPress={() => setShowPreview(false)}>
                 <Feather name="x" size={16} color={Colors.brand.gold} />
               </TouchableOpacity>
             </View>
-            <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 12 }}>
-              <TouchableOpacity
-                style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60", opacity: dlLoading ? 0.6 : 1 }]}
-                onPress={() => downloadDesign("front")}
-                disabled={dlLoading}
-              >
-                {dlLoading ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="download" size={13} color={Colors.brand.primary} />}
-                <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Front</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60", opacity: dlLoading ? 0.6 : 1 }]}
-                onPress={() => downloadDesign("back")}
-                disabled={dlLoading}
-              >
-                {dlLoading ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="download" size={13} color={Colors.brand.primary} />}
-                <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Back</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[styles.dlBtn, { borderColor: Colors.brand.gold + "60", flex: 1.5, opacity: dlLoading ? 0.6 : 1 }]}
-                onPress={async () => {
-                  if (dlFrontUri) { shareImageUtil(dlFrontUri); return; }
-                  setDlLoading(true);
-                  try {
-                    const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
-                      method: "POST", headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({ neck, sleeve, back, fabric, view: "front" }),
-                    });
-                    const data = await res.json();
-                    if (data.b64_json) {
-                      const uri = `data:${data.mimeType ?? "image/svg+xml"};base64,${data.b64_json}`;
-                      setDlFrontUri(uri);
-                      shareImageUtil(uri);
-                    }
-                  } catch { Alert.alert("Error", "Could not generate file."); }
-                  finally { setDlLoading(false); }
-                }}
-                disabled={dlLoading}
-              >
-                <Feather name="share-2" size={13} color={Colors.brand.gold} />
-                <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share</Text>
-              </TouchableOpacity>
-            </View>
+
             {/* Save to My Fits */}
             <TouchableOpacity
               style={[
@@ -919,7 +817,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
                 { backgroundColor: Colors.brand.primary, opacity: savingToFits ? 0.7 : 1 },
               ]}
               onPress={saveToFits}
-              disabled={savingToFits || !aiPreviewUri}
+              disabled={savingToFits}
               testID="save-to-fits-button"
             >
               {savingToFits ? (
