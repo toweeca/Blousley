@@ -536,6 +536,8 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const [notes, setNotes] = useState("");
   const [initialized, setInitialized] = useState(false);
   const [showPreview, setShowPreview] = useState(false);
+  const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
+  const [aiPreviewGenerating, setAiPreviewGenerating] = useState(false);
   const [savingToFits, setSavingToFits] = useState(false);
   const [borderPattern, setBorderPattern] = useState("None");
   const [borderPatternCustomUri, setBorderPatternCustomUri] = useState<string | null>(null);
@@ -556,13 +558,34 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
   const handleStyleChange = (setter: (v: string) => void, value: string) => {
     setter(value);
     setShowPreview(false);
+    setAiPreviewUri(null);
   };
 
   const allSelected = !!(neck && sleeve && back && fabric);
 
-  const generateAIPreview = () => {
+  const generateAIPreview = async () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setShowPreview(true);
+    setAiPreviewUri(null);
+    setAiPreviewGenerating(true);
+    try {
+      const bp = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
+      const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: bp, view: "front" }),
+      });
+      if (!res.ok) throw new Error("Generation failed");
+      const data = await res.json();
+      if (data.b64_json) {
+        setAiPreviewUri(`data:${data.mimeType ?? "image/png"};base64,${data.b64_json}`);
+      }
+    } catch {
+      Alert.alert("Preview failed", "Could not generate AI preview. Please try again.");
+      setShowPreview(false);
+    } finally {
+      setAiPreviewGenerating(false);
+    }
   };
 
   const handleUploadCustomPattern = async () => {
@@ -622,6 +645,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
+          imageUrl: aiPreviewUri ?? undefined,
           stylePrefs: { neckline: neck, sleeves: sleeve, back, fabric },
           aiAnalysis: `Style selection — ${[neck, sleeve, back, fabric].filter(Boolean).join(", ")}`,
         }),
@@ -779,41 +803,53 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       {showPreview && (
         <Animated.View entering={FadeInDown.springify()} style={{ gap: 12 }}>
           <View style={[styles.aiPreviewCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
-            {/* ── 2×2 grid of selected style images ── */}
-            <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 2, borderRadius: 12, overflow: "hidden" }}>
-              {[
-                { label: "Neckline", key: neck, src: NECK_IMAGES[neck] },
-                { label: "Sleeve", key: sleeve, src: SLEEVE_IMAGES[sleeve] },
-                { label: "Back", key: back, src: BACK_IMAGES[back] },
-                { label: "Fabric", key: fabric, src: FABRIC_IMAGES[fabric] },
-              ].map(({ label, key, src }) => (
-                <View
-                  key={label}
-                  style={{ width: (SCREEN_WIDTH - 52) / 2, height: (SCREEN_WIDTH - 52) / 2, backgroundColor: theme.backgroundSecondary, position: "relative" }}
-                >
-                  {src ? (
-                    <Image source={src} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
-                  ) : (
-                    <View style={{ flex: 1, alignItems: "center", justifyContent: "center" }}>
-                      <MaterialCommunityIcons name="hanger" size={32} color={theme.border} />
-                    </View>
-                  )}
-                  <View style={{ position: "absolute", bottom: 0, left: 0, right: 0, backgroundColor: "rgba(0,0,0,0.45)", paddingVertical: 5, paddingHorizontal: 8 }}>
-                    <Text style={{ fontSize: 10, color: "rgba(255,255,255,0.65)", fontFamily: "Inter_400Regular" }}>{label}</Text>
-                    <Text style={{ fontSize: 12, color: "#fff", fontFamily: "Inter_600SemiBold" }} numberOfLines={1}>{key || "—"}</Text>
-                  </View>
-                </View>
-              ))}
-            </View>
+
+            {/* ── AI-generated image or loading state ── */}
+            {aiPreviewGenerating ? (
+              <View style={[styles.aiPreviewPlaceholder, { minHeight: SCREEN_WIDTH - 52 }]}>
+                <ActivityIndicator color={Colors.brand.gold} size="large" />
+                <Text style={[styles.aiPreviewLoadingText, { color: theme.textSecondary }]}>
+                  Generating your blouse preview…{"\n"}AI is creating your design
+                </Text>
+              </View>
+            ) : aiPreviewUri ? (
+              <View style={{ borderRadius: 12, overflow: "hidden" }}>
+                <Image
+                  source={{ uri: aiPreviewUri }}
+                  style={{ width: SCREEN_WIDTH - 52, height: SCREEN_WIDTH - 52 }}
+                  resizeMode="cover"
+                />
+              </View>
+            ) : null}
 
             <View style={styles.aiPreviewFooter}>
               <Text style={[styles.aiPreviewLabel, { color: theme.textSecondary }]}>
                 ✦ {[neck, sleeve, back, fabric].filter(Boolean).join(" · ") || "select styles above"}
               </Text>
-              <TouchableOpacity onPress={() => setShowPreview(false)}>
+              <TouchableOpacity onPress={() => { setShowPreview(false); setAiPreviewUri(null); }}>
                 <Feather name="x" size={16} color={Colors.brand.gold} />
               </TouchableOpacity>
             </View>
+
+            {/* Download / share buttons — only when image is ready */}
+            {aiPreviewUri && (
+              <View style={{ flexDirection: "row", gap: 8, paddingHorizontal: 12, paddingBottom: 4 }}>
+                <TouchableOpacity
+                  style={[styles.dlBtn, { borderColor: Colors.brand.primary + "60" }]}
+                  onPress={() => saveImageUtil(aiPreviewUri, "styles-preview")}
+                >
+                  <Feather name="download" size={13} color={Colors.brand.primary} />
+                  <Text style={[styles.dlBtnText, { color: Colors.brand.primary }]}>Save</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.dlBtn, { borderColor: Colors.brand.gold + "60", flex: 1.5 }]}
+                  onPress={() => shareImageUtil(aiPreviewUri)}
+                >
+                  <Feather name="share-2" size={13} color={Colors.brand.gold} />
+                  <Text style={[styles.dlBtnText, { color: Colors.brand.gold }]}>Share Design</Text>
+                </TouchableOpacity>
+              </View>
+            )}
 
             {/* Save to My Fits */}
             <TouchableOpacity
