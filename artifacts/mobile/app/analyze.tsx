@@ -147,7 +147,7 @@ function OptionChip({
         <Text
           style={[
             styles.chipText,
-            { color: selected ? "#fff" : Colors.brand.textMuted },
+            { color: selected ? "#fff" : "#8A6070" },
           ]}
         >
           {label}
@@ -778,11 +778,7 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingVertical: 14,
     borderRadius: 14,
-    shadowColor: Colors.brand.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
+    ...Platform.select({ web: { boxShadow: "0px 4px 8px rgba(139,34,82,0.3)" }, default: { shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 } }),
   },
   analyzeBtnText: {
     fontFamily: "Inter_600SemiBold",
@@ -968,11 +964,7 @@ const styles = StyleSheet.create({
     gap: 10,
     paddingVertical: 16,
     borderRadius: 16,
-    shadowColor: Colors.brand.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({ web: { boxShadow: "0px 6px 12px rgba(139,34,82,0.35)" }, default: { shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 6 }, shadowOpacity: 0.35, shadowRadius: 12, elevation: 8 } }),
   },
   saveBtnText: {
     fontFamily: "Inter_700Bold",

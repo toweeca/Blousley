@@ -439,11 +439,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     paddingHorizontal: 32,
     gap: 10,
-    shadowColor: Colors.brand.gold,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 12,
-    elevation: 8,
+    ...Platform.select({ web: { boxShadow: "0px 4px 12px rgba(155,122,62,0.4)" }, default: { shadowColor: Colors.brand.gold, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.4, shadowRadius: 12, elevation: 8 } }),
   },
   analyzeButtonText: {
     fontFamily: "Inter_700Bold",

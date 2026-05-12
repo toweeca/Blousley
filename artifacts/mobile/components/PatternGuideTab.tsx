@@ -90,7 +90,7 @@ function SeamAllowanceIcon() {
       <Rect x={4} y={8} width={36} height={28} rx={2} fill="#F5EDEA" stroke="#1E1E1E" strokeWidth={2} />
       <Line x1={4} y1={20} x2={40} y2={20} stroke="#B22222" strokeWidth={1.5} strokeDasharray="4,2" />
       {[8,14,20,26,32,38].map((x) => (
-        <Line key={x} x1={x} y1={20} x2={x + 3} y2={28} stroke="#B22222" strokeWidth={1} key={x} />
+        <Line key={x} x1={x} y1={20} x2={x + 3} y2={28} stroke="#B22222" strokeWidth={1} />
       ))}
     </Svg>
   );

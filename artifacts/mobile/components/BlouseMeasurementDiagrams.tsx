@@ -13,7 +13,7 @@
  */
 
 import React from "react";
-import { View, Text, ScrollView, StyleSheet } from "react-native";
+import { View, Text, ScrollView, StyleSheet, Platform } from "react-native";
 import Svg, { Path, Circle, Line, G, Ellipse, Polygon, Rect } from "react-native-svg";
 
 // ── Palette ──────────────────────────────────────────────────────────────────
@@ -435,11 +435,7 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: "center",
     width: CARD_W + 28,
-    shadowColor: "#000",
-    shadowOpacity: 0.07,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 2,
+    ...Platform.select({ web: { boxShadow: "0px 2px 8px rgba(0,0,0,0.07)" }, default: { shadowColor: "#000", shadowOpacity: 0.07, shadowRadius: 8, shadowOffset: { width: 0, height: 2 }, elevation: 2 } }),
   },
   cardTitle: {
     fontFamily: "Inter_700Bold",

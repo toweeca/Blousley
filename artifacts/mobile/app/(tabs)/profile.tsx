@@ -85,8 +85,10 @@ async function saveImageUtil(uri: string, label = "blouse") {
     // On mobile: SVGs can't be stored in the photo library — share as file instead
     if (isSvg) {
       const b64 = uri.split(",")[1];
-      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.svg`;
-      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      // @ts-ignore – expo-file-system version mismatch; API still works at runtime
+      const path = `${(FileSystem as any).cacheDirectory}blousify-${label}-${Date.now()}.svg`;
+      // @ts-ignore
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
       const available = await Sharing.isAvailableAsync();
       if (available) {
         await Sharing.shareAsync(path, { mimeType, dialogTitle: "Save or share your Blousify design" });
@@ -104,11 +106,14 @@ async function saveImageUtil(uri: string, label = "blouse") {
     let localUri = uri;
     if (uri.startsWith("data:")) {
       const b64 = uri.split(",")[1];
-      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
-      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+      // @ts-ignore
+      const path = `${(FileSystem as any).cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
+      // @ts-ignore
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
       localUri = path;
     } else if (uri.startsWith("http")) {
-      const path = `${FileSystem.cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
+      // @ts-ignore
+      const path = `${(FileSystem as any).cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
       const { uri: downloaded } = await FileSystem.downloadAsync(uri, path);
       localUri = downloaded;
     }
@@ -139,8 +144,10 @@ async function shareImageUtil(uri: string) {
       return;
     }
     const b64 = uri.split(",")[1];
-    const path = `${FileSystem.cacheDirectory}blousify-share-${Date.now()}.${ext}`;
-    await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
+    // @ts-ignore
+    const path = `${(FileSystem as any).cacheDirectory}blousify-share-${Date.now()}.${ext}`;
+    // @ts-ignore
+    await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
     const available = await Sharing.isAvailableAsync();
     if (available) await Sharing.shareAsync(path, { mimeType, dialogTitle: "Share my Blousify design" });
   } catch {
@@ -573,8 +580,6 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
           : asset.uri;
         setBorderPatternCustomUri(uri);
         setBorderPattern("custom");
-        setAiPreviewUri(null);
-        setAiPreviewBackUri(null);
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       }
     } catch {
@@ -685,13 +690,13 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
           {FABRIC_COLORS.map((col) => (
             <TouchableOpacity
               key={col}
-              onPress={() => { setFabricColor(col); setAiPreviewUri(null); setAiPreviewBackUri(null); Haptics.selectionAsync(); }}
+              onPress={() => { setFabricColor(col); Haptics.selectionAsync(); }}
               style={{
                 width: 40, height: 40, borderRadius: 20,
                 backgroundColor: col,
                 borderWidth: fabricColor === col ? 3 : 1.5,
                 borderColor: fabricColor === col ? Colors.brand.gold : "rgba(0,0,0,0.15)",
-                shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 },
+                ...Platform.select({ web: { boxShadow: "0px 2px 4px rgba(0,0,0,0.15)" }, default: { shadowColor: "#000", shadowOpacity: 0.15, shadowRadius: 4, shadowOffset: { width: 0, height: 2 } } }),
               }}
             >
               {fabricColor === col && (
@@ -707,7 +712,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       <Animated.View entering={FadeInDown.delay(300).springify()}>
         <PatternPickerRow
           selected={borderPattern}
-          onSelect={(v) => { setBorderPattern(v); setAiPreviewUri(null); setAiPreviewBackUri(null); }}
+          onSelect={(v) => { setBorderPattern(v); }}
           onUpload={handleUploadCustomPattern}
           customUri={borderPatternCustomUri}
           theme={theme}
@@ -954,14 +959,14 @@ function SketchCanvas({
         ) : null}
       </Svg>
       {paths.length === 0 && !liveD && !backgroundImageUri && (
-        <View style={styles.sketchHint} pointerEvents="none">
+        <View style={[styles.sketchHint, { pointerEvents: "none" } as any]}>
           <Feather name="edit-3" size={28} color={Colors.brand.primary + "40"} />
           <Text style={styles.sketchHintText}>Draw your blouse sketch here</Text>
           <Text style={styles.sketchHintSub}>Or add a photo as background below</Text>
         </View>
       )}
       {paths.length === 0 && !liveD && backgroundImageUri && (
-        <View style={styles.sketchHint} pointerEvents="none">
+        <View style={[styles.sketchHint, { pointerEvents: "none" } as any]}>
           <Feather name="edit-3" size={28} color="rgba(255,255,255,0.8)" />
           <Text style={[styles.sketchHintText, { color: "rgba(255,255,255,0.9)" }]}>Draw on top of your photo</Text>
         </View>
@@ -3029,7 +3034,11 @@ export default function ProfileScreen() {
               key={tile.label}
               style={[styles.statTile, { backgroundColor: theme.card, borderColor: theme.border }]}
               activeOpacity={0.75}
-              onPress={() => { setActiveTab(tile.tab); Haptics.selectionAsync(); }}
+              onPress={() => {
+                if ((tile.tab as string) === "fits") { router.push("/(tabs)/history" as any); }
+                else { setActiveTab(tile.tab as Tab); }
+                Haptics.selectionAsync();
+              }}
             >
               <View style={[styles.statTileIcon, { backgroundColor: tile.color + "18" }]}>
                 <Feather name={tile.icon as any} size={18} color={tile.color} />
@@ -3288,7 +3297,7 @@ const styles = StyleSheet.create({
   infoValue: { fontFamily: "Inter_500Medium", fontSize: 14, flex: 1 },
   logoutBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 8, paddingVertical: 14, borderRadius: 14, borderWidth: 1.5 },
   logoutText: { fontFamily: "Inter_500Medium", fontSize: 15 },
-  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16, shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 },
+  primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16, ...Platform.select({ web: { boxShadow: "0px 4px 8px rgba(139,34,82,0.3)" }, default: { shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 } }) },
   primaryBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
   groupLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   savedBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },

@@ -49,7 +49,7 @@ function NativeTabLayout() {
         <Label>My Fits</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="tailor">
-        <Icon sf={{ default: "scissors", selected: "scissors.fill" }} />
+        <Icon sf={{ default: "scissors", selected: "scissors" }} />
         <Label>Tailor</Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="chat">

@@ -146,7 +146,7 @@ export default function RotationViewer({
 
         {/* Drag hint */}
         {!singleImage && (
-          <Animated.View style={[styles.hintOverlay, { opacity: hintOpacity }]} pointerEvents="none">
+          <Animated.View style={[styles.hintOverlay, { opacity: hintOpacity, pointerEvents: "none" } as any]}>
             <View style={styles.hintPill}>
               <Feather name="move" size={14} color="#fff" />
               <Text style={styles.hintText}>Drag to rotate</Text>

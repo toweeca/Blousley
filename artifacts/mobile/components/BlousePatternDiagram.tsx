@@ -278,7 +278,7 @@ export default function BlousePatternDiagram({
         <Path d={backPath} fill={FILL} stroke={OUTLINE} strokeWidth="2.5" strokeLinejoin="round" />
 
         {/* Fold line */}
-        <Line x1={B.foldX} y1={B.topY - 12} x2={B.foldX} y2={B.hemY}
+        <Line x1={B.foldX} y1={B.neckY - 12} x2={B.foldX} y2={B.hemY}
           stroke={FOLD_C} strokeWidth="2" strokeDasharray="8,5" />
 
         {/* Seam allowance dashes at hem */}

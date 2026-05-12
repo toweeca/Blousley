@@ -231,7 +231,7 @@ export default function ChatThread({
                   </Text>
                   <View style={[styles.dateLine, { backgroundColor: theme.border }]} />
                 </View>
-                {group.msgs.map((m) => (
+                {group.msgs.map((m: any) => (
                   <View key={m.id}>{renderItem({ item: m })}</View>
                 ))}
               </View>
