@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";

@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from "react-native";
 import { router } from "expo-router";
@@ -17,6 +18,12 @@ export function ConsentText({
   );
 }
 
+export function CopyrightNotice() {
+  return (
+    <Text style={styles.copyright}>© 2026 Blousify. All rights reserved.</Text>
+  );
+}
+
 export function LegalFooter({ theme }: { theme: Theme }) {
   return (
     <View style={[styles.footer, { borderTopColor: theme.border }]}>
@@ -31,6 +38,9 @@ export function LegalFooter({ theme }: { theme: Theme }) {
       <TouchableOpacity onPress={() => Linking.openURL("mailto:legal@yourdomain.com")}>
         <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Contact</Text>
       </TouchableOpacity>
+      <Text style={[styles.copyright, { width: "100%", textAlign: "center", marginTop: 4 }]}>
+        © 2026 Blousify. All rights reserved.
+      </Text>
     </View>
   );
 }
@@ -92,6 +102,14 @@ export function AiPreviewConsent({ theme }: { theme: Theme }) {
 }
 
 const styles = StyleSheet.create({
+  copyright: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: "#9E8B8B",
+    textAlign: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+  },
   footer: {
     flexDirection: "row",
     alignItems: "center",

@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { Feather } from "@expo/vector-icons";
 import { router, useLocalSearchParams } from "expo-router";
 import React, { useState } from "react";
@@ -15,6 +16,7 @@ import Svg, { Circle, Ellipse, Line, Path, Polygon, Rect, Text as SvgText } from
 import Animated, { FadeInDown } from "react-native-reanimated";
 
 import Colors from "@/constants/colors";
+import { CopyrightNotice } from "@/components/LegalLinks";
 
 // ─── Types ───────────────────────────────────────────────────────────────────
 
@@ -638,6 +640,7 @@ export default function SewingGuideScreen() {
             })}
           </Animated.View>
         )}
+        <CopyrightNotice />
       </ScrollView>
     </View>
   );

@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import React from "react";
 import {
   View,
@@ -12,6 +13,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Feather } from "@expo/vector-icons";
 import { router } from "expo-router";
 import Colors from "@/constants/colors";
+import { CopyrightNotice } from "@/components/LegalLinks";
 
 const SECTIONS = [
   {
@@ -118,6 +120,7 @@ export default function TermsScreen() {
             )}
           </View>
         ))}
+        <CopyrightNotice />
       </ScrollView>
     </View>
   );

@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";

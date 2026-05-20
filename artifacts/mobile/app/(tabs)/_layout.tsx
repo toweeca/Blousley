@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";

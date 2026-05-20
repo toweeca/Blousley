@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import express, { type Express } from "express";
 import cors from "cors";
 import fs from "fs";

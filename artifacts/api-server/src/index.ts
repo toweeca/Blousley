@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import app from "./app";
 
 const rawPort = process.env["PORT"];

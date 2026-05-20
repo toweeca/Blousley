@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { Router, type IRouter } from "express";
 import healthRouter from "./health";
 import blouseRouter from "./blouse";

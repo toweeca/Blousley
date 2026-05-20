@@ -1,3 +1,4 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import {
   Inter_400Regular,
   Inter_500Medium,

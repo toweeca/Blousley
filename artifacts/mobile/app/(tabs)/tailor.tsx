@@ -1,4 +1,6 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { CopyrightNotice } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
 import React, { useState } from "react";
@@ -718,6 +720,7 @@ export default function TailorScreen() {
             </Animated.View>
           ) : null
         }
+        ListFooterComponent={<CopyrightNotice />}
       />
 
       {/* Chat Thread */}

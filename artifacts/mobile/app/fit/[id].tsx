@@ -1,4 +1,6 @@
+// Copyright © 2026 Blousify. All rights reserved.
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { CopyrightNotice } from "@/components/LegalLinks";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
 import React from "react";
@@ -248,6 +250,7 @@ export default function FitDetailScreen() {
             <Text style={styles.shareFullBtnText}>Share with Tailor</Text>
           </TouchableOpacity>
         </Animated.View>
+        <CopyrightNotice />
       </ScrollView>
     </View>
   );
