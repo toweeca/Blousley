@@ -10,12 +10,17 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import React, { useEffect } from "react";
+import { LogBox, Platform } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { KeyboardProvider } from "react-native-keyboard-controller";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import { AppProvider } from "@/context/AppContext";
+
+LogBox.ignoreLogs([
+  "props.pointerEvents is deprecated",
+]);
 
 SplashScreen.preventAutoHideAsync();
 
@@ -69,6 +74,19 @@ export default function RootLayout() {
       SplashScreen.hideAsync();
     }
   }, [fontsLoaded, fontError]);
+
+  // Scale down the entire web preview so text/UI doesn't look zoomed-in
+  // when rendered inside a desktop-sized iframe.
+  useEffect(() => {
+    if (Platform.OS !== "web" || typeof document === "undefined") return;
+    const style = document.createElement("style");
+    style.setAttribute("data-blousify-web-scale", "true");
+    style.textContent = `html, body { zoom: 0.7; }`;
+    document.head.appendChild(style);
+    return () => {
+      document.head.removeChild(style);
+    };
+  }, []);
 
   if (!fontsLoaded && !fontError) return null;
 
