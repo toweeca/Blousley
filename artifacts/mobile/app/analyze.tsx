@@ -253,10 +253,23 @@ export default function AnalyzeScreen() {
   // Ask for explicit consent to analyze body measurements from the photo
   // before opening the camera or gallery.
   const requestAnalysisConsent = useCallback((): Promise<boolean> => {
+    const message =
+      "Blousify will use this photo to estimate your body measurements (such as bust, waist, shoulder, and hip) and generate blouse fitting suggestions. Your photo is processed only for this purpose. Do you consent?";
+
+    // React Native Web's Alert.alert does not fire button callbacks, so the
+    // Promise would never resolve. Use the browser's confirm dialog there.
+    if (Platform.OS === "web") {
+      const ok =
+        typeof window !== "undefined" && typeof window.confirm === "function"
+          ? window.confirm(`Consent to Analyze Your Photo\n\n${message}`)
+          : true;
+      return Promise.resolve(ok);
+    }
+
     return new Promise((resolve) => {
       Alert.alert(
         "Consent to Analyze Your Photo",
-        "Blousify will use this photo to estimate your body measurements (such as bust, waist, shoulder, and hip) and generate blouse fitting suggestions. Your photo is processed only for this purpose. Do you consent?",
+        message,
         [
           { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
           { text: "I Consent", onPress: () => resolve(true) },
