@@ -98,15 +98,24 @@ export default function AccountScreen() {
   };
 
   const handleLogout = () => {
+    const performLogout = async () => {
+      await setUser(null);
+      setName(""); setPhone(""); setRole("customer");
+      qc.clear();
+    };
+    // React Native Web's Alert.alert does not fire button callbacks, so use
+    // the browser's confirm dialog there; native uses Alert with buttons.
+    if (isWeb) {
+      const ok =
+        typeof window !== "undefined" && typeof window.confirm === "function"
+          ? window.confirm("Sign Out\n\nClear your profile from this device?")
+          : true;
+      if (ok) void performLogout();
+      return;
+    }
     Alert.alert("Sign Out", "Clear your profile from this device?", [
       { text: "Cancel", style: "cancel" },
-      {
-        text: "Sign Out", style: "destructive", onPress: async () => {
-          await setUser(null);
-          setName(""); setPhone(""); setRole("customer");
-          qc.clear();
-        },
-      },
+      { text: "Sign Out", style: "destructive", onPress: () => { void performLogout(); } },
     ]);
   };
 
