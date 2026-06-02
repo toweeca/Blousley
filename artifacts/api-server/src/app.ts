@@ -8,8 +8,10 @@ import router from "./routes";
 const app: Express = express();
 
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// Base64-encoded photos can be several MB, so raise the body size limit
+// well above Express's 100kb default to avoid PayloadTooLargeError.
+app.use(express.json({ limit: "25mb" }));
+app.use(express.urlencoded({ extended: true, limit: "25mb" }));
 
 app.use("/api", router);
 
