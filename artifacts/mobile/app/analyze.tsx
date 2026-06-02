@@ -243,7 +243,25 @@ export default function AnalyzeScreen() {
     fit: "Regular",
   });
 
+  // Ask for explicit consent to analyze body measurements from the photo
+  // before opening the camera or gallery.
+  const requestAnalysisConsent = useCallback((): Promise<boolean> => {
+    return new Promise((resolve) => {
+      Alert.alert(
+        "Consent to Analyze Your Photo",
+        "Blousify will use this photo to estimate your body measurements (such as bust, waist, shoulder, and hip) and generate blouse fitting suggestions. Your photo is processed only for this purpose. Do you consent?",
+        [
+          { text: "Cancel", style: "cancel", onPress: () => resolve(false) },
+          { text: "I Consent", onPress: () => resolve(true) },
+        ],
+        { cancelable: true, onDismiss: () => resolve(false) },
+      );
+    });
+  }, []);
+
   const pickFromGallery = useCallback(async () => {
+    const consented = await requestAnalysisConsent();
+    if (!consented) return;
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission needed", "Please allow access to your photos.");
@@ -261,9 +279,11 @@ export default function AnalyzeScreen() {
       setImageBase64(result.assets[0].base64 ?? null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, []);
+  }, [requestAnalysisConsent]);
 
   const takePhoto = useCallback(async () => {
+    const consented = await requestAnalysisConsent();
+    if (!consented) return;
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
       Alert.alert("Permission needed", "Please allow camera access.");
@@ -280,7 +300,7 @@ export default function AnalyzeScreen() {
       setImageBase64(result.assets[0].base64 ?? null);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     }
-  }, []);
+  }, [requestAnalysisConsent]);
 
   const analyzeImage = useCallback(async () => {
     if (!imageBase64) return;
