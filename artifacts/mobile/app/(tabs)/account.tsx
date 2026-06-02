@@ -57,7 +57,7 @@ export default function AccountScreen() {
 
   const [name, setName] = useState(user?.name ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
-  const [role, setRole] = useState<UserRole>(user?.role ?? "customer");
+  const [role, setRole] = useState<UserRole | null>(user?.role ?? null);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showMeasModal, setShowMeasModal] = useState(false);
@@ -81,6 +81,7 @@ export default function AccountScreen() {
   });
 
   const handleCreate = () => {
+    if (!role) { Alert.alert("Choose account type", "Please select Customer or Tailor to continue."); return; }
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
     setUser({ id: userId, name: name.trim(), phone: phone.trim() || undefined, role });
@@ -90,7 +91,7 @@ export default function AccountScreen() {
   const handleUpdate = async () => {
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
     setSaving(true);
-    setUser({ ...user!, name: name.trim(), phone: phone.trim() || undefined, role });
+    setUser({ ...user!, name: name.trim(), phone: phone.trim() || undefined, role: role ?? user!.role });
     await new Promise((r) => setTimeout(r, 300));
     setSaving(false);
     setEditing(false);
@@ -100,7 +101,7 @@ export default function AccountScreen() {
   const handleLogout = () => {
     const performLogout = async () => {
       await setUser(null);
-      setName(""); setPhone(""); setRole("customer");
+      setName(""); setPhone(""); setRole(null);
       qc.clear();
     };
     // React Native Web's Alert.alert does not fire button callbacks, so use
@@ -168,70 +169,80 @@ export default function AccountScreen() {
               Set up your profile to save fits, get AI recommendations, and connect with tailors.
             </Text>
 
-            <View style={styles.formField}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                value={name}
-                onChangeText={setName}
-                placeholder="Enter your full name"
-                placeholderTextColor={theme.textMuted}
-                autoCapitalize="words"
-                testID="name-input"
-              />
+            {/* Step 1 — choose account type (required, shown first as squares) */}
+            <View style={styles.signupStepHeader}>
+              <View style={styles.signupStepNum}><Text style={styles.signupStepNumText}>1</Text></View>
+              <Text style={[styles.signupStepLabel, { color: theme.text }]}>Choose your account type</Text>
+            </View>
+            <View style={styles.roleSquares}>
+              {ROLES.map((r) => {
+                const selected = role === r.value;
+                return (
+                  <TouchableOpacity
+                    key={r.value}
+                    activeOpacity={0.85}
+                    style={[styles.roleSquare, { backgroundColor: selected ? Colors.brand.primary + "12" : theme.card, borderColor: selected ? Colors.brand.primary : theme.border, borderWidth: selected ? 2 : 1 }]}
+                    onPress={() => { setRole(r.value); Haptics.selectionAsync(); }}
+                    testID={`role-${r.value}`}
+                  >
+                    {selected && (
+                      <View style={styles.roleSquareCheck}>
+                        <Feather name="check-circle" size={18} color={Colors.brand.primary} />
+                      </View>
+                    )}
+                    <View style={[styles.roleSquareIcon, { backgroundColor: selected ? Colors.brand.primary : Colors.brand.primary + "12" }]}>
+                      <MaterialCommunityIcons name={r.icon as any} size={28} color={selected ? "#fff" : Colors.brand.primary} />
+                    </View>
+                    <Text style={[styles.roleSquareTitle, { color: selected ? Colors.brand.primary : theme.text }]}>{r.label}</Text>
+                    <Text style={[styles.roleSquareDesc, { color: theme.textMuted }]}>{r.desc}</Text>
+                  </TouchableOpacity>
+                );
+              })}
             </View>
 
-            <View style={styles.formField}>
-              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
-              <TextInput
-                style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                value={phone}
-                onChangeText={setPhone}
-                placeholder="+91 98765 43210"
-                placeholderTextColor={theme.textMuted}
-                keyboardType="phone-pad"
-              />
-            </View>
-
-            <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>I am a…</Text>
-            <View style={{ gap: 10 }}>
-              {ROLES.map((r) => (
-                <TouchableOpacity
-                  key={r.value}
-                  style={[
-                    styles.roleCard,
-                    {
-                      backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card,
-                      borderColor: role === r.value ? Colors.brand.primary : theme.border,
-                      borderWidth: role === r.value ? 2 : 1,
-                    },
-                  ]}
-                  onPress={() => { setRole(r.value); Haptics.selectionAsync(); }}
-                  testID={`role-${r.value}`}
-                >
-                  <MaterialCommunityIcons
-                    name={r.icon as any}
-                    size={22}
-                    color={role === r.value ? Colors.brand.primary : theme.textSecondary}
+            {/* Step 2 — details (only after a type is chosen) */}
+            {role && (
+              <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
+                <View style={styles.signupStepHeader}>
+                  <View style={styles.signupStepNum}><Text style={styles.signupStepNumText}>2</Text></View>
+                  <Text style={[styles.signupStepLabel, { color: theme.text }]}>Your details</Text>
+                </View>
+                <View style={styles.formField}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    value={name}
+                    onChangeText={setName}
+                    placeholder="Enter your full name"
+                    placeholderTextColor={theme.textMuted}
+                    autoCapitalize="words"
+                    testID="name-input"
                   />
-                  <View style={{ flex: 1 }}>
-                    <Text style={[styles.roleTitle, { color: role === r.value ? Colors.brand.primary : theme.text }]}>
-                      {r.label}
-                    </Text>
-                    <Text style={[styles.roleDesc, { color: theme.textMuted }]}>{r.desc}</Text>
-                  </View>
-                  {role === r.value && <Feather name="check-circle" size={18} color={Colors.brand.primary} />}
-                </TouchableOpacity>
-              ))}
-            </View>
+                </View>
+                <View style={styles.formField}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    value={phone}
+                    onChangeText={setPhone}
+                    placeholder="+91 98765 43210"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="phone-pad"
+                  />
+                </View>
+              </Animated.View>
+            )}
 
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]}
+              style={[styles.primaryBtn, { backgroundColor: role ? Colors.brand.primary : theme.border, opacity: role ? 1 : 0.55 }]}
               onPress={handleCreate}
+              disabled={!role}
               testID="save-profile-button"
             >
-              <Feather name="check" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>Create Profile</Text>
+              <Feather name={role ? "check" : "lock"} size={18} color="#fff" />
+              <Text style={styles.primaryBtnText}>
+                {role ? `Continue as ${role === "tailor" ? "Tailor" : "Customer"}` : "Select an account type"}
+              </Text>
             </TouchableOpacity>
 
             <SignupConsent theme={theme} />
@@ -659,6 +670,16 @@ const styles = StyleSheet.create({
   },
   roleTitle: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
   roleDesc: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 2 },
+  signupStepHeader: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 4, marginBottom: 4 },
+  signupStepNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.brand.primary, alignItems: "center", justifyContent: "center" },
+  signupStepNumText: { fontFamily: "Inter_700Bold", fontSize: 12, color: "#fff" },
+  signupStepLabel: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  roleSquares: { flexDirection: "row", gap: 12 },
+  roleSquare: { flex: 1, aspectRatio: 0.92, borderRadius: 18, padding: 14, alignItems: "center", justifyContent: "center", gap: 8 },
+  roleSquareCheck: { position: "absolute", top: 10, right: 10 },
+  roleSquareIcon: { width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center" },
+  roleSquareTitle: { fontFamily: "Inter_700Bold", fontSize: 16 },
+  roleSquareDesc: { fontFamily: "Inter_400Regular", fontSize: 11, textAlign: "center", lineHeight: 15 },
   primaryBtn: {
     flexDirection: "row",
     alignItems: "center",
