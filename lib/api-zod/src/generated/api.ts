@@ -24,6 +24,7 @@ export const AnalyzeBlouseBody = zod.object({
 });
 
 export const AnalyzeBlouseResponse = zod.object({
+  imageType: zod.enum(["person", "blouse"]),
   measurements: zod
     .object({
       bust: zod.number().optional(),
@@ -31,9 +32,15 @@ export const AnalyzeBlouseResponse = zod.object({
       shoulder: zod.number().optional(),
       hip: zod.number().optional(),
     })
-    .optional(),
+    .nullish(),
   bodyShape: zod.string(),
   aiAnalysis: zod.string(),
+  analysisPoints: zod.array(
+    zod.object({
+      label: zod.string(),
+      detail: zod.string(),
+    }),
+  ),
   suggestedStyles: zod.array(zod.string()),
 });
 

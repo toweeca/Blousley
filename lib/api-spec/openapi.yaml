@@ -245,22 +245,46 @@ components:
         - imageBase64
         - userId
 
+    AnalysisPoint:
+      type: object
+      properties:
+        label:
+          type: string
+        detail:
+          type: string
+      required:
+        - label
+        - detail
+
     AnalyzeBlouseResponse:
       type: object
       properties:
+        imageType:
+          type: string
+          enum:
+            - person
+            - blouse
         measurements:
-          $ref: "#/components/schemas/Measurements"
+          allOf:
+            - $ref: "#/components/schemas/Measurements"
+          nullable: true
         bodyShape:
           type: string
         aiAnalysis:
           type: string
+        analysisPoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisPoint"
         suggestedStyles:
           type: array
           items:
             type: string
       required:
+        - imageType
         - bodyShape
         - aiAnalysis
+        - analysisPoints
         - suggestedStyles
 
     SaveBlouseFitRequest:

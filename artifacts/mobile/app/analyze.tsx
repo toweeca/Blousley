@@ -34,15 +34,22 @@ import { useApp } from "@/context/AppContext";
 
 type Step = "upload" | "analyzing" | "customize" | "saving";
 
+interface AnalysisPoint {
+  label: string;
+  detail: string;
+}
+
 interface AnalysisResult {
+  imageType?: "person" | "blouse";
   measurements?: {
     bust?: number;
     waist?: number;
     shoulder?: number;
     hip?: number;
-  };
+  } | null;
   bodyShape: string;
   aiAnalysis: string;
+  analysisPoints?: AnalysisPoint[];
   suggestedStyles: string[];
 }
 
@@ -319,7 +326,15 @@ export default function AnalyzeScreen() {
         }),
       });
       if (!res.ok) throw new Error("Analysis failed");
-      const data: AnalysisResult = await res.json();
+      const raw = (await res.json()) as Partial<AnalysisResult>;
+      const data: AnalysisResult = {
+        imageType: raw.imageType === "blouse" ? "blouse" : "person",
+        measurements: raw.measurements ?? null,
+        bodyShape: raw.bodyShape ?? "hourglass",
+        aiAnalysis: raw.aiAnalysis ?? "",
+        analysisPoints: Array.isArray(raw.analysisPoints) ? raw.analysisPoints : [],
+        suggestedStyles: Array.isArray(raw.suggestedStyles) ? raw.suggestedStyles : [],
+      };
       setAnalysis(data);
       setStep("customize");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -511,9 +526,15 @@ export default function AnalyzeScreen() {
             <View style={[styles.resultCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={styles.resultHeader}>
                 <View style={styles.resultShape}>
-                  <MaterialCommunityIcons name="human-female" size={24} color={Colors.brand.primary} />
+                  <MaterialCommunityIcons
+                    name={analysis.imageType === "blouse" ? "tshirt-crew" : "human-female"}
+                    size={24}
+                    color={Colors.brand.primary}
+                  />
                   <View>
-                    <Text style={[styles.resultShapeLabel, { color: theme.textSecondary }]}>Body Shape</Text>
+                    <Text style={[styles.resultShapeLabel, { color: theme.textSecondary }]}>
+                      {analysis.imageType === "blouse" ? "Garment" : "Body Shape"}
+                    </Text>
                     <Text style={[styles.resultShapeValue, { color: theme.text }]}>
                       {analysis.bodyShape}
                     </Text>
@@ -533,6 +554,31 @@ export default function AnalyzeScreen() {
                 </View>
               )}
             </View>
+
+            {/* Point-by-point analysis */}
+            {analysis.analysisPoints && analysis.analysisPoints.length > 0 && (
+              <View style={[styles.pointsCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                <View style={styles.pointsHeader}>
+                  <MaterialCommunityIcons name="format-list-checks" size={18} color={Colors.brand.primary} />
+                  <Text style={[styles.pointsTitle, { color: theme.text }]}>Point-by-Point Analysis</Text>
+                </View>
+                {analysis.analysisPoints.map((p, i) => (
+                  <View key={`${p.label}-${i}`} style={styles.pointRow}>
+                    <View style={[styles.pointBullet, { backgroundColor: Colors.brand.primary }]}>
+                      <Text style={styles.pointBulletText}>{i + 1}</Text>
+                    </View>
+                    <View style={styles.pointBody}>
+                      {!!p.label && (
+                        <Text style={[styles.pointLabel, { color: theme.text }]}>{p.label}</Text>
+                      )}
+                      {!!p.detail && (
+                        <Text style={[styles.pointDetail, { color: theme.textSecondary }]}>{p.detail}</Text>
+                      )}
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Suggested Styles */}
             {analysis.suggestedStyles.length > 0 && (
@@ -912,6 +958,52 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.brand.gold,
     marginTop: 2,
+  },
+  pointsCard: {
+    borderRadius: 16,
+    borderWidth: 1,
+    padding: 16,
+    gap: 12,
+  },
+  pointsHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  pointsTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  pointRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+  },
+  pointBullet: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 1,
+  },
+  pointBulletText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: "#FFFFFF",
+  },
+  pointBody: {
+    flex: 1,
+    gap: 2,
+  },
+  pointLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 14,
+  },
+  pointDetail: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
   },
   suggestionsSection: { gap: 10 },
   suggestionsScroll: { marginHorizontal: -4 },

@@ -21,23 +21,42 @@ router.post("/analyze", async (req, res) => {
       return;
     }
 
-    const prompt = `You are an expert saree blouse fitting consultant specializing in traditional Indian and Tamil fashion. 
-Analyze this photo of a person and provide:
-1. Estimated body measurements in centimeters (bust, waist, shoulder width, hip) - provide realistic estimates based on visible proportions
-2. Body shape classification (hourglass, pear, apple, rectangle, inverted triangle)
-3. A detailed AI analysis of the person's body shape and proportions for blouse fitting
-4. 3-5 specific blouse style recommendations suited for their shape, including traditional Tamil blouse styles
+    const prompt = `You are an expert saree blouse fitting consultant specializing in traditional Indian and Tamil fashion.
+
+First, determine what the uploaded image shows:
+- "person": a photo of a person (full body, upper body, or portrait)
+- "blouse": a photo of just a blouse / garment / fabric (no wearer, or the garment is the clear subject)
+
+Then perform a thorough POINT-BY-POINT analysis tailored to the image type.
+
+If the image is a PERSON:
+- Estimate body measurements in centimeters (bust, waist, shoulder width, hip) from visible proportions
+- Classify body shape (hourglass, pear, apple, rectangle, inverted triangle)
+- Give detailed point-by-point observations: shoulder line, bust proportion, waist definition, torso length, posture, and which necklines/sleeves/backs flatter them
+- Recommend 3-5 specific blouse styles suited to their shape, including traditional Tamil blouse styles
+
+If the image is a BLOUSE / GARMENT:
+- Set measurements to null
+- Set bodyShape to "garment"
+- Give detailed point-by-point observations of the garment: neckline style, sleeve style, back design, fabric/material, color and embellishments (zari, embroidery, mirror work, etc.), fit type, and the occasion it suits
+- Recommend 3-5 ways to style, pair, or improve this blouse, including matching saree/fabric suggestions
+
+The "analysisPoints" array is REQUIRED in both cases — each entry is one clear, specific observation with a short label and a detail sentence. Provide 5-8 points.
 
 Respond ONLY with valid JSON in this exact format:
 {
+  "imageType": "person" | "blouse",
   "measurements": {
     "bust": <number>,
     "waist": <number>,
     "shoulder": <number>,
     "hip": <number>
-  },
-  "bodyShape": "<shape>",
+  } | null,
+  "bodyShape": "<shape or 'garment'>",
   "aiAnalysis": "<detailed analysis paragraph>",
+  "analysisPoints": [
+    { "label": "<short label>", "detail": "<one specific observation sentence>" }
+  ],
   "suggestedStyles": ["<style1>", "<style2>", "<style3>"]
 }`;
 
@@ -50,15 +69,17 @@ Respond ONLY with valid JSON in this exact format:
           { text: prompt },
         ],
       }],
-      config: { maxOutputTokens: 1024 },
+      config: { maxOutputTokens: 2048 },
     });
 
     const content = response.text ?? "{}";
 
     let parsed: {
-      measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number };
+      imageType?: "person" | "blouse";
+      measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number } | null;
       bodyShape?: string;
       aiAnalysis?: string;
+      analysisPoints?: { label?: string; detail?: string }[];
       suggestedStyles?: string[];
     };
 
@@ -67,10 +88,16 @@ Respond ONLY with valid JSON in this exact format:
       parsed = JSON.parse(jsonMatch ? jsonMatch[0] : content);
     } catch {
       parsed = {
+        imageType: "person",
         measurements: { bust: 86, waist: 70, shoulder: 38, hip: 92 },
         bodyShape: "hourglass",
         aiAnalysis:
           "Based on the image, we detected a well-proportioned figure. Traditional saree blouses would complement this body shape beautifully.",
+        analysisPoints: [
+          { label: "Shoulder line", detail: "Balanced shoulders that suit boat and sweetheart necklines." },
+          { label: "Waist definition", detail: "Defined waist that pairs well with fitted-waist blouses." },
+          { label: "Recommended neckline", detail: "Sweetheart or deep-V necklines will flatter your proportions." },
+        ],
         suggestedStyles: [
           "Sweetheart neckline with puff sleeves",
           "Boat neck with elbow sleeves",
@@ -79,12 +106,35 @@ Respond ONLY with valid JSON in this exact format:
       };
     }
 
+    const analysisPoints = (parsed.analysisPoints ?? [])
+      .map((p) => ({
+        label: (p?.label ?? "").toString().trim(),
+        detail: (p?.detail ?? "").toString().trim(),
+      }))
+      .filter((p) => p.label || p.detail);
+
+    const imageType = parsed.imageType === "blouse" ? "blouse" : "person";
+
+    // Enforce response invariants so person/garment outputs stay consistent.
+    const measurements =
+      imageType === "blouse" ? null : (parsed.measurements ?? null);
+    const bodyShape =
+      imageType === "blouse"
+        ? "garment"
+        : (parsed.bodyShape && parsed.bodyShape !== "garment"
+            ? parsed.bodyShape
+            : "hourglass");
+
     res.json({
-      measurements: parsed.measurements ?? null,
-      bodyShape: parsed.bodyShape ?? "hourglass",
+      imageType,
+      measurements,
+      bodyShape,
       aiAnalysis:
         parsed.aiAnalysis ?? "AI analysis complete. Recommendations generated.",
-      suggestedStyles: parsed.suggestedStyles ?? [],
+      analysisPoints,
+      suggestedStyles: Array.isArray(parsed.suggestedStyles)
+        ? parsed.suggestedStyles
+        : [],
     });
   } catch (error) {
     console.error("Error analyzing blouse:", error);

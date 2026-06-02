@@ -42,10 +42,25 @@ export interface AnalyzeBlouseRequest {
   userId: string;
 }
 
+export interface AnalysisPoint {
+  label: string;
+  detail: string;
+}
+
+export type AnalyzeBlouseResponseImageType =
+  (typeof AnalyzeBlouseResponseImageType)[keyof typeof AnalyzeBlouseResponseImageType];
+
+export const AnalyzeBlouseResponseImageType = {
+  person: "person",
+  blouse: "blouse",
+} as const;
+
 export interface AnalyzeBlouseResponse {
-  measurements?: Measurements;
+  imageType: AnalyzeBlouseResponseImageType;
+  measurements?: Measurements | null;
   bodyShape: string;
   aiAnalysis: string;
+  analysisPoints: AnalysisPoint[];
   suggestedStyles: string[];
 }
 

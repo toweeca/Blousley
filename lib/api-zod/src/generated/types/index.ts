@@ -6,8 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
+export * from "./analysisPoint";
 export * from "./analyzeBlouseRequest";
 export * from "./analyzeBlouseResponse";
+export * from "./analyzeBlouseResponseImageType";
 export * from "./blouseFit";
 export * from "./deleteResponse";
 export * from "./getBlouseFitsParams";
