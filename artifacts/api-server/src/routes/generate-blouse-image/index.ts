@@ -1,6 +1,6 @@
 // Copyright © 2026 Blousify. All rights reserved.
 import { Router, type IRouter } from "express";
-import { generateImageBuffer } from "@workspace/integrations-openai-ai-server/image";
+import { generateImage as generateGeminiImage } from "@workspace/integrations-gemini-ai/image";
 
 const router: IRouter = Router();
 
@@ -467,14 +467,13 @@ function generateBlouseSVG(opts: {
 </svg>`;
 }
 
-// ─── AI image generation via Replit OpenAI integration (gpt-image-1) ────────
+// ─── AI image generation via Replit Gemini integration (nano banana) ────────
 
 async function generateBlousePhoto(
   prompt: string,
   _seed?: number,
 ): Promise<{ b64_json: string; mimeType: string }> {
-  const buffer = await generateImageBuffer(prompt, "1024x1024");
-  return { b64_json: buffer.toString("base64"), mimeType: "image/png" };
+  return generateGeminiImage(prompt);
 }
 
 // Maps UI option names → vivid descriptive phrases the AI model can render faithfully
