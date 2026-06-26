@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import { Feather } from "@expo/vector-icons";
 import { LegalFooter } from "@/components/LegalLinks";
 import { LinearGradient } from "expo-linear-gradient";
@@ -200,7 +200,7 @@ export default function HomeScreen() {
           {/* Branding */}
           <Animated.View entering={FadeInDown.delay(100).springify()} style={styles.brandRow}>
             <View>
-              <Text style={styles.appName}>Blousify</Text>
+              <Text style={styles.appName}>Blousley</Text>
               <Text style={styles.headerGreeting}>
                 {user ? `Namaste, ${user.name.split(" ")[0]}` : "Namaste"}
               </Text>

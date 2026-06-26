@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import React from "react";
 import { View, Text, TouchableOpacity, StyleSheet, Linking } from "react-native";
 import { router } from "expo-router";
@@ -20,7 +20,7 @@ export function ConsentText({
 
 export function CopyrightNotice() {
   return (
-    <Text style={styles.copyright}>© 2026 Blousify. All rights reserved.</Text>
+    <Text style={styles.copyright}>© 2026 Blousley. All rights reserved.</Text>
   );
 }
 
@@ -39,7 +39,7 @@ export function LegalFooter({ theme }: { theme: Theme }) {
         <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Contact</Text>
       </TouchableOpacity>
       <Text style={[styles.copyright, { width: "100%", textAlign: "center", marginTop: 4 }]}>
-        © 2026 Blousify. All rights reserved.
+        © 2026 Blousley. All rights reserved.
       </Text>
     </View>
   );
@@ -69,7 +69,7 @@ export function UploadConsent({ theme }: { theme: Theme }) {
   return (
     <View style={styles.consentBlock}>
       <Text style={[styles.consentText, { color: theme.textMuted }]}>
-        By uploading a photo, you consent to Blousify using it to generate blouse previews, fitting suggestions, and related design outputs. Upload only photos you have permission to use.{" "}
+        By uploading a photo, you consent to Blousley using it to generate blouse previews, fitting suggestions, and related design outputs. Upload only photos you have permission to use.{" "}
       </Text>
       <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
         <Text style={[styles.consentLink, { color: Colors.brand.primary }]}>See our Privacy Policy.</Text>
@@ -82,7 +82,7 @@ export function MeasurementConsent({ theme }: { theme: Theme }) {
   return (
     <View style={styles.consentBlock}>
       <Text style={[styles.consentText, { color: theme.textMuted }]}>
-        By saving your measurements, you consent to Blousify using them to create sizing recommendations, blouse previews, and sewing-related outputs. We collect only the information needed for these features.{" "}
+        By saving your measurements, you consent to Blousley using them to create sizing recommendations, blouse previews, and sewing-related outputs. We collect only the information needed for these features.{" "}
       </Text>
       <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
         <Text style={[styles.consentLink, { color: Colors.brand.primary }]}>See our Privacy Policy.</Text>

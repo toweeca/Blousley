@@ -1,12 +1,12 @@
-# Blousify
+# Blousley
 
-**Copyright © 2026 Blousify. All rights reserved.**
+**Copyright © 2026 Blousley. All rights reserved.**
 
 AI-powered saree blouse fitting app — Expo React Native + Express API.
 
 ## Overview
 
-Blousify helps users find their perfect saree blouse fit using AI image generation,
+Blousley helps users find their perfect saree blouse fit using AI image generation,
 body shape analysis, and tailor matching. The app features six tabs: Home, My Fits,
 Tailor, Messages, Design, and Profile.
 

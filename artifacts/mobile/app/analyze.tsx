@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { UploadConsent, MeasurementConsent } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";
@@ -254,7 +254,7 @@ export default function AnalyzeScreen() {
   // before opening the camera or gallery.
   const requestAnalysisConsent = useCallback((): Promise<boolean> => {
     const message =
-      "Blousify will use this photo to estimate your body measurements (such as bust, waist, shoulder, and hip) and generate blouse fitting suggestions. Your photo is processed only for this purpose. Do you consent?";
+      "Blousley will use this photo to estimate your body measurements (such as bust, waist, shoulder, and hip) and generate blouse fitting suggestions. Your photo is processed only for this purpose. Do you consent?";
 
     // React Native Web's Alert.alert does not fire button callbacks, so the
     // Promise would never resolve. Use the browser's confirm dialog there.

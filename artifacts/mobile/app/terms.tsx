@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import React from "react";
 import {
   View,
@@ -18,11 +18,11 @@ import { CopyrightNotice } from "@/components/LegalLinks";
 const SECTIONS = [
   {
     heading: "1. Acceptance of terms",
-    body: `By accessing or using Blousify, you agree to these Terms of Service and the Privacy Policy.`,
+    body: `By accessing or using Blousley, you agree to these Terms of Service and the Privacy Policy.`,
   },
   {
     heading: "2. Services",
-    body: `Blousify provides blouse design, measurement, preview, AI-assisted visualization, and related tailoring or sewing support features.`,
+    body: `Blousley provides blouse design, measurement, preview, AI-assisted visualization, and related tailoring or sewing support features.`,
   },
   {
     heading: "3. Account responsibility",
@@ -32,17 +32,17 @@ const SECTIONS = [
     heading: "4. User content",
     body: `You retain responsibility for the photos, measurements, sketches, design choices, and other content you submit.
 
-By uploading content to Blousify, you confirm that:
+By uploading content to Blousley, you confirm that:
 
 • you own it or have permission to use it;
 • it does not violate another person's rights;
 • it does not contain unlawful, abusive, or harmful material.
 
-You grant Blousify a limited license to use submitted content only as needed to operate, display, process, and improve the requested app features.`,
+You grant Blousley a limited license to use submitted content only as needed to operate, display, process, and improve the requested app features.`,
   },
   {
     heading: "5. AI and design output disclaimer",
-    body: `Blousify may provide AI-generated previews, fitting ideas, templates, or sewing guidance. These outputs are for informational and design assistance purposes only and may not always be exact, complete, or suitable for every body type, fabric, or tailoring situation.
+    body: `Blousley may provide AI-generated previews, fitting ideas, templates, or sewing guidance. These outputs are for informational and design assistance purposes only and may not always be exact, complete, or suitable for every body type, fabric, or tailoring situation.
 
 Users should verify critical measurements and sewing decisions before cutting fabric or producing garments.`,
   },
@@ -62,7 +62,7 @@ Users should verify critical measurements and sewing decisions before cutting fa
   },
   {
     heading: "8. Limitation of liability",
-    body: `To the fullest extent allowed by law, Blousify is provided on an "as is" and "as available" basis. Blousify is not liable for indirect, incidental, special, consequential, or business losses arising from use of the service.`,
+    body: `To the fullest extent allowed by law, Blousley is provided on an "as is" and "as available" basis. Blousley is not liable for indirect, incidental, special, consequential, or business losses arising from use of the service.`,
   },
   {
     heading: "9. Termination",
@@ -74,7 +74,7 @@ Users should verify critical measurements and sewing decisions before cutting fa
   },
   {
     heading: "11. Contact",
-    body: "For legal questions, contact:\n\nBlousify Legal Contact",
+    body: "For legal questions, contact:\n\nBlousley Legal Contact",
     email: "legal@yourdomain.com",
   },
 ];
@@ -102,7 +102,7 @@ export default function TermsScreen() {
         <Text style={[styles.lastUpdated, { color: theme.textMuted }]}>Last updated: May 1, 2026</Text>
 
         <Text style={[styles.intro, { color: theme.textSecondary }]}>
-          These Terms of Service govern your use of Blousify.
+          These Terms of Service govern your use of Blousley.
         </Text>
 
         {SECTIONS.map((s) => (

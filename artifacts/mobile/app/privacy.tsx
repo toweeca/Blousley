@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import React from "react";
 import {
   View,
@@ -18,7 +18,7 @@ import { CopyrightNotice } from "@/components/LegalLinks";
 const SECTIONS = [
   {
     heading: "1. Information we collect",
-    body: `We may collect the following information when you use Blousify:
+    body: `We may collect the following information when you use Blousley:
 
 • Account information: name, email address, login credentials, and profile details.
 
@@ -50,24 +50,24 @@ We aim to collect only the information reasonably needed for these purposes.`,
     heading: "3. Consent",
     body: `By creating an account, uploading photos, saving measurements, or using AI preview features, you consent to the collection, use, and disclosure of your information as described in this Privacy Policy.
 
-Where appropriate, Blousify presents additional consent text at the point of collection, such as when you upload an image or save body measurements.
+Where appropriate, Blousley presents additional consent text at the point of collection, such as when you upload an image or save body measurements.
 
 You should upload only photos and content you have permission to use.`,
   },
   {
     heading: "4. How uploaded photos and measurements are used",
-    body: `If you upload a photo or enter body measurements, Blousify may use that information to:
+    body: `If you upload a photo or enter body measurements, Blousley may use that information to:
 
 • generate blouse previews;
 • provide fitting recommendations;
 • create templates, diagrams, or sewing-related outputs;
 • save results to your account for later access.
 
-Blousify does not ask for more sensitive information than necessary for these features.`,
+Blousley does not ask for more sensitive information than necessary for these features.`,
   },
   {
     heading: "5. Sharing with service providers",
-    body: `We may use third-party providers to operate Blousify. Depending on the final production setup, these providers may include:
+    body: `We may use third-party providers to operate Blousley. Depending on the final production setup, these providers may include:
 
 • hosting and deployment providers;
 • database and authentication providers;
@@ -96,7 +96,7 @@ You may also withdraw consent for future use of your information, although some 
   },
   {
     heading: "9. Children",
-    body: `Blousify is not intended for children under the age required by applicable law to consent on their own.`,
+    body: `Blousley is not intended for children under the age required by applicable law to consent on their own.`,
   },
   {
     heading: "10. International processing",
@@ -108,7 +108,7 @@ You may also withdraw consent for future use of your information, although some 
   },
   {
     heading: "12. Contact",
-    body: `For privacy requests or questions, contact:\n\nBlousify Privacy Contact\nEmail: privacy@yourdomain.com`,
+    body: `For privacy requests or questions, contact:\n\nBlousley Privacy Contact\nEmail: privacy@yourdomain.com`,
     email: "privacy@yourdomain.com",
   },
 ];
@@ -136,7 +136,7 @@ export default function PrivacyScreen() {
         <Text style={[styles.lastUpdated, { color: theme.textMuted }]}>Last updated: May 1, 2026</Text>
 
         <Text style={[styles.intro, { color: theme.textSecondary }]}>
-          Blousify is a blouse design and preview application that helps users save measurements, choose blouse styles, upload reference images, and generate blouse design previews and related outputs.
+          Blousley is a blouse design and preview application that helps users save measurements, choose blouse styles, upload reference images, and generate blouse design previews and related outputs.
         </Text>
 
         {SECTIONS.map((s) => (
@@ -145,7 +145,7 @@ export default function PrivacyScreen() {
             {s.email ? (
               <>
                 <Text style={[styles.sectionBody, { color: theme.textSecondary }]}>
-                  {`For privacy requests or questions, contact:\n\nBlousify Privacy Contact`}
+                  {`For privacy requests or questions, contact:\n\nBlousley Privacy Contact`}
                 </Text>
                 <TouchableOpacity onPress={() => Linking.openURL(`mailto:${s.email}`)}>
                   <Text style={[styles.emailLink, { color: Colors.brand.primary }]}>{s.email}</Text>

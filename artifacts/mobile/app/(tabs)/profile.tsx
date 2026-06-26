@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -77,7 +77,7 @@ async function saveImageUtil(uri: string, label = "blouse") {
     if (Platform.OS === "web") {
       const a = document.createElement("a");
       a.href = uri;
-      a.download = `blousify-${label}-${Date.now()}.${ext}`;
+      a.download = `blousley-${label}-${Date.now()}.${ext}`;
       a.click();
       Alert.alert("Downloaded!", `Design saved as .${ext} to your downloads folder.`);
       return;
@@ -87,12 +87,12 @@ async function saveImageUtil(uri: string, label = "blouse") {
     if (isSvg) {
       const b64 = uri.split(",")[1];
       // @ts-ignore – expo-file-system version mismatch; API still works at runtime
-      const path = `${(FileSystem as any).cacheDirectory}blousify-${label}-${Date.now()}.svg`;
+      const path = `${(FileSystem as any).cacheDirectory}blousley-${label}-${Date.now()}.svg`;
       // @ts-ignore
       await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
       const available = await Sharing.isAvailableAsync();
       if (available) {
-        await Sharing.shareAsync(path, { mimeType, dialogTitle: "Save or share your Blousify design" });
+        await Sharing.shareAsync(path, { mimeType, dialogTitle: "Save or share your Blousley design" });
       } else {
         Alert.alert("Sharing not available", "Please use a device that supports file sharing.");
       }
@@ -108,13 +108,13 @@ async function saveImageUtil(uri: string, label = "blouse") {
     if (uri.startsWith("data:")) {
       const b64 = uri.split(",")[1];
       // @ts-ignore
-      const path = `${(FileSystem as any).cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
+      const path = `${(FileSystem as any).cacheDirectory}blousley-${label}-${Date.now()}.${ext}`;
       // @ts-ignore
       await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
       localUri = path;
     } else if (uri.startsWith("http")) {
       // @ts-ignore
-      const path = `${(FileSystem as any).cacheDirectory}blousify-${label}-${Date.now()}.${ext}`;
+      const path = `${(FileSystem as any).cacheDirectory}blousley-${label}-${Date.now()}.${ext}`;
       const { uri: downloaded } = await FileSystem.downloadAsync(uri, path);
       localUri = downloaded;
     }
@@ -138,7 +138,7 @@ async function shareImageUtil(uri: string) {
 
     if (Platform.OS === "web") {
       if (navigator.share) {
-        await navigator.share({ title: "My Blousify Design", url: uri.startsWith("data:") ? window.location.href : uri });
+        await navigator.share({ title: "My Blousley Design", url: uri.startsWith("data:") ? window.location.href : uri });
       } else {
         await saveImageUtil(uri, "share");
       }
@@ -146,11 +146,11 @@ async function shareImageUtil(uri: string) {
     }
     const b64 = uri.split(",")[1];
     // @ts-ignore
-    const path = `${(FileSystem as any).cacheDirectory}blousify-share-${Date.now()}.${ext}`;
+    const path = `${(FileSystem as any).cacheDirectory}blousley-share-${Date.now()}.${ext}`;
     // @ts-ignore
     await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
     const available = await Sharing.isAvailableAsync();
-    if (available) await Sharing.shareAsync(path, { mimeType, dialogTitle: "Share my Blousify design" });
+    if (available) await Sharing.shareAsync(path, { mimeType, dialogTitle: "Share my Blousley design" });
   } catch {
     Alert.alert("Error", "Could not share the image.");
   }

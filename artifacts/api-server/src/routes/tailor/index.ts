@@ -1,4 +1,4 @@
-// Copyright © 2026 Blousify. All rights reserved.
+// Copyright © 2026 Blousley. All rights reserved.
 import { Router, type IRouter } from "express";
 import { db, blouseFitsTable, tailorsTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
