@@ -38,6 +38,10 @@ import {
 } from "@/components/BlouseMeasurementDiagrams";
 import PatternGuideTab from "@/components/PatternGuideTab";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+
+const MEASUREMENT_GUIDE_IMG = require("@/assets/images/blouse-measurement-guide.png");
+const MEASUREMENT_GUIDE_ALT =
+  "Saree blouse measurement guide diagram showing bust, underbust, shoulder width, blouse length, sleeve length, and armhole.";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
@@ -2107,6 +2111,21 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
             ))}
           </View>
 
+          {/* Measurement guide image */}
+          <View style={[styles.refChartWrap, { borderColor: theme.border }]}>
+            <Text style={[styles.refChartLabel, { color: Colors.brand.primary }]}>📏 Measurement Guide</Text>
+            <Image
+              source={MEASUREMENT_GUIDE_IMG}
+              style={styles.guideImage}
+              resizeMode="contain"
+              accessible
+              accessibilityLabel={MEASUREMENT_GUIDE_ALT}
+            />
+            <Text style={[styles.measureInputHint, { color: theme.textMuted, textAlign: "center", paddingHorizontal: 12 }]}>
+              Follow this diagram when taking each measurement below.
+            </Text>
+          </View>
+
           {/* Input fields */}
           <View style={{ gap: 14 }}>
             {MEASURE_FIELDS.map((f) => (
@@ -2458,6 +2477,16 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
               const DiagramComp = d.Component;
               return (
                 <Animated.View entering={FadeInDown.springify()} style={[styles.guideBody, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                  {/* ── Measurement guide image ── */}
+                  <View style={[styles.refChartWrap, { borderColor: theme.border }]}>
+                    <Image
+                      source={MEASUREMENT_GUIDE_IMG}
+                      style={styles.guideImage}
+                      resizeMode="contain"
+                      accessible
+                      accessibilityLabel={MEASUREMENT_GUIDE_ALT}
+                    />
+                  </View>
                   {/* ── Carousel ── */}
                   <View style={styles.diagCarousel}>
                     <View style={styles.diagHeader}>
@@ -3409,6 +3438,7 @@ const styles = StyleSheet.create({
   refChartWrap: { borderRadius: 12, borderWidth: 1, overflow: "hidden", alignItems: "center", gap: 8, paddingBottom: 8 },
   refChartLabel: { fontFamily: "Inter_600SemiBold", fontSize: 13, paddingTop: 10 },
   refChartImage: { width: "100%", height: 200 },
+  guideImage: { width: "100%", aspectRatio: 683 / 1024, maxHeight: 560, alignSelf: "center" },
   diagCarousel: { gap: 12, alignItems: "center" },
   diagHeader: { flexDirection: "row", alignItems: "center", width: "100%", paddingHorizontal: 4 },
   diagNavBtn: { width: 36, height: 36, borderRadius: 18, borderWidth: 1, alignItems: "center", justifyContent: "center" },
