@@ -12,9 +12,13 @@ export type UserRole = "customer" | "tailor";
 interface AppUser {
   id: string;
   name: string;
+  email?: string;
   role: UserRole;
   phone?: string;
 }
+
+const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 
 interface AppContextType {
   user: AppUser | null;
@@ -51,6 +55,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
     setUserState(u);
     if (u) {
       await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(u));
+      if (u.email && API_BASE) {
+        fetch(`${API_BASE}/api/users/me`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone }),
+        }).catch((e) => console.error("Failed to sync user to server", e));
+      }
     } else {
       await AsyncStorage.removeItem(USER_STORAGE_KEY);
     }

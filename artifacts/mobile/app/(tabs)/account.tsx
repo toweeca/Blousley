@@ -28,6 +28,8 @@ import { SignupConsent, LegalFooter } from "@/components/LegalLinks";
 const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
 const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 const ROLES: { label: string; value: UserRole; icon: string; desc: string }[] = [
   { label: "Customer", value: "customer", icon: "human-female", desc: "Get AI blouse fitting recommendations" },
   { label: "Tailor", value: "tailor", icon: "scissors-cutting", desc: "View customer profiles & add notes" },
@@ -56,6 +58,7 @@ export default function AccountScreen() {
   const qc = useQueryClient();
 
   const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState<UserRole | null>(user?.role ?? null);
   const [editing, setEditing] = useState(false);
@@ -83,15 +86,17 @@ export default function AccountScreen() {
   const handleCreate = () => {
     if (!role) { Alert.alert("Choose account type", "Please select Customer or Tailor to continue."); return; }
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
+    if (!EMAIL_RE.test(email.trim())) { Alert.alert("Valid email required", "Please enter a valid email address."); return; }
     const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    setUser({ id: userId, name: name.trim(), phone: phone.trim() || undefined, role });
+    setUser({ id: userId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || undefined, role });
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
 
   const handleUpdate = async () => {
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
+    if (!EMAIL_RE.test(email.trim())) { Alert.alert("Valid email required", "Please enter a valid email address."); return; }
     setSaving(true);
-    setUser({ ...user!, name: name.trim(), phone: phone.trim() || undefined, role: role ?? user!.role });
+    setUser({ ...user!, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || undefined, role: role ?? user!.role });
     await new Promise((r) => setTimeout(r, 300));
     setSaving(false);
     setEditing(false);
@@ -220,6 +225,21 @@ export default function AccountScreen() {
                   />
                 </View>
                 <View style={styles.formField}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    autoCorrect={false}
+                    testID="email-input"
+                  />
+                </View>
+                <View style={styles.formField}>
                   <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
@@ -345,6 +365,7 @@ export default function AccountScreen() {
             <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
               {[
                 { icon: "user", label: "Name", value: user.name },
+                ...(user.email ? [{ icon: "mail", label: "Email", value: user.email }] : []),
                 ...(user.phone ? [{ icon: "phone", label: "Phone", value: user.phone }] : []),
                 { icon: "hash", label: "User ID", value: user.id.slice(0, 16) + "…" },
               ].map((row, i) => (
@@ -366,7 +387,7 @@ export default function AccountScreen() {
             {!editing ? (
               <TouchableOpacity
                 style={[styles.outlineBtn, { borderColor: Colors.brand.primary + "60" }]}
-                onPress={() => { setName(user.name); setPhone(user.phone ?? ""); setRole(user.role ?? "customer"); setEditing(true); }}
+                onPress={() => { setName(user.name); setEmail(user.email ?? ""); setPhone(user.phone ?? ""); setRole(user.role ?? "customer"); setEditing(true); }}
               >
                 <Feather name="edit-2" size={15} color={Colors.brand.primary} />
                 <Text style={[styles.outlineBtnText, { color: Colors.brand.primary }]}>Edit Profile</Text>
@@ -389,6 +410,21 @@ export default function AccountScreen() {
                     placeholder="Your full name"
                     placeholderTextColor={theme.textMuted}
                     autoCapitalize="words"
+                  />
+                </View>
+
+                <View style={styles.formField}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                    value={email}
+                    onChangeText={setEmail}
+                    placeholder="you@example.com"
+                    placeholderTextColor={theme.textMuted}
+                    keyboardType="email-address"
+                    autoCapitalize="none"
+                    autoComplete="email"
+                    autoCorrect={false}
                   />
                 </View>
 

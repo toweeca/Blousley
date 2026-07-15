@@ -8,6 +8,7 @@ import ideasRouter from "./ideas";
 import measurementsRouter from "./measurements";
 import generateBlouseImageRouter from "./generate-blouse-image";
 import chatRouter from "./chat";
+import usersRouter from "./users";
 
 const router: IRouter = Router();
 
@@ -19,5 +20,6 @@ router.use("/ideas", ideasRouter);
 router.use("/measurements", measurementsRouter);
 router.use("/generate-blouse-image", generateBlouseImageRouter);
 router.use("/chat", chatRouter);
+router.use("/users", usersRouter);
 
 export default router;

@@ -2981,6 +2981,7 @@ export default function ProfileScreen() {
   const [showAccountModal, setShowAccountModal] = useState(false);
   const [showMeasModal, setShowMeasModal] = useState(false);
   const [name, setName] = useState(user?.name ?? "");
+  const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState<UserRole | null>(user?.role ?? null);
 
@@ -3017,8 +3018,9 @@ export default function ProfileScreen() {
   const handleSave = () => {
     if (!role) { Alert.alert("Choose account type", "Please select Customer or Tailor first."); return; }
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { Alert.alert("Valid email required", "Please enter a valid email address."); return; }
     const userId = user?.id ?? `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    setUser({ id: userId, name: name.trim(), phone: phone.trim() || undefined, role });
+    setUser({ id: userId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || undefined, role });
     setShowAccountModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   };
@@ -3260,6 +3262,10 @@ export default function ProfileScreen() {
             <View style={styles.formField}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
               <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={name} onChangeText={setName} placeholder="Enter your full name" placeholderTextColor={theme.textMuted} autoCapitalize="words" />
+            </View>
+            <View style={styles.formField}>
+              <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
+              <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={email} onChangeText={setEmail} placeholder="you@example.com" placeholderTextColor={theme.textMuted} keyboardType="email-address" autoCapitalize="none" autoComplete="email" autoCorrect={false} />
             </View>
             <View style={styles.formField}>
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
