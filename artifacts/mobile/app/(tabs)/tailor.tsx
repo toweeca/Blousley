@@ -596,6 +596,7 @@ export default function TailorScreen() {
           customerId: selectedIdea.userId,
           tailorId: user.id,
           title: `Design: ${selectedIdea.title ?? "Blouse Request"}`,
+          ideaId: selectedIdea.id,
         }),
       });
       if (!convoRes.ok) throw new Error("Failed to create conversation");

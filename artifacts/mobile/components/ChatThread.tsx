@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   Animated,
   Alert,
+  Image,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,6 +28,13 @@ interface Message {
   content: string;
   isRead: boolean;
   createdAt: string;
+}
+
+interface IdeaSummary {
+  id: number;
+  title: string | null;
+  notes: string | null;
+  imageUrl: string | null;
 }
 
 interface ChatThreadProps {
@@ -76,6 +84,16 @@ export default function ChatThread({
       return r.json();
     },
     refetchInterval: 5000,
+    enabled: visible && conversationId > 0,
+  });
+
+  const { data: idea } = useQuery<IdeaSummary | null>({
+    queryKey: ["chat-idea", conversationId],
+    queryFn: async () => {
+      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/idea`);
+      if (!r.ok) return null;
+      return r.json();
+    },
     enabled: visible && conversationId > 0,
   });
 
@@ -209,6 +227,30 @@ export default function ChatThread({
           <View style={{ width: 40 }} />
         </View>
 
+        {/* Design context banner */}
+        {idea ? (
+          <View style={[styles.ideaBanner, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            {idea.imageUrl ? (
+              <Image source={{ uri: idea.imageUrl }} style={styles.ideaThumb} resizeMode="cover" />
+            ) : (
+              <View style={[styles.ideaThumb, styles.ideaThumbFallback, { backgroundColor: Colors.brand.primary + "15" }]}>
+                <Feather name="scissors" size={16} color={Colors.brand.primary} />
+              </View>
+            )}
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.ideaLabel, { color: theme.textMuted }]}>About this design</Text>
+              <Text style={[styles.ideaTitle, { color: theme.text }]} numberOfLines={1}>
+                {idea.title ?? "Blouse design request"}
+              </Text>
+              {idea.notes ? (
+                <Text style={[styles.ideaNotes, { color: theme.textMuted }]} numberOfLines={1}>
+                  {idea.notes}
+                </Text>
+              ) : null}
+            </View>
+          </View>
+        ) : null}
+
         {/* Messages */}
         {isLoading && msgs.length === 0 ? (
           <View style={styles.loadingBox}>
@@ -340,6 +382,21 @@ const styles = StyleSheet.create({
   onlineRow: { flexDirection: "row", alignItems: "center", gap: 5, marginTop: 2 },
   onlineDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: "#4ADE80" },
   onlineText: { fontFamily: "Inter_400Regular", fontSize: 12, color: "rgba(255,255,255,0.75)" },
+  ideaBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 10,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  ideaThumb: { width: 44, height: 44, borderRadius: 8 },
+  ideaThumbFallback: { alignItems: "center", justifyContent: "center" },
+  ideaLabel: { fontFamily: "Inter_500Medium", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
+  ideaTitle: { fontFamily: "Inter_700Bold", fontSize: 14, marginTop: 1 },
+  ideaNotes: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 },
   loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyBox: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 40 },
   emptyTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },

@@ -1,7 +1,7 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { conversations, messages } from "@workspace/db/schema";
+import { conversations, messages, customerIdeasTable } from "@workspace/db/schema";
 import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
 
 const router = Router();
@@ -46,11 +46,37 @@ router.get("/conversations", async (req, res) => {
   }
 });
 
+router.get("/conversations/:id/idea", async (req, res) => {
+  const id = Number(req.params.id);
+  if (!id) return res.status(400).json({ error: "conversation id required" });
+
+  try {
+    const convoRows = await db
+      .select()
+      .from(conversations)
+      .where(eq(conversations.id, id))
+      .limit(1);
+    const convo = convoRows[0];
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (!convo.ideaId) return res.json(null);
+
+    const ideaRows = await db
+      .select()
+      .from(customerIdeasTable)
+      .where(eq(customerIdeasTable.id, convo.ideaId))
+      .limit(1);
+    res.json(ideaRows[0] ?? null);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
 router.post("/conversations", async (req, res) => {
-  const { customerId, tailorId, title } = req.body as {
+  const { customerId, tailorId, title, ideaId } = req.body as {
     customerId: string;
     tailorId: string;
     title?: string;
+    ideaId?: number;
   };
   if (!customerId || !tailorId)
     return res.status(400).json({ error: "customerId and tailorId required" });
@@ -64,7 +90,17 @@ router.post("/conversations", async (req, res) => {
       )
       .limit(1);
 
-    if (existing.length > 0) return res.json(existing[0]);
+    if (existing.length > 0) {
+      if (ideaId && existing[0].ideaId !== ideaId) {
+        const [updated] = await db
+          .update(conversations)
+          .set({ ideaId, ...(title ? { title } : {}) })
+          .where(eq(conversations.id, existing[0].id))
+          .returning();
+        return res.json(updated);
+      }
+      return res.json(existing[0]);
+    }
 
     const [created] = await db
       .insert(conversations)
@@ -72,6 +108,7 @@ router.post("/conversations", async (req, res) => {
         title: title ?? `Chat with ${customerId.slice(0, 6)}`,
         customerId,
         tailorId,
+        ideaId: ideaId ?? null,
       })
       .returning();
 
