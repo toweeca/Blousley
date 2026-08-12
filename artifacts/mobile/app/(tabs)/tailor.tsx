@@ -598,12 +598,14 @@ export default function TailorScreen() {
           title: `Design: ${selectedIdea.title ?? "Blouse Request"}`,
         }),
       });
+      if (!convoRes.ok) throw new Error("Failed to create conversation");
       const convo = await convoRes.json();
-      await fetch(`${apiBase}/api/chat/messages`, {
+      const msgRes = await fetch(`${apiBase}/api/chat/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId: convo.id, senderId: user.id, content: offerText.trim() }),
       });
+      if (!msgRes.ok) throw new Error("Failed to send offer message");
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
       setOfferModalVisible(false);
       setChatConvoId(convo.id);

@@ -2,7 +2,7 @@
 import { Router } from "express";
 import { db } from "@workspace/db";
 import { conversations, messages } from "@workspace/db/schema";
-import { eq, or, desc, and } from "drizzle-orm";
+import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
 
 const router = Router();
 
@@ -135,7 +135,13 @@ router.patch("/messages/read", async (req, res) => {
     await db
       .update(messages)
       .set({ isRead: true })
-      .where(and(eq(messages.conversationId, conversationId), eq(messages.isRead, false)));
+      .where(
+        and(
+          eq(messages.conversationId, conversationId),
+          eq(messages.isRead, false),
+          or(ne(messages.senderId, userId), isNull(messages.senderId))
+        )
+      );
     res.json({ ok: true });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

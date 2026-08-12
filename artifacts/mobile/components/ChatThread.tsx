@@ -12,6 +12,7 @@ import {
   useColorScheme,
   ActivityIndicator,
   Animated,
+  Alert,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -94,12 +95,16 @@ export default function ChatThread({
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId, senderId: currentUserId, content }),
       });
+      if (!r.ok) throw new Error("Failed to send message");
       return r.json();
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
       setDraft("");
+    },
+    onError: () => {
+      Alert.alert("Message not sent", "Please check your connection and try again.");
     },
   });
 
