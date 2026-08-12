@@ -6,6 +6,19 @@ import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
 
 const router = Router();
 
+// Returns the conversation if userId is a participant (customer or tailor), else null.
+async function getConversationForParticipant(conversationId: number, userId: string) {
+  const rows = await db
+    .select()
+    .from(conversations)
+    .where(eq(conversations.id, conversationId))
+    .limit(1);
+  const convo = rows[0];
+  if (!convo) return { convo: null, allowed: false };
+  const allowed = convo.customerId === userId || convo.tailorId === userId;
+  return { convo, allowed };
+}
+
 router.get("/conversations", async (req, res) => {
   const { userId } = req.query as { userId?: string };
   if (!userId) return res.status(400).json({ error: "userId required" });
@@ -48,16 +61,14 @@ router.get("/conversations", async (req, res) => {
 
 router.get("/conversations/:id/idea", async (req, res) => {
   const id = Number(req.params.id);
+  const { userId } = req.query as { userId?: string };
   if (!id) return res.status(400).json({ error: "conversation id required" });
+  if (!userId) return res.status(400).json({ error: "userId required" });
 
   try {
-    const convoRows = await db
-      .select()
-      .from(conversations)
-      .where(eq(conversations.id, id))
-      .limit(1);
-    const convo = convoRows[0];
+    const { convo, allowed } = await getConversationForParticipant(id, userId);
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
     if (!convo.ideaId) return res.json(null);
 
     const ideaRows = await db
@@ -119,10 +130,15 @@ router.post("/conversations", async (req, res) => {
 });
 
 router.get("/messages", async (req, res) => {
-  const { conversationId } = req.query as { conversationId?: string };
+  const { conversationId, userId } = req.query as { conversationId?: string; userId?: string };
   if (!conversationId) return res.status(400).json({ error: "conversationId required" });
+  if (!userId) return res.status(400).json({ error: "userId required" });
 
   try {
+    const { convo, allowed } = await getConversationForParticipant(Number(conversationId), userId);
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
+
     const msgs = await db
       .select()
       .from(messages)
@@ -144,6 +160,10 @@ router.post("/messages", async (req, res) => {
     return res.status(400).json({ error: "conversationId, senderId, content required" });
 
   try {
+    const { convo, allowed } = await getConversationForParticipant(conversationId, senderId);
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
+
     const [msg] = await db
       .insert(messages)
       .values({ conversationId, senderId, content, role: "user", isRead: false })
@@ -169,6 +189,10 @@ router.patch("/messages/read", async (req, res) => {
     return res.status(400).json({ error: "conversationId and userId required" });
 
   try {
+    const { convo, allowed } = await getConversationForParticipant(conversationId, userId);
+    if (!convo) return res.status(404).json({ error: "Conversation not found" });
+    if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
+
     await db
       .update(messages)
       .set({ isRead: true })

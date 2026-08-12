@@ -80,7 +80,7 @@ export default function ChatThread({
   const { data: msgs = [], isLoading } = useQuery<Message[]>({
     queryKey: ["chat-messages", conversationId],
     queryFn: async () => {
-      const r = await fetch(`${apiBase}/api/chat/messages?conversationId=${conversationId}`);
+      const r = await fetch(`${apiBase}/api/chat/messages?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`);
       return r.json();
     },
     refetchInterval: 5000,
@@ -90,7 +90,7 @@ export default function ChatThread({
   const { data: idea } = useQuery<IdeaSummary | null>({
     queryKey: ["chat-idea", conversationId],
     queryFn: async () => {
-      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/idea`);
+      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/idea?userId=${encodeURIComponent(currentUserId)}`);
       if (!r.ok) return null;
       return r.json();
     },
