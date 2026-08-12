@@ -81,7 +81,7 @@ export default function RootLayout() {
     if (Platform.OS !== "web" || typeof document === "undefined") return;
     const style = document.createElement("style");
     style.setAttribute("data-blousify-web-scale", "true");
-    style.textContent = `html, body { zoom: 0.7; }`;
+    style.textContent = `html, body { zoom: 0.85; }`;
     document.head.appendChild(style);
     return () => {
       document.head.removeChild(style);
