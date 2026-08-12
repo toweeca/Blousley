@@ -1593,6 +1593,18 @@ const MEASURE_FIELDS = [
 ] as const;
 
 type MeasureKey = (typeof MEASURE_FIELDS)[number]["key"];
+type MeasurementUnit = "cm" | "in";
+
+function normalizeMeasurementUnit(unit: unknown): MeasurementUnit {
+  return unit === "in" || unit === "inches" ? "in" : "cm";
+}
+
+function convertMeasurement(value: unknown, from: MeasurementUnit, to: MeasurementUnit): string {
+  if (value === null || value === undefined || value === "") return "";
+  const number = Number(value);
+  if (!Number.isFinite(number) || from === to) return String(value);
+  return (from === "cm" ? number / 2.54 : number * 2.54).toFixed(1);
+}
 
 function BodyDiagram({ theme }: { theme: typeof Colors.light }) {
   const W = SCREEN_WIDTH - 48;
@@ -1822,7 +1834,7 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
   });
 
   const [editing, setEditing] = useState(false);
-  const [unit, setUnit] = useState<"cm" | "in">("cm");
+  const [unit, setUnit] = useState<MeasurementUnit>("cm");
   const [guideOpen, setGuideOpen] = useState(false);
   const [diagramIdx, setDiagramIdx] = useState(0);
 
@@ -1849,7 +1861,7 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
 
   React.useEffect(() => {
     if (saved && !initialized) {
-      setUnit((saved.unit as "cm" | "in") ?? "cm");
+      setUnit(normalizeMeasurementUnit(saved.unit));
       setFields({
         aboveBust: saved.aboveBust ?? "",
         bust: saved.bust ?? "",
@@ -1867,6 +1879,22 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
       setEditing(true);
     }
   }, [saved, isLoading, initialized]);
+
+  const convertFields = (from: MeasurementUnit, to: MeasurementUnit) => {
+    setFields((previous) => {
+      const next = { ...previous };
+      MEASURE_FIELDS.forEach(({ key }) => {
+        next[key] = convertMeasurement(previous[key], from, to);
+      });
+      return next;
+    });
+  };
+
+  const changeUnit = (next: MeasurementUnit, convertFieldsForEditing = false) => {
+    if (next === unit) return;
+    if (convertFieldsForEditing) convertFields(unit, next);
+    setUnit(next);
+  };
 
   const validate = () => {
     const errs: Partial<Record<MeasureKey, string>> = {};
@@ -2031,13 +2059,41 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
             <View>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>My Measurements</Text>
               <Text style={[styles.savedDate, { color: theme.textMuted }]}>
-                Saved in {saved.unit?.toUpperCase() ?? "CM"} · {new Date(saved.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                Showing in {unit === "cm" ? "cm" : "inches"} · {new Date(saved.updatedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
               </Text>
             </View>
-            <TouchableOpacity style={[styles.editMeasureBtn, { borderColor: Colors.brand.primary + "50" }]} onPress={() => setEditing(true)}>
+            <TouchableOpacity
+              style={[styles.editMeasureBtn, { borderColor: Colors.brand.primary + "50" }]}
+              onPress={() => {
+                const savedUnit = normalizeMeasurementUnit(saved.unit);
+                setFields((previous) => {
+                  const next = { ...previous };
+                  MEASURE_FIELDS.forEach(({ key }) => {
+                    next[key] = convertMeasurement(saved[key], savedUnit, unit);
+                  });
+                  return next;
+                });
+                setEditing(true);
+              }}
+            >
               <Feather name="edit-2" size={14} color={Colors.brand.primary} />
               <Text style={[styles.editMeasureBtnText, { color: Colors.brand.primary }]}>Edit</Text>
             </TouchableOpacity>
+          </View>
+
+          <View style={[styles.unitToggle, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.unitToggleLabel, { color: theme.textSecondary }]}>Unit:</Text>
+            {(["cm", "in"] as const).map((u) => (
+              <TouchableOpacity
+                key={u}
+                style={[styles.unitBtn, unit === u && { backgroundColor: Colors.brand.primary }]}
+                onPress={() => { changeUnit(u); Haptics.selectionAsync(); }}
+              >
+                <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>
+                  {u === "cm" ? "cm" : "inches"}
+                </Text>
+              </TouchableOpacity>
+            ))}
           </View>
 
           <View style={[styles.measureGrid, { borderColor: theme.border }]}>
@@ -2058,7 +2114,7 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
                   </View>
                   <Text style={[styles.measureCellLabel, { color: theme.textSecondary }]}>{f.label}</Text>
                   <Text style={[styles.measureCellValue, { color: val ? theme.text : theme.textMuted }]}>
-                    {val ? `${Number(val).toFixed(1)} ${saved.unit ?? "cm"}` : "—"}
+                    {val ? `${Number(convertMeasurement(val, normalizeMeasurementUnit(saved.unit), unit)).toFixed(1)} ${unit === "cm" ? "cm" : "inches"}` : "—"}
                   </Text>
                 </View>
               );
@@ -2102,10 +2158,10 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
               <TouchableOpacity
                 key={u}
                 style={[styles.unitBtn, unit === u && { backgroundColor: Colors.brand.primary }]}
-                onPress={() => { setUnit(u); Haptics.selectionAsync(); }}
+                onPress={() => { changeUnit(u, true); Haptics.selectionAsync(); }}
               >
                 <Text style={[styles.unitBtnText, { color: unit === u ? "#fff" : theme.textSecondary }]}>
-                  {u === "cm" ? "Centimetres" : "Inches"}
+                  {u === "cm" ? "cm" : "inches"}
                 </Text>
               </TouchableOpacity>
             ))}
@@ -2133,7 +2189,7 @@ function MeasurementsTab({ theme, user, onSaved }: { theme: typeof Colors.light;
                 <View style={styles.measureInputLabel}>
                   <View style={[styles.measureDotSmall, { backgroundColor: MEASURE_COLORS[f.key] }]} />
                   <Text style={[styles.fieldLabel, { color: theme.text }]}>{f.label}</Text>
-                  <Text style={[styles.fieldUnit, { color: theme.textMuted }]}>{unit}</Text>
+                   <Text style={[styles.fieldUnit, { color: theme.textMuted }]}>{unit === "cm" ? "cm" : "inches"}</Text>
                 </View>
                 <TextInput
                   style={[
