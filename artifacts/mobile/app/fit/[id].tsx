@@ -15,10 +15,11 @@ import {
   Share,
   ActivityIndicator,
   Image,
+  Alert,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useMutation } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
@@ -32,6 +33,7 @@ interface BlouseFit {
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  findMyTailor?: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -63,6 +65,7 @@ function MeasBadge({ label, value }: { label: string; value?: number }) {
 export default function FitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useApp();
+  const fitUserId = user?.id ?? "guest";
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
@@ -72,14 +75,30 @@ export default function FitDetailScreen() {
   const bottomPad = isWeb ? 34 : insets.bottom;
 
   const { data: fit, isLoading } = useQuery<BlouseFit>({
-     queryKey: ["blouse-fit", id, user?.id],
+     queryKey: ["blouse-fit", id, fitUserId],
     queryFn: async () => {
       const domain = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
-       const res = await fetch(`${domain}/api/blouse/fits/${id}?userId=${encodeURIComponent(user?.id ?? "")}`);
+       const res = await fetch(`${domain}/api/blouse/fits/${id}?userId=${encodeURIComponent(fitUserId)}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
-     enabled: !!id && !!user?.id,
+     enabled: !!id,
+  });
+
+  const [addedToTailorFits, setAddedToTailorFits] = React.useState(false);
+  const addToTailorFitsMutation = useMutation({
+    mutationFn: async () => {
+      const domain = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
+      const res = await fetch(`${domain}/api/blouse/fits/${id}/find-tailor`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: fitUserId }),
+      });
+      if (!res.ok) throw new Error("Could not add fit");
+      return res.json();
+    },
+    onSuccess: () => setAddedToTailorFits(true),
+    onError: () => Alert.alert("Error", "Could not add this fit to Tailor Fits."),
   });
 
   const handleShare = async () => {
@@ -250,7 +269,17 @@ export default function FitDetailScreen() {
             onPress={handleShare}
           >
             <Feather name="share-2" size={18} color="#fff" />
-            <Text style={styles.shareFullBtnText}>Share with Tailor</Text>
+            <Text style={styles.shareFullBtnText}>Send to Tailor</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.shareFullBtn, { backgroundColor: Colors.brand.gold, marginTop: 10, opacity: addToTailorFitsMutation.isPending ? 0.7 : 1 }]}
+            onPress={() => addToTailorFitsMutation.mutate()}
+            disabled={addToTailorFitsMutation.isPending || !!fit.findMyTailor || addedToTailorFits}
+          >
+            <Feather name={fit.findMyTailor || addedToTailorFits ? "check-circle" : "plus-circle"} size={18} color={Colors.brand.primaryDark} />
+            <Text style={[styles.shareFullBtnText, { color: Colors.brand.primaryDark }]}>
+              {fit.findMyTailor || addedToTailorFits ? "Added to Tailor Fits" : "Add to Tailor Fits"}
+            </Text>
           </TouchableOpacity>
         </Animated.View>
         <CopyrightNotice />
