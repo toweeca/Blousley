@@ -3,6 +3,7 @@ import {
   serial,
   text,
   integer,
+  boolean,
   jsonb,
   timestamp,
 } from "drizzle-orm/pg-core";
@@ -29,6 +30,7 @@ export const blouseFitsTable = pgTable("blouse_fits", {
   }>(),
   aiAnalysis: text("ai_analysis"),
   notes: text("notes"),
+  findMyTailor: boolean("find_my_tailor").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });

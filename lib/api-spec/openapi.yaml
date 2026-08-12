@@ -96,6 +96,11 @@ paths:
           required: true
           schema:
             type: integer
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: Blouse fit
@@ -120,6 +125,35 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/DeleteResponse"
+
+  /blouse/fits/{id}/find-tailor:
+    patch:
+      operationId: submitFitToTailors
+      tags: [blouse]
+      summary: Submit an owned fit to the tailor list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+      responses:
+        "200":
+          description: Submitted fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlouseFit"
 
   /blouse/fits/{id}/notes:
     patch:
@@ -150,7 +184,13 @@ paths:
     get:
       operationId: getTailorCustomers
       tags: [tailor]
-      summary: Get all customers fits (tailor view)
+      summary: Get fits submitted to the tailor list
+      parameters:
+        - name: tailorId
+          in: query
+          required: true
+          schema:
+            type: string
       responses:
         "200":
           description: List of all fits
@@ -222,6 +262,9 @@ components:
         notes:
           type: string
           nullable: true
+        findMyTailor:
+          type: boolean
+          default: false
         createdAt:
           type: string
           format: date-time
@@ -231,6 +274,7 @@ components:
       required:
         - id
         - userId
+        - findMyTailor
         - createdAt
         - updatedAt
 

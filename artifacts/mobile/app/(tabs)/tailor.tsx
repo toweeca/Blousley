@@ -30,6 +30,7 @@ import ChatThread from "@/components/ChatThread";
 interface BlouseFit {
   id: number;
   userId: string;
+  imageUrl?: string | null;
   bodyShape?: string | null;
   measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number } | null;
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
@@ -70,6 +71,9 @@ function CustomerCard({
   return (
     <Animated.View entering={FadeInDown.delay(delay).springify()}>
       <View style={[styles.customerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+        {fit.imageUrl ? (
+          <Image source={{ uri: fit.imageUrl }} style={styles.customerFitImage} resizeMode="cover" />
+        ) : null}
         <View style={styles.cardTopRow}>
           <View style={[styles.customerAvatar, { backgroundColor: Colors.brand.primary + "20" }]}>
             <Text style={[styles.customerAvatarText, { color: Colors.brand.primary }]}>
@@ -520,7 +524,7 @@ export default function TailorScreen() {
     queryFn: async () => {
       const endpoint =
         user?.role === "tailor"
-          ? `${apiBase}/api/tailor/customers`
+          ? `${apiBase}/api/tailor/customers?tailorId=${encodeURIComponent(user.id)}`
           : `${apiBase}/api/blouse/fits?userId=${user?.id ?? "guest"}`;
       const res = await fetch(endpoint);
       if (!res.ok) throw new Error("Failed to fetch");
@@ -568,9 +572,16 @@ export default function TailorScreen() {
       const res = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ customerId: fit.userId, tailorId: user.id, title: `Customer #${fit.userId.slice(-6)}` }),
+        body: JSON.stringify({
+          customerId: fit.userId,
+          tailorId: user.id,
+          requesterId: user.id,
+          fitId: fit.id,
+          title: `Customer #${fit.userId.slice(-6)}`,
+        }),
       });
-      const convo = await res.json();
+       if (!res.ok) throw new Error("Could not open chat");
+       const convo = await res.json();
       setChatConvoId(convo.id);
       setChatPartnerName(`Customer #${fit.userId.slice(-6)}`);
       setChatVisible(true);
@@ -595,6 +606,7 @@ export default function TailorScreen() {
         body: JSON.stringify({
           customerId: selectedIdea.userId,
           tailorId: user.id,
+          requesterId: user.id,
           title: `Design: ${selectedIdea.title ?? "Blouse Request"}`,
           ideaId: selectedIdea.id,
         }),
@@ -895,6 +907,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     padding: 18,
     gap: 14,
+  },
+  customerFitImage: {
+    width: "100%",
+    height: 180,
+    borderRadius: 12,
   },
   cardTopRow: {
     flexDirection: "row",

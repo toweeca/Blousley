@@ -17,6 +17,7 @@ export interface BlouseFit {
   stylePrefs?: StylePrefs | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  findMyTailor: boolean;
   createdAt: Date;
   updatedAt: Date;
 }

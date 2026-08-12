@@ -51,6 +51,8 @@ export const GetBlouseFitsQueryParams = zod.object({
   userId: zod.coerce.string(),
 });
 
+export const getBlouseFitsResponseFindMyTailorDefault = false;
+
 export const GetBlouseFitsResponseItem = zod.object({
   id: zod.number(),
   userId: zod.string(),
@@ -75,6 +77,7 @@ export const GetBlouseFitsResponseItem = zod.object({
     .nullish(),
   aiAnalysis: zod.string().nullish(),
   notes: zod.string().nullish(),
+  findMyTailor: zod.boolean().default(getBlouseFitsResponseFindMyTailorDefault),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });
@@ -114,6 +117,12 @@ export const GetBlouseFitParams = zod.object({
   id: zod.coerce.number(),
 });
 
+export const GetBlouseFitQueryParams = zod.object({
+  userId: zod.coerce.string(),
+});
+
+export const getBlouseFitResponseFindMyTailorDefault = false;
+
 export const GetBlouseFitResponse = zod.object({
   id: zod.number(),
   userId: zod.string(),
@@ -138,6 +147,7 @@ export const GetBlouseFitResponse = zod.object({
     .nullish(),
   aiAnalysis: zod.string().nullish(),
   notes: zod.string().nullish(),
+  findMyTailor: zod.boolean().default(getBlouseFitResponseFindMyTailorDefault),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });
@@ -154,6 +164,50 @@ export const DeleteBlouseFitResponse = zod.object({
 });
 
 /**
+ * @summary Submit an owned fit to the tailor list
+ */
+export const SubmitFitToTailorsParams = zod.object({
+  id: zod.coerce.number(),
+});
+
+export const SubmitFitToTailorsBody = zod.object({
+  userId: zod.string(),
+});
+
+export const submitFitToTailorsResponseFindMyTailorDefault = false;
+
+export const SubmitFitToTailorsResponse = zod.object({
+  id: zod.number(),
+  userId: zod.string(),
+  imageUrl: zod.string().nullish(),
+  measurements: zod
+    .object({
+      bust: zod.number().optional(),
+      waist: zod.number().optional(),
+      shoulder: zod.number().optional(),
+      hip: zod.number().optional(),
+    })
+    .nullish(),
+  bodyShape: zod.string().nullish(),
+  stylePrefs: zod
+    .object({
+      neckline: zod.string().optional(),
+      sleeves: zod.string().optional(),
+      back: zod.string().optional(),
+      fabric: zod.string().optional(),
+      fit: zod.string().optional(),
+    })
+    .nullish(),
+  aiAnalysis: zod.string().nullish(),
+  notes: zod.string().nullish(),
+  findMyTailor: zod
+    .boolean()
+    .default(submitFitToTailorsResponseFindMyTailorDefault),
+  createdAt: zod.date(),
+  updatedAt: zod.date(),
+});
+
+/**
  * @summary Update tailor notes for a fit
  */
 export const UpdateFitNotesParams = zod.object({
@@ -163,6 +217,8 @@ export const UpdateFitNotesParams = zod.object({
 export const UpdateFitNotesBody = zod.object({
   notes: zod.string(),
 });
+
+export const updateFitNotesResponseFindMyTailorDefault = false;
 
 export const UpdateFitNotesResponse = zod.object({
   id: zod.number(),
@@ -188,13 +244,22 @@ export const UpdateFitNotesResponse = zod.object({
     .nullish(),
   aiAnalysis: zod.string().nullish(),
   notes: zod.string().nullish(),
+  findMyTailor: zod
+    .boolean()
+    .default(updateFitNotesResponseFindMyTailorDefault),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });
 
 /**
- * @summary Get all customers fits (tailor view)
+ * @summary Get fits submitted to the tailor list
  */
+export const GetTailorCustomersQueryParams = zod.object({
+  tailorId: zod.coerce.string(),
+});
+
+export const getTailorCustomersResponseFindMyTailorDefault = false;
+
 export const GetTailorCustomersResponseItem = zod.object({
   id: zod.number(),
   userId: zod.string(),
@@ -219,6 +284,9 @@ export const GetTailorCustomersResponseItem = zod.object({
     .nullish(),
   aiAnalysis: zod.string().nullish(),
   notes: zod.string().nullish(),
+  findMyTailor: zod
+    .boolean()
+    .default(getTailorCustomersResponseFindMyTailorDefault),
   createdAt: zod.date(),
   updatedAt: zod.date(),
 });

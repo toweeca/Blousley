@@ -21,6 +21,7 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
+import { useApp } from "@/context/AppContext";
 
 interface BlouseFit {
   id: number;
@@ -61,6 +62,7 @@ function MeasBadge({ label, value }: { label: string; value?: number }) {
 
 export default function FitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useApp();
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
@@ -70,13 +72,14 @@ export default function FitDetailScreen() {
   const bottomPad = isWeb ? 34 : insets.bottom;
 
   const { data: fit, isLoading } = useQuery<BlouseFit>({
-    queryKey: ["blouse-fit", id],
+     queryKey: ["blouse-fit", id, user?.id],
     queryFn: async () => {
       const domain = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
-      const res = await fetch(`${domain}/api/blouse/fits/${id}`);
+       const res = await fetch(`${domain}/api/blouse/fits/${id}?userId=${encodeURIComponent(user?.id ?? "")}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
+     enabled: !!id && !!user?.id,
   });
 
   const handleShare = async () => {

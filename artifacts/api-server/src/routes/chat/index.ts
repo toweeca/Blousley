@@ -1,7 +1,7 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router } from "express";
 import { db } from "@workspace/db";
-import { conversations, messages, customerIdeasTable } from "@workspace/db/schema";
+import { conversations, messages, customerIdeasTable, blouseFitsTable } from "@workspace/db/schema";
 import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
 
 const router = Router();
@@ -83,16 +83,38 @@ router.get("/conversations/:id/idea", async (req, res) => {
 });
 
 router.post("/conversations", async (req, res) => {
-  const { customerId, tailorId, title, ideaId } = req.body as {
+  const { customerId, tailorId, requesterId, title, ideaId, fitId } = req.body as {
     customerId: string;
     tailorId: string;
+    requesterId: string;
     title?: string;
     ideaId?: number;
+    fitId?: number;
   };
-  if (!customerId || !tailorId)
-    return res.status(400).json({ error: "customerId and tailorId required" });
+  if (!customerId || !tailorId || !requesterId)
+    return res.status(400).json({ error: "customerId, tailorId, and requesterId required" });
+  if (requesterId !== customerId && requesterId !== tailorId)
+    return res.status(403).json({ error: "Requester is not a conversation participant" });
 
   try {
+    if (fitId && requesterId !== tailorId) {
+      return res.status(403).json({ error: "Only the assigned tailor can open this fit chat" });
+    }
+    if (fitId) {
+      const [sharedFit] = await db
+        .select({ id: blouseFitsTable.id })
+        .from(blouseFitsTable)
+        .where(
+          and(
+            eq(blouseFitsTable.id, fitId),
+            eq(blouseFitsTable.userId, customerId),
+            eq(blouseFitsTable.findMyTailor, true),
+          ),
+        )
+        .limit(1);
+      if (!sharedFit) return res.status(403).json({ error: "This fit is not available for tailor contact" });
+    }
+
     const existing = await db
       .select()
       .from(conversations)

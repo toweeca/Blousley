@@ -33,6 +33,7 @@ export interface BlouseFit {
   stylePrefs?: StylePrefs | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  findMyTailor: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -83,4 +84,16 @@ export interface DeleteResponse {
 
 export type GetBlouseFitsParams = {
   userId: string;
+};
+
+export type GetBlouseFitParams = {
+  userId: string;
+};
+
+export type SubmitFitToTailorsBody = {
+  userId: string;
+};
+
+export type GetTailorCustomersParams = {
+  tailorId: string;
 };

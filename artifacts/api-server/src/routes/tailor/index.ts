@@ -1,16 +1,27 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router, type IRouter } from "express";
-import { db, blouseFitsTable, tailorsTable } from "@workspace/db";
+import { db, blouseFitsTable, tailorsTable, usersTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
-import { desc, eq, count } from "drizzle-orm";
+import { desc, eq, count, and } from "drizzle-orm";
 
 const router: IRouter = Router();
 
 router.get("/customers", async (req, res) => {
   try {
+    const { tailorId } = req.query as { tailorId?: string };
+    if (!tailorId) return res.status(400).json({ error: "tailorId required" });
+
+    const [tailor] = await db
+      .select({ id: usersTable.id })
+      .from(usersTable)
+      .where(and(eq(usersTable.id, tailorId), eq(usersTable.role, "tailor")))
+      .limit(1);
+    if (!tailor) return res.status(403).json({ error: "Tailor access required" });
+
     const fits = await db
       .select()
       .from(blouseFitsTable)
+      .where(eq(blouseFitsTable.findMyTailor, true))
       .orderBy(desc(blouseFitsTable.createdAt));
     res.json(fits);
   } catch (error) {

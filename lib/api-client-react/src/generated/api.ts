@@ -21,9 +21,12 @@ import type {
   AnalyzeBlouseResponse,
   BlouseFit,
   DeleteResponse,
+  GetBlouseFitParams,
   GetBlouseFitsParams,
+  GetTailorCustomersParams,
   HealthStatus,
   SaveBlouseFitRequest,
+  SubmitFitToTailorsBody,
   UpdateNotesRequest,
 } from "./api.schemas";
 
@@ -381,22 +384,38 @@ export const useSaveBlouseFit = <
 /**
  * @summary Get a single blouse fit
  */
-export const getGetBlouseFitUrl = (id: number) => {
-  return `/api/blouse/fits/${id}`;
+export const getGetBlouseFitUrl = (id: number, params: GetBlouseFitParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/blouse/fits/${id}?${stringifiedParams}`
+    : `/api/blouse/fits/${id}`;
 };
 
 export const getBlouseFit = async (
   id: number,
+  params: GetBlouseFitParams,
   options?: RequestInit,
 ): Promise<BlouseFit> => {
-  return customFetch<BlouseFit>(getGetBlouseFitUrl(id), {
+  return customFetch<BlouseFit>(getGetBlouseFitUrl(id, params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetBlouseFitQueryKey = (id: number) => {
-  return [`/api/blouse/fits/${id}`] as const;
+export const getGetBlouseFitQueryKey = (
+  id: number,
+  params?: GetBlouseFitParams,
+) => {
+  return [`/api/blouse/fits/${id}`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetBlouseFitQueryOptions = <
@@ -404,6 +423,7 @@ export const getGetBlouseFitQueryOptions = <
   TError = ErrorType<unknown>,
 >(
   id: number,
+  params: GetBlouseFitParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getBlouseFit>>,
@@ -415,11 +435,12 @@ export const getGetBlouseFitQueryOptions = <
 ) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetBlouseFitQueryKey(id);
+  const queryKey =
+    queryOptions?.queryKey ?? getGetBlouseFitQueryKey(id, params);
 
   const queryFn: QueryFunction<Awaited<ReturnType<typeof getBlouseFit>>> = ({
     signal,
-  }) => getBlouseFit(id, { signal, ...requestOptions });
+  }) => getBlouseFit(id, params, { signal, ...requestOptions });
 
   return {
     queryKey,
@@ -447,6 +468,7 @@ export function useGetBlouseFit<
   TError = ErrorType<unknown>,
 >(
   id: number,
+  params: GetBlouseFitParams,
   options?: {
     query?: UseQueryOptions<
       Awaited<ReturnType<typeof getBlouseFit>>,
@@ -456,7 +478,7 @@ export function useGetBlouseFit<
     request?: SecondParameter<typeof customFetch>;
   },
 ): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetBlouseFitQueryOptions(id, options);
+  const queryOptions = getGetBlouseFitQueryOptions(id, params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;
@@ -550,6 +572,93 @@ export const useDeleteBlouseFit = <
 };
 
 /**
+ * @summary Submit an owned fit to the tailor list
+ */
+export const getSubmitFitToTailorsUrl = (id: number) => {
+  return `/api/blouse/fits/${id}/find-tailor`;
+};
+
+export const submitFitToTailors = async (
+  id: number,
+  submitFitToTailorsBody: SubmitFitToTailorsBody,
+  options?: RequestInit,
+): Promise<BlouseFit> => {
+  return customFetch<BlouseFit>(getSubmitFitToTailorsUrl(id), {
+    ...options,
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+    body: JSON.stringify(submitFitToTailorsBody),
+  });
+};
+
+export const getSubmitFitToTailorsMutationOptions = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitFitToTailors>>,
+    TError,
+    { id: number; data: BodyType<SubmitFitToTailorsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationOptions<
+  Awaited<ReturnType<typeof submitFitToTailors>>,
+  TError,
+  { id: number; data: BodyType<SubmitFitToTailorsBody> },
+  TContext
+> => {
+  const mutationKey = ["submitFitToTailors"];
+  const { mutation: mutationOptions, request: requestOptions } = options
+    ? options.mutation &&
+      "mutationKey" in options.mutation &&
+      options.mutation.mutationKey
+      ? options
+      : { ...options, mutation: { ...options.mutation, mutationKey } }
+    : { mutation: { mutationKey }, request: undefined };
+
+  const mutationFn: MutationFunction<
+    Awaited<ReturnType<typeof submitFitToTailors>>,
+    { id: number; data: BodyType<SubmitFitToTailorsBody> }
+  > = (props) => {
+    const { id, data } = props ?? {};
+
+    return submitFitToTailors(id, data, requestOptions);
+  };
+
+  return { mutationFn, ...mutationOptions };
+};
+
+export type SubmitFitToTailorsMutationResult = NonNullable<
+  Awaited<ReturnType<typeof submitFitToTailors>>
+>;
+export type SubmitFitToTailorsMutationBody = BodyType<SubmitFitToTailorsBody>;
+export type SubmitFitToTailorsMutationError = ErrorType<unknown>;
+
+/**
+ * @summary Submit an owned fit to the tailor list
+ */
+export const useSubmitFitToTailors = <
+  TError = ErrorType<unknown>,
+  TContext = unknown,
+>(options?: {
+  mutation?: UseMutationOptions<
+    Awaited<ReturnType<typeof submitFitToTailors>>,
+    TError,
+    { id: number; data: BodyType<SubmitFitToTailorsBody> },
+    TContext
+  >;
+  request?: SecondParameter<typeof customFetch>;
+}): UseMutationResult<
+  Awaited<ReturnType<typeof submitFitToTailors>>,
+  TError,
+  { id: number; data: BodyType<SubmitFitToTailorsBody> },
+  TContext
+> => {
+  return useMutation(getSubmitFitToTailorsMutationOptions(options));
+};
+
+/**
  * @summary Update tailor notes for a fit
  */
 export const getUpdateFitNotesUrl = (id: number) => {
@@ -637,43 +746,62 @@ export const useUpdateFitNotes = <
 };
 
 /**
- * @summary Get all customers fits (tailor view)
+ * @summary Get fits submitted to the tailor list
  */
-export const getGetTailorCustomersUrl = () => {
-  return `/api/tailor/customers`;
+export const getGetTailorCustomersUrl = (params: GetTailorCustomersParams) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? "null" : value.toString());
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0
+    ? `/api/tailor/customers?${stringifiedParams}`
+    : `/api/tailor/customers`;
 };
 
 export const getTailorCustomers = async (
+  params: GetTailorCustomersParams,
   options?: RequestInit,
 ): Promise<BlouseFit[]> => {
-  return customFetch<BlouseFit[]>(getGetTailorCustomersUrl(), {
+  return customFetch<BlouseFit[]>(getGetTailorCustomersUrl(params), {
     ...options,
     method: "GET",
   });
 };
 
-export const getGetTailorCustomersQueryKey = () => {
-  return [`/api/tailor/customers`] as const;
+export const getGetTailorCustomersQueryKey = (
+  params?: GetTailorCustomersParams,
+) => {
+  return [`/api/tailor/customers`, ...(params ? [params] : [])] as const;
 };
 
 export const getGetTailorCustomersQueryOptions = <
   TData = Awaited<ReturnType<typeof getTailorCustomers>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getTailorCustomers>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}) => {
+>(
+  params: GetTailorCustomersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTailorCustomers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+) => {
   const { query: queryOptions, request: requestOptions } = options ?? {};
 
-  const queryKey = queryOptions?.queryKey ?? getGetTailorCustomersQueryKey();
+  const queryKey =
+    queryOptions?.queryKey ?? getGetTailorCustomersQueryKey(params);
 
   const queryFn: QueryFunction<
     Awaited<ReturnType<typeof getTailorCustomers>>
-  > = ({ signal }) => getTailorCustomers({ signal, ...requestOptions });
+  > = ({ signal }) => getTailorCustomers(params, { signal, ...requestOptions });
 
   return { queryKey, queryFn, ...queryOptions } as UseQueryOptions<
     Awaited<ReturnType<typeof getTailorCustomers>>,
@@ -688,21 +816,24 @@ export type GetTailorCustomersQueryResult = NonNullable<
 export type GetTailorCustomersQueryError = ErrorType<unknown>;
 
 /**
- * @summary Get all customers fits (tailor view)
+ * @summary Get fits submitted to the tailor list
  */
 
 export function useGetTailorCustomers<
   TData = Awaited<ReturnType<typeof getTailorCustomers>>,
   TError = ErrorType<unknown>,
->(options?: {
-  query?: UseQueryOptions<
-    Awaited<ReturnType<typeof getTailorCustomers>>,
-    TError,
-    TData
-  >;
-  request?: SecondParameter<typeof customFetch>;
-}): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
-  const queryOptions = getGetTailorCustomersQueryOptions(options);
+>(
+  params: GetTailorCustomersParams,
+  options?: {
+    query?: UseQueryOptions<
+      Awaited<ReturnType<typeof getTailorCustomers>>,
+      TError,
+      TData
+    >;
+    request?: SecondParameter<typeof customFetch>;
+  },
+): UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+  const queryOptions = getGetTailorCustomersQueryOptions(params, options);
 
   const query = useQuery(queryOptions) as UseQueryResult<TData, TError> & {
     queryKey: QueryKey;

@@ -32,6 +32,7 @@ interface BlouseFit {
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  findMyTailor: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -39,12 +40,16 @@ interface BlouseFit {
 function FitCard({
   fit,
   onDelete,
+  onFindTailor,
   isDeleting,
+  isFindingTailor,
   delay,
 }: {
   fit: BlouseFit;
   onDelete: () => void;
+  onFindTailor: () => void;
   isDeleting: boolean;
+  isFindingTailor: boolean;
   delay: number;
 }) {
   const colorScheme = useColorScheme();
@@ -190,6 +195,20 @@ function FitCard({
               </Text>
             </View>
           )}
+          <TouchableOpacity
+            style={[styles.findTailorBtn, { borderColor: Colors.brand.primary + "50", opacity: isFindingTailor ? 0.6 : 1 }]}
+            onPress={(e) => {
+              e.stopPropagation();
+              if (!fit.findMyTailor) onFindTailor();
+            }}
+            disabled={isFindingTailor || fit.findMyTailor}
+            testID={`find-tailor-${fit.id}`}
+          >
+            <Feather name={fit.findMyTailor ? "check-circle" : "search"} size={15} color={Colors.brand.primary} />
+            <Text style={[styles.findTailorText, { color: Colors.brand.primary }]}>
+              {fit.findMyTailor ? "Sent to Tailors" : "Find My Tailor"}
+            </Text>
+          </TouchableOpacity>
         </View>
       </TouchableOpacity>
     </Animated.View>
@@ -230,16 +249,36 @@ export default function HistoryScreen() {
     onError: () => Alert.alert("Error", "Could not delete this fit. Please try again."),
   });
 
+  const findTailorMutation = useMutation({
+    mutationFn: async (id: number) => {
+      const _d2 = process.env.EXPO_PUBLIC_DOMAIN ?? "";
+      const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
+      const res = await fetch(`${domain}/api/blouse/fits/${id}/find-tailor`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id }),
+      });
+      if (!res.ok) throw new Error("Find tailor failed");
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["blouse-fits"] });
+      Alert.alert("Sent to Tailors", "Tailors can now view this outfit and message you.");
+    },
+    onError: () => Alert.alert("Error", "Could not submit this outfit. Please try again."),
+  });
+
   const renderItem = useCallback(
     ({ item, index }: { item: BlouseFit; index: number }) => (
       <FitCard
         fit={item}
         delay={index * 60}
         isDeleting={deleteMutation.isPending && deleteMutation.variables === item.id}
+        isFindingTailor={findTailorMutation.isPending && findTailorMutation.variables === item.id}
         onDelete={() => deleteMutation.mutate(item.id)}
+        onFindTailor={() => findTailorMutation.mutate(item.id)}
       />
     ),
-    [deleteMutation]
+    [deleteMutation, findTailorMutation]
   );
 
   return (
@@ -450,6 +489,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     flex: 1,
     lineHeight: 18,
+  },
+  findTailorBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 7,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingVertical: 10,
+  },
+  findTailorText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
   },
   emptyState: {
     alignItems: "center",

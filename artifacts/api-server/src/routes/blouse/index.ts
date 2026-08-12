@@ -1,7 +1,7 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router, type IRouter } from "express";
 import { db, blouseFitsTable } from "@workspace/db";
-import { eq, desc } from "drizzle-orm";
+import { eq, desc, and } from "drizzle-orm";
 import { ai } from "@workspace/integrations-gemini-ai";
 import designRouter from "./design";
 
@@ -199,10 +199,15 @@ router.post("/fits", async (req, res) => {
 router.get("/fits/:id", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
+    const { userId } = req.query as { userId?: string };
+    if (!userId) {
+      res.status(400).json({ error: "userId is required" });
+      return;
+    }
     const [fit] = await db
       .select()
       .from(blouseFitsTable)
-      .where(eq(blouseFitsTable.id, id));
+      .where(and(eq(blouseFitsTable.id, id), eq(blouseFitsTable.userId, userId)));
     if (!fit) {
       res.status(404).json({ error: "Fit not found" });
       return;
@@ -211,6 +216,37 @@ router.get("/fits/:id", async (req, res) => {
   } catch (error) {
     console.error("Error fetching fit:", error);
     res.status(500).json({ error: "Failed to fetch fit" });
+  }
+});
+
+router.patch("/fits/:id/find-tailor", async (req, res) => {
+  try {
+    const id = parseInt(req.params["id"] ?? "0");
+    const { userId } = req.body as { userId?: string };
+    if (!userId) {
+      res.status(400).json({ error: "userId is required" });
+      return;
+    }
+
+    const [fit] = await db
+      .select({ id: blouseFitsTable.id })
+      .from(blouseFitsTable)
+      .where(and(eq(blouseFitsTable.id, id), eq(blouseFitsTable.userId, userId)))
+      .limit(1);
+    if (!fit) {
+      res.status(404).json({ error: "Fit not found" });
+      return;
+    }
+
+    const [updated] = await db
+      .update(blouseFitsTable)
+      .set({ findMyTailor: true, updatedAt: new Date() })
+      .where(eq(blouseFitsTable.id, id))
+      .returning();
+    res.json(updated);
+  } catch (error) {
+    console.error("Error submitting fit to tailors:", error);
+    res.status(500).json({ error: "Failed to find a tailor" });
   }
 });
 
