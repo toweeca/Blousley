@@ -36,6 +36,7 @@ interface BlouseFit {
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  assignedTailorId?: string | null;
   createdAt: string;
 }
 
@@ -53,11 +54,13 @@ function CustomerCard({
   fit,
   onAddNote,
   onMessage,
+  tailorId,
   delay,
 }: {
   fit: BlouseFit;
   onAddNote: (fit: BlouseFit) => void;
   onMessage: (fit: BlouseFit) => void;
+  tailorId: string;
   delay: number;
 }) {
   const colorScheme = useColorScheme();
@@ -67,6 +70,8 @@ function CustomerCard({
     day: "numeric",
     month: "short",
   });
+  const assignedToThisTailor = fit.assignedTailorId === tailorId;
+  const assignedToAnotherTailor = !!fit.assignedTailorId && !assignedToThisTailor;
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).springify()}>
@@ -146,12 +151,15 @@ function CustomerCard({
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.msgBtn, { backgroundColor: Colors.brand.primary }]}
+            style={[styles.msgBtn, { backgroundColor: Colors.brand.primary, opacity: assignedToAnotherTailor ? 0.55 : 1 }]}
             onPress={() => onMessage(fit)}
+            disabled={assignedToAnotherTailor}
             testID={`message-customer-${fit.id}`}
           >
-            <Feather name="message-circle" size={15} color="#fff" />
-            <Text style={styles.msgBtnText}>Message</Text>
+            <Feather name={assignedToAnotherTailor ? "lock" : assignedToThisTailor ? "message-circle" : "check"} size={15} color="#fff" />
+            <Text style={styles.msgBtnText}>
+              {assignedToAnotherTailor ? "Assigned" : assignedToThisTailor ? "Message" : "Accept Job"}
+            </Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -520,7 +528,7 @@ export default function TailorScreen() {
   })();
 
   const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
-    queryKey: ["tailor-customers"],
+    queryKey: ["tailor-customers", user?.id],
     queryFn: async () => {
       const endpoint =
         user?.role === "tailor"
@@ -582,6 +590,7 @@ export default function TailorScreen() {
       });
        if (!res.ok) throw new Error("Could not open chat");
        const convo = await res.json();
+       qc.invalidateQueries({ queryKey: ["tailor-customers"] });
       setChatConvoId(convo.id);
       setChatPartnerName(`Customer #${fit.userId.slice(-6)}`);
       setChatVisible(true);
@@ -661,6 +670,7 @@ export default function TailorScreen() {
         renderItem={({ item, index }) => (
           <CustomerCard
             fit={item}
+            tailorId={user?.id ?? ""}
             onAddNote={handleAddNote}
             onMessage={handleMessage}
             delay={index * 60}

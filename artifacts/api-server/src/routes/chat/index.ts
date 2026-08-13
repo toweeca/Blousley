@@ -20,14 +20,18 @@ async function getConversationForParticipant(conversationId: number, userId: str
 }
 
 router.get("/conversations", async (req, res) => {
-  const { userId } = req.query as { userId?: string };
+  const { userId, fitId } = req.query as { userId?: string; fitId?: string };
   if (!userId) return res.status(400).json({ error: "userId required" });
 
   try {
+    const participantFilter = or(eq(conversations.customerId, userId), eq(conversations.tailorId, userId));
+    const filters = fitId
+      ? and(participantFilter, eq(conversations.fitId, Number(fitId)))
+      : participantFilter;
     const convos = await db
       .select()
       .from(conversations)
-      .where(or(eq(conversations.customerId, userId), eq(conversations.tailorId, userId)))
+      .where(filters)
       .orderBy(desc(conversations.lastMessageAt));
 
     const withUnread = await Promise.all(
@@ -113,13 +117,32 @@ router.post("/conversations", async (req, res) => {
         )
         .limit(1);
       if (!sharedFit) return res.status(403).json({ error: "This fit is not available for tailor contact" });
+
+      const [assignedConversation] = await db
+        .select()
+        .from(conversations)
+        .where(eq(conversations.fitId, fitId))
+        .limit(1);
+      if (assignedConversation && assignedConversation.tailorId !== tailorId) {
+        return res.status(409).json({ error: "This fit is already assigned to another tailor" });
+      }
     }
 
     const existing = await db
       .select()
       .from(conversations)
       .where(
-        and(eq(conversations.customerId, customerId), eq(conversations.tailorId, tailorId))
+        fitId
+          ? and(
+              eq(conversations.customerId, customerId),
+              eq(conversations.tailorId, tailorId),
+              eq(conversations.fitId, fitId),
+            )
+          : and(
+              eq(conversations.customerId, customerId),
+              eq(conversations.tailorId, tailorId),
+              isNull(conversations.fitId),
+            )
       )
       .limit(1);
 
@@ -142,6 +165,7 @@ router.post("/conversations", async (req, res) => {
         customerId,
         tailorId,
         ideaId: ideaId ?? null,
+        fitId: fitId ?? null,
       })
       .returning();
 

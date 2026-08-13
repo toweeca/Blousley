@@ -8,6 +8,7 @@ export const conversations = pgTable("conversations", {
   customerId: text("customer_id"),
   tailorId: text("tailor_id"),
   ideaId: integer("idea_id"),
+  fitId: integer("fit_id"),
   lastMessageAt: timestamp("last_message_at", { withTimezone: true }),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });

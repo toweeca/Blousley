@@ -23,6 +23,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
+import ChatThread from "@/components/ChatThread";
 
 interface BlouseFit {
   id: number;
@@ -36,6 +37,11 @@ interface BlouseFit {
   findMyTailor?: boolean;
   createdAt: string;
   updatedAt: string;
+}
+
+interface FitConversation {
+  id: number;
+  tailorId: string | null;
 }
 
 function DetailRow({ label, value, icon }: { label: string; value?: string | number | null; icon: string }) {
@@ -66,6 +72,7 @@ export default function FitDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { user } = useApp();
   const fitUserId = user?.id ?? "guest";
+  const apiBase = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const insets = useSafeAreaInsets();
@@ -77,19 +84,30 @@ export default function FitDetailScreen() {
   const { data: fit, isLoading } = useQuery<BlouseFit>({
      queryKey: ["blouse-fit", id, fitUserId],
     queryFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
-       const res = await fetch(`${domain}/api/blouse/fits/${id}?userId=${encodeURIComponent(fitUserId)}`);
+       const res = await fetch(`${apiBase}/api/blouse/fits/${id}?userId=${encodeURIComponent(fitUserId)}`);
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
      enabled: !!id,
   });
 
+  const { data: fitConversation } = useQuery<FitConversation | null>({
+    queryKey: ["chat-conversation-fit", id, fitUserId],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase}/api/chat/conversations?userId=${encodeURIComponent(fitUserId)}&fitId=${id}`);
+      if (!res.ok) return null;
+      const conversations = await res.json();
+      return conversations[0] ?? null;
+    },
+    enabled: !!id && !!fit,
+    refetchInterval: 5000,
+  });
+
   const [addedToTailorFits, setAddedToTailorFits] = React.useState(false);
+  const [chatVisible, setChatVisible] = React.useState(false);
   const addToTailorFitsMutation = useMutation({
     mutationFn: async () => {
-      const domain = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
-      const res = await fetch(`${domain}/api/blouse/fits/${id}/find-tailor`, {
+      const res = await fetch(`${apiBase}/api/blouse/fits/${id}/find-tailor`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: fitUserId }),
@@ -281,9 +299,28 @@ export default function FitDetailScreen() {
               {fit.findMyTailor || addedToTailorFits ? "Added to Tailor Fits" : "Add to Tailor Fits"}
             </Text>
           </TouchableOpacity>
+          {fitConversation && (
+            <TouchableOpacity
+              style={[styles.shareFullBtn, { backgroundColor: Colors.brand.primaryDark, marginTop: 10 }]}
+              onPress={() => setChatVisible(true)}
+            >
+              <Feather name="message-circle" size={18} color="#fff" />
+              <Text style={styles.shareFullBtnText}>Message Tailor</Text>
+            </TouchableOpacity>
+          )}
         </Animated.View>
         <CopyrightNotice />
       </ScrollView>
+      {fitConversation && fitConversation.tailorId && (
+        <ChatThread
+          visible={chatVisible}
+          onClose={() => setChatVisible(false)}
+          conversationId={fitConversation.id}
+          partnerName={`Tailor #${fitConversation.tailorId.slice(-6)}`}
+          currentUserId={fitUserId}
+          apiBase={apiBase}
+        />
+      )}
     </View>
   );
 }

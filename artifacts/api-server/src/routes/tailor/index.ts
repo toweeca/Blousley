@@ -18,12 +18,13 @@ router.get("/customers", async (req, res) => {
       .limit(1);
     if (!tailor) return res.status(403).json({ error: "Tailor access required" });
 
-    const fits = await db
-      .select()
+    const rows = await db
+      .select({ fit: blouseFitsTable, assignedTailorId: conversations.tailorId })
       .from(blouseFitsTable)
+      .leftJoin(conversations, eq(conversations.fitId, blouseFitsTable.id))
       .where(eq(blouseFitsTable.findMyTailor, true))
       .orderBy(desc(blouseFitsTable.createdAt));
-    res.json(fits);
+    res.json(rows.map(({ fit, assignedTailorId }) => ({ ...fit, assignedTailorId })));
   } catch (error) {
     console.error("Error fetching customer fits:", error);
     res.status(500).json({ error: "Failed to fetch customer fits" });
