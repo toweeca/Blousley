@@ -2,7 +2,7 @@
 import { Router, type IRouter } from "express";
 import { db, blouseFitsTable, tailorsTable, usersTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
-import { desc, eq, count, and } from "drizzle-orm";
+import { desc, eq, count, and, gte, lt } from "drizzle-orm";
 
 const router: IRouter = Router();
 
@@ -18,11 +18,18 @@ router.get("/customers", async (req, res) => {
       .limit(1);
     if (!tailor) return res.status(403).json({ error: "Tailor access required" });
 
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const rows = await db
       .select({ fit: blouseFitsTable, assignedTailorId: conversations.tailorId })
       .from(blouseFitsTable)
       .leftJoin(conversations, eq(conversations.fitId, blouseFitsTable.id))
-      .where(eq(blouseFitsTable.findMyTailor, true))
+      .where(and(
+        eq(blouseFitsTable.findMyTailor, true),
+        gte(blouseFitsTable.createdAt, startOfToday),
+        lt(blouseFitsTable.createdAt, startOfTomorrow),
+      ))
       .orderBy(desc(blouseFitsTable.createdAt));
     res.json(rows.map(({ fit, assignedTailorId }) => ({ ...fit, assignedTailorId })));
   } catch (error) {
