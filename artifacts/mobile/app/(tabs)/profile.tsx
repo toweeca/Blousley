@@ -1020,9 +1020,10 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const qc = useQueryClient();
   const domain = API_BASE;
 
-  const [mode, setMode] = useState<"list" | "upload" | "sketch">("list");
+  const [mode, setMode] = useState<"list" | "upload" | "sketch" | "text">("list");
   const [title, setTitle] = useState("");
   const [notes, setNotes] = useState("");
+  const [textDescription, setTextDescription] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
   const [sketchPaths, setSketchPaths] = useState<SketchPath[]>([]);
@@ -1095,6 +1096,29 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     }
   };
 
+  const generateAIFromText = async () => {
+    if (!textDescription.trim()) {
+      Alert.alert("Describe your idea", "Type a blouse design description first.");
+      return;
+    }
+    setAiSketchGenerating(true);
+    setImageUri(null);
+    try {
+      const res = await fetch(`${domain}/api/generate-blouse-image/text`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ description: textDescription.trim() }),
+      });
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setImageUri(`data:${data.mimeType ?? "image/png"};base64,${data.b64_json}`);
+    } catch {
+      Alert.alert("Generation failed", "Could not generate your design image. Please try again.");
+    } finally {
+      setAiSketchGenerating(false);
+    }
+  };
+
   const { data: ideas = [], isLoading } = useQuery({
     queryKey: ["ideas", user.id],
     queryFn: async () => {
@@ -1125,7 +1149,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
-          imageUrl: mode === "upload" ? imageUri : sketchBackground,
+           imageUrl: mode === "upload" || mode === "text" ? imageUri : sketchBackground,
           sketchCanvas: sketchData,
           notes: notes || null,
           title: title || null,
@@ -1137,7 +1161,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["ideas", user.id] });
-      setTitle(""); setNotes(""); setImageUri(null); setShared(false);
+       setTitle(""); setNotes(""); setTextDescription(""); setImageUri(null); setShared(false);
       setSketchPaths([]); setSketchBackground(null);
       setMode("list");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -1168,15 +1192,15 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 
   const DRAW_COLORS = [Colors.brand.primary, "#C1536A", "#C9A96E", "#1A1A1A", "#FFFFFF", "#E05A77", "#4A90D9"];
 
-  if (mode === "upload" || mode === "sketch") {
+  if (mode === "upload" || mode === "sketch" || mode === "text") {
     return (
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, gap: 20, paddingBottom: 80 }}>
         <View style={styles.modeHeader}>
-          <TouchableOpacity onPress={() => { setMode("list"); setSketchPaths([]); setSketchBackground(null); setImageUri(null); }} style={styles.backBtn}>
+          <TouchableOpacity onPress={() => { setMode("list"); setSketchPaths([]); setSketchBackground(null); setTextDescription(""); setImageUri(null); }} style={styles.backBtn}>
             <Feather name="arrow-left" size={20} color={Colors.brand.primary} />
           </TouchableOpacity>
           <Text style={[styles.modeTitle, { color: theme.text }]}>
-            {mode === "upload" ? "Upload Blouse Idea" : "Sketch on Photo"}
+            {mode === "upload" ? "Upload Blouse Idea" : mode === "text" ? "Type Your Idea" : "Sketch on Photo"}
           </Text>
         </View>
 
@@ -1186,12 +1210,59 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
             style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
             value={title}
             onChangeText={setTitle}
-            placeholder={mode === "upload" ? "E.g. Pinterest inspo — heavy kanjeevaram" : "E.g. My rough neck idea"}
+            placeholder={mode === "upload" ? "E.g. Pinterest inspo — heavy kanjeevaram" : mode === "text" ? "E.g. Emerald silk blouse with gold embroidery" : "E.g. My rough neck idea"}
             placeholderTextColor={theme.textMuted}
           />
         </View>
 
-        {mode === "upload" ? (
+        {mode === "text" ? (
+          <View style={{ gap: 12 }}>
+            <Text style={[styles.groupLabel, { color: theme.text }]}>Describe your design</Text>
+            <TextInput
+              style={[styles.notesInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border, height: 110 }]}
+              value={textDescription}
+              onChangeText={setTextDescription}
+              placeholder="Describe the neckline, sleeves, fabric, colours, and details…"
+              placeholderTextColor={theme.textMuted}
+              multiline
+              numberOfLines={4}
+              textAlignVertical="top"
+            />
+            <TouchableOpacity
+              style={[styles.aiGenBtn, { borderColor: Colors.brand.gold + "80", opacity: aiSketchGenerating ? 0.7 : 1 }]}
+              onPress={generateAIFromText}
+              disabled={aiSketchGenerating}
+            >
+              {aiSketchGenerating ? (
+                <>
+                  <ActivityIndicator color={Colors.brand.gold} size="small" />
+                  <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>Creating your design…</Text>
+                </>
+              ) : (
+                <>
+                  <Text style={styles.aiGenBtnIcon}>✦</Text>
+                  <Text style={[styles.aiGenBtnText, { color: Colors.brand.gold }]}>Generate Image</Text>
+                </>
+              )}
+            </TouchableOpacity>
+            {(aiSketchGenerating || imageUri) && (
+              <View style={[styles.imagePreviewWrapper, { backgroundColor: theme.card }]}>
+                {aiSketchGenerating ? (
+                  <View style={[styles.imagePreview, styles.centerLoader]}>
+                    <ActivityIndicator color={Colors.brand.primary} size="large" />
+                  </View>
+                ) : imageUri ? (
+                  <>
+                    <Image source={{ uri: imageUri }} style={styles.imagePreview} resizeMode="cover" />
+                    <TouchableOpacity style={styles.removeImageBtn} onPress={() => setImageUri(null)}>
+                      <Feather name="x" size={16} color="#fff" />
+                    </TouchableOpacity>
+                  </>
+                ) : null}
+              </View>
+            )}
+          </View>
+        ) : mode === "upload" ? (
           <View style={{ gap: 12 }}>
             <Text style={[styles.groupLabel, { color: theme.text }]}>Photo / Inspiration</Text>
             {imageUri ? (
@@ -1480,6 +1551,10 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
         <TouchableOpacity style={[styles.addIdeaBtn, { backgroundColor: Colors.brand.gold }]} onPress={() => setMode("sketch")}>
           <Feather name="edit-3" size={16} color={Colors.brand.primaryDark} />
           <Text style={[styles.addIdeaBtnText, { color: Colors.brand.primaryDark }]}>Sketch on Photo</Text>
+        </TouchableOpacity>
+        <TouchableOpacity style={[styles.addIdeaBtn, { backgroundColor: Colors.brand.primaryLight }]} onPress={() => setMode("text")}>
+          <Feather name="type" size={16} color="#fff" />
+          <Text style={styles.addIdeaBtnText}>Type your idea</Text>
         </TouchableOpacity>
       </View>
 

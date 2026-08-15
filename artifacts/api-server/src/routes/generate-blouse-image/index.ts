@@ -4,6 +4,24 @@ import { generateImage as generateGeminiImage } from "@workspace/integrations-ge
 
 const router: IRouter = Router();
 
+router.post("/text", async (req, res) => {
+  const { description } = req.body as { description?: string };
+  if (!description?.trim()) {
+    res.status(400).json({ error: "description is required" });
+    return;
+  }
+
+  try {
+    const result = await generateGeminiImage(
+      `Create a fashion design concept image of a saree blouse based on this customer description: ${description.trim()}. Show one front-facing blouse on a clean, neutral studio background with clear neckline, sleeves, fabric, and embellishment details. Do not include text or a person.`,
+    );
+    res.json(result);
+  } catch (error) {
+    console.error("Text-to-image generation error:", error);
+    res.status(500).json({ error: "Failed to generate design image" });
+  }
+});
+
 // ─── Colour helpers ──────────────────────────────────────────────────────────
 
 function hex2rgb(hex: string): [number, number, number] {
