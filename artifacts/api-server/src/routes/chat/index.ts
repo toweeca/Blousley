@@ -1,10 +1,60 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router } from "express";
+import type { Server } from "node:http";
 import { db } from "@workspace/db";
 import { conversations, messages, customerIdeasTable, blouseFitsTable } from "@workspace/db/schema";
 import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
+import { WebSocket, WebSocketServer } from "ws";
 
 const router = Router();
+const chatSockets = new Map<number, Set<WebSocket>>();
+
+export function attachChatRealtime(server: Server) {
+  const wss = new WebSocketServer({ server, path: "/api/chat/ws" });
+
+  wss.on("connection", async (socket, request) => {
+    const url = new URL(request.url ?? "", `http://${request.headers.host ?? "localhost"}`);
+    const conversationId = Number(url.searchParams.get("conversationId"));
+    const userId = url.searchParams.get("userId");
+    if (!conversationId || !userId) {
+      socket.close(1008, "conversationId and userId required");
+      return;
+    }
+
+    try {
+      const [conversation] = await db
+        .select({ customerId: conversations.customerId, tailorId: conversations.tailorId })
+        .from(conversations)
+        .where(eq(conversations.id, conversationId))
+        .limit(1);
+      if (!conversation || (conversation.customerId !== userId && conversation.tailorId !== userId)) {
+        socket.close(1008, "Not a conversation participant");
+        return;
+      }
+
+      const sockets = chatSockets.get(conversationId) ?? new Set<WebSocket>();
+      sockets.add(socket);
+      chatSockets.set(conversationId, sockets);
+      const removeSocket = () => {
+        sockets.delete(socket);
+        if (sockets.size === 0) chatSockets.delete(conversationId);
+      };
+      socket.on("close", removeSocket);
+      socket.on("error", removeSocket);
+    } catch {
+      socket.close(1011, "Could not authorize chat");
+    }
+  });
+}
+
+function broadcastChatMessage(conversationId: number, message: unknown) {
+  const sockets = chatSockets.get(conversationId);
+  if (!sockets) return;
+  const payload = JSON.stringify({ type: "message", message });
+  for (const socket of sockets) {
+    if (socket.readyState === WebSocket.OPEN) socket.send(payload);
+  }
+}
 
 // Returns the conversation if userId is a participant (customer or tailor), else null.
 async function getConversationForParticipant(conversationId: number, userId: string) {
@@ -220,6 +270,7 @@ router.post("/messages", async (req, res) => {
       .set({ lastMessageAt: new Date() })
       .where(eq(conversations.id, conversationId));
 
+    broadcastChatMessage(conversationId, msg);
     res.status(201).json(msg);
   } catch (e: any) {
     res.status(500).json({ error: e.message });

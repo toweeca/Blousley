@@ -83,7 +83,6 @@ export default function ChatThread({
       const r = await fetch(`${apiBase}/api/chat/messages?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`);
       return r.json();
     },
-    refetchInterval: 5000,
     enabled: visible && conversationId > 0,
   });
 
@@ -105,6 +104,28 @@ export default function ChatThread({
       body: JSON.stringify({ conversationId, userId: currentUserId }),
     }).catch(() => null);
   }, [msgs.length, visible, conversationId, currentUserId, apiBase]);
+
+  useEffect(() => {
+    if (!visible || conversationId <= 0 || !currentUserId) return;
+    const wsBase = apiBase.replace(/^http/, "ws");
+    const socket = new WebSocket(
+      `${wsBase}/api/chat/ws?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`,
+    );
+    socket.onmessage = (event) => {
+      try {
+        const payload = JSON.parse(event.data);
+        if (payload.type !== "message" || !payload.message) return;
+        qc.setQueryData<Message[]>(["chat-messages", conversationId], (current = []) =>
+          current.some((message) => message.id === payload.message.id)
+            ? current
+            : [...current, payload.message],
+        );
+      } catch {
+        // Ignore malformed real-time events; REST remains the fallback.
+      }
+    };
+    return () => socket.close();
+  }, [visible, conversationId, currentUserId, apiBase, qc]);
 
   const sendMutation = useMutation({
     mutationFn: async (content: string) => {
