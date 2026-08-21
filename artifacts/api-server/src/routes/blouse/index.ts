@@ -158,9 +158,9 @@ Respond ONLY with valid JSON in this exact format:
 
 router.get("/fits", async (req, res) => {
   try {
-    const { userId } = req.query as { userId?: string };
+    const userId = req.userId;
     if (!isValidUserId(userId)) {
-      res.status(400).json({ error: "A valid userId is required" });
+      res.status(401).json({ error: "Authentication required" });
       return;
     }
     const fits = await db
@@ -200,20 +200,21 @@ router.post("/fits", async (req, res) => {
       aiAnalysis?: string;
     };
 
-    if (!isValidUserId(body.userId)) {
-      res.status(400).json({ error: "A valid userId is required" });
+    const userId = req.userId;
+    if (!isValidUserId(userId)) {
+      res.status(401).json({ error: "Authentication required" });
       return;
     }
 
     const uploadedImage = body.imageBase64
       ? imageDataUriFromBase64(body.imageBase64)
       : body.imageUrl ?? null;
-    const privateImage = uploadedImage ? await savePrivateImage(uploadedImage, body.userId) : null;
+    const privateImage = uploadedImage ? await savePrivateImage(uploadedImage, userId) : null;
 
     const [fit] = await db
       .insert(blouseFitsTable)
       .values({
-        userId: body.userId,
+        userId,
         imageUrl: null,
         measurements: body.measurements ?? null,
         bodyShape: body.bodyShape ?? null,
@@ -223,20 +224,20 @@ router.post("/fits", async (req, res) => {
       .returning();
 
     if (privateImage) {
-      await withRlsUser(body.userId, (tx) =>
+      await withRlsUser(userId, (tx) =>
         tx.insert(privateImages).values({
           fitId: fit.id,
-          ownerId: body.userId,
+          ownerId: userId,
           storageKey: privateImage.storageKey,
           mimeType: privateImage.mimeType,
         }),
       );
-      console.info("image_upload_complete", { userId: body.userId, fitId: fit.id, mimeType: privateImage.mimeType });
+      console.info("image_upload_complete", { userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
 
     res.status(201).json({
       ...fit,
-      imageUrl: privateImage ? privateImageUrl(req, fit.id, body.userId) : null,
+      imageUrl: privateImage ? privateImageUrl(req, fit.id, userId) : null,
     });
   } catch (error) {
     console.error("Error saving fit:", error);
@@ -251,9 +252,9 @@ router.post("/fits", async (req, res) => {
 router.get("/fits/:id", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
-    const { userId } = req.query as { userId?: string };
+    const userId = req.userId;
     if (!isValidUserId(userId)) {
-      res.status(400).json({ error: "A valid userId is required" });
+      res.status(401).json({ error: "Authentication required" });
       return;
     }
     const [fit] = await db
@@ -282,9 +283,9 @@ router.get("/fits/:id", async (req, res) => {
 router.patch("/fits/:id/find-tailor", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
-    const { userId } = req.body as { userId?: string };
+    const userId = req.userId;
     if (!isValidUserId(userId) || !Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Valid fit and user are required" });
+      res.status(401).json({ error: "Authentication required" });
       return;
     }
 
@@ -313,9 +314,9 @@ router.patch("/fits/:id/find-tailor", async (req, res) => {
 router.delete("/fits/:id", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
-    const { userId } = req.query as { userId?: string };
+    const userId = req.userId;
     if (!isValidUserId(userId) || !Number.isSafeInteger(id) || id <= 0) {
-      res.status(400).json({ error: "Valid fit and user are required" });
+      res.status(401).json({ error: "Authentication required" });
       return;
     }
     const deleted = await db
@@ -336,9 +337,10 @@ router.delete("/fits/:id", async (req, res) => {
 router.patch("/fits/:id/notes", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
-    const { userId, notes } = req.body as { userId?: string; notes?: string };
+    const { notes } = req.body as { notes?: string };
+    const userId = req.userId;
     if (!isValidUserId(userId) || !Number.isSafeInteger(id) || id <= 0 || typeof notes !== "string" || notes.length > 4_000) {
-      res.status(400).json({ error: "Valid fit, user, and notes are required" });
+      res.status(400).json({ error: "Valid fit and notes are required" });
       return;
     }
     const [fit] = await db

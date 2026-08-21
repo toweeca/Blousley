@@ -1,6 +1,7 @@
 import { Router, type IRouter } from "express";
-import { eq } from "drizzle-orm";
-import { privateImages } from "@workspace/db/schema";
+import { and, eq } from "drizzle-orm";
+import { db } from "@workspace/db";
+import { blouseFitsTable, conversations, privateImages } from "@workspace/db/schema";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { readPrivateImage } from "../../lib/privateImages";
 
@@ -15,6 +16,28 @@ router.get("/fits/:fitId", async (req, res) => {
   }
 
   try {
+    const [fit] = await db
+      .select({ userId: blouseFitsTable.userId })
+      .from(blouseFitsTable)
+      .where(eq(blouseFitsTable.id, fitId))
+      .limit(1);
+    if (!fit) {
+      res.status(404).json({ error: "Fit not found" });
+      return;
+    }
+    const isOwner = fit.userId === userId;
+    const [assignedConversation] = isOwner
+      ? [undefined]
+      : await db
+          .select({ id: conversations.id })
+          .from(conversations)
+          .where(and(eq(conversations.fitId, fitId), eq(conversations.tailorId, userId)))
+          .limit(1);
+    if (!isOwner && !assignedConversation) {
+      res.status(403).json({ error: "Not authorized to view this image" });
+      return;
+    }
+
     const image = await withRlsUser(userId, async (tx) => {
       const [privateImage] = await tx
         .select()
