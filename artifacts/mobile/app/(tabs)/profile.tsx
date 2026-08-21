@@ -1174,7 +1174,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
       const r = await fetch(`${domain}/api/ideas/${id}/share`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ sharedWithTailors: val }),
+        body: JSON.stringify({ userId: user.id, sharedWithTailors: val }),
       });
       if (!r.ok) throw new Error("Failed");
       return r.json();
@@ -1184,7 +1184,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const r = await fetch(`${domain}/api/ideas/${id}`, { method: "DELETE" });
+      const r = await fetch(`${domain}/api/ideas/${id}?userId=${encodeURIComponent(user.id)}`, { method: "DELETE" });
       if (!r.ok) throw new Error("Failed");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ideas", user.id] }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); },

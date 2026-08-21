@@ -242,7 +242,7 @@ export default function HistoryScreen() {
     mutationFn: async (id: number) => {
       const _d2 = process.env.EXPO_PUBLIC_DOMAIN ?? "";
       const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
-      const res = await fetch(`${domain}/api/blouse/fits/${id}`, { method: "DELETE" });
+      const res = await fetch(`${domain}/api/blouse/fits/${id}?userId=${encodeURIComponent(user?.id ?? "")}`, { method: "DELETE" });
       if (!res.ok) throw new Error("Delete failed");
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["blouse-fits"] }),

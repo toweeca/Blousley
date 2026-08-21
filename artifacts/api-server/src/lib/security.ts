@@ -3,15 +3,26 @@ import type { NextFunction, Request, RequestHandler, Response } from "express";
 type Bucket = { startedAt: number; count: number };
 const buckets = new Map<string, Bucket>();
 
-function clientKey(req: Request) {
+function clientKey(req: Request, scope: "ip" | "user") {
+  if (scope === "ip") return `ip:${req.ip || "unknown"}`;
   const userId = req.body?.userId ?? req.query?.userId ?? req.query?.tailorId;
   return typeof userId === "string" ? `user:${userId}` : `ip:${req.ip || "unknown"}`;
 }
 
-export function rateLimit(windowMs: number, max: number, prefix: string): RequestHandler {
+export function rateLimit(
+  windowMs: number,
+  max: number,
+  prefix: string,
+  scope: "ip" | "user" = "ip",
+  methods?: string[],
+): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
+    if (methods && !methods.includes(req.method)) {
+      next();
+      return;
+    }
     const now = Date.now();
-    const key = `${prefix}:${clientKey(req)}`;
+    const key = `${prefix}:${clientKey(req, scope)}`;
     const bucket = buckets.get(key);
     if (!bucket || now - bucket.startedAt >= windowMs) {
       buckets.set(key, { startedAt: now, count: 1 });

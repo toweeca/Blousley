@@ -555,7 +555,7 @@ export default function TailorScreen() {
       const res = await fetch(`${apiBase}/api/blouse/fits/${id}/notes`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ notes }),
+        body: JSON.stringify({ userId: user?.id, notes }),
       });
       if (!res.ok) throw new Error("Failed to update notes");
       return res.json();

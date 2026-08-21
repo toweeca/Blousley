@@ -2,6 +2,7 @@
 import { Router, type IRouter } from "express";
 import { db, usersTable } from "@workspace/db";
 import { eq } from "drizzle-orm";
+import { isValidUserId } from "../../lib/rls";
 
 const router: IRouter = Router();
 
@@ -17,19 +18,24 @@ router.post("/me", async (req, res) => {
       phone?: string;
     };
 
-    if (!id || !/^user_\d+_[a-z0-9]{4,12}$/.test(id) || !name?.trim() || !role) {
+    if (!isValidUserId(id) || !name?.trim() || name.trim().length > 100 || !["customer", "tailor"].includes(role ?? "")) {
       res.status(400).json({ error: "id, name and role are required" });
       return;
     }
-    if (!email || !EMAIL_RE.test(email.trim())) {
+    if (!email || email.length > 254 || !EMAIL_RE.test(email.trim())) {
       res.status(400).json({ error: "A valid email is required" });
       return;
     }
+    if (phone && (phone.length > 32 || !/^[0-9+()\s-]+$/.test(phone))) {
+      res.status(400).json({ error: "A valid phone number is required" });
+      return;
+    }
 
+    const safeRole = role === "tailor" ? "tailor" : "customer";
     const payload = {
       name: name.trim(),
       email: email.trim().toLowerCase(),
-      role,
+      role: safeRole,
       phone: phone?.trim() || null,
       updatedAt: new Date(),
     };
@@ -38,9 +44,11 @@ router.post("/me", async (req, res) => {
 
     if (existing.length > 0) {
       const updated = await db.update(usersTable).set(payload).where(eq(usersTable.id, id)).returning();
+      console.info("identity_sync", { userId: id, outcome: "updated" });
       res.json(updated[0]);
     } else {
       const inserted = await db.insert(usersTable).values({ id, ...payload }).returning();
+      console.info("identity_sync", { userId: id, outcome: "created" });
       res.json(inserted[0]);
     }
   } catch (err) {

@@ -6,7 +6,7 @@ const router: IRouter = Router();
 
 router.post("/text", async (req, res) => {
   const { description } = req.body as { description?: string };
-  if (!description?.trim()) {
+  if (!description?.trim() || description.length > 1_000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(description)) {
     res.status(400).json({ error: "description is required" });
     return;
   }

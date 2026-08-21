@@ -20,6 +20,24 @@ function matchesImageSignature(buffer: Buffer, mimeType: string) {
   return buffer.length >= 12 && buffer.subarray(0, 4).equals(Buffer.from("RIFF")) && buffer.subarray(8, 12).equals(Buffer.from("WEBP"));
 }
 
+function detectedMimeType(buffer: Buffer) {
+  return ["image/jpeg", "image/png", "image/webp"].find((mimeType) => matchesImageSignature(buffer, mimeType)) ?? null;
+}
+
+export function imageDataUriFromBase64(base64: string) {
+  const dataUri = base64.match(DATA_URI_RE);
+  const declaredMimeType = dataUri?.[1]?.toLowerCase();
+  const encoded = dataUri ? dataUri[2] : base64;
+  if (!dataUri && !/^[A-Za-z0-9+/=\s]+$/.test(encoded)) throw new Error("Invalid image data");
+  const normalized = encoded.replace(/\s/g, "");
+  const buffer = Buffer.from(normalized, "base64");
+  const mimeType = detectedMimeType(buffer);
+  if (!mimeType || (declaredMimeType && declaredMimeType !== mimeType) || !buffer.length || buffer.length > MAX_IMAGE_BYTES) {
+    throw new Error("Invalid or oversized image upload");
+  }
+  return `data:${mimeType};base64,${normalized}`;
+}
+
 export async function savePrivateImage(image: string, userId: string, originalName?: string) {
   const match = image.match(DATA_URI_RE);
   if (!match) throw new Error("Only PNG, JPEG, and WebP image data is accepted");

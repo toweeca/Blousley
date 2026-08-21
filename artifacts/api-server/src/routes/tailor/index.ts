@@ -4,7 +4,7 @@ import { db, blouseFitsTable, privateImages, tailorsTable, usersTable } from "@w
 import { conversations } from "@workspace/db/schema";
 import { desc, eq, count, and, gte, lt } from "drizzle-orm";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { savePrivateImage } from "../../lib/privateImages";
+import { imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
@@ -68,9 +68,9 @@ router.post("/fits", async (req, res) => {
     const { userId, imageUrl, imageBase64, measurements, stylePrefs, notes, aiAnalysis } = req.body;
     if (!isValidUserId(userId)) return res.status(400).json({ error: "A valid userId is required" });
     const upload = imageBase64
-      ? `data:image/jpeg;base64,${imageBase64}`
+      ? imageDataUriFromBase64(imageBase64)
       : imageUrl;
-    const privateImage = upload ? await savePrivateImage(upload) : null;
+    const privateImage = upload ? await savePrivateImage(upload, userId) : null;
 
     const [fit] = await db.insert(blouseFitsTable).values({
       userId,
@@ -90,6 +90,7 @@ router.post("/fits", async (req, res) => {
           mimeType: privateImage.mimeType,
         }),
       );
+      console.info("image_upload_complete", { userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
     res.json({
       ...fit,
@@ -97,7 +98,7 @@ router.post("/fits", async (req, res) => {
     });
   } catch (error) {
     console.error("Error adding fit:", error);
-    if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP/.test(error.message)) {
+    if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP|extension|Upload limit/.test(error.message)) {
       res.status(400).json({ error: "Invalid image upload" });
       return;
     }

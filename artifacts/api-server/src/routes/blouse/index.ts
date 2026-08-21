@@ -3,9 +3,10 @@ import { Router, type IRouter } from "express";
 import { db, blouseFitsTable, privateImages } from "@workspace/db";
 import { eq, desc, and } from "drizzle-orm";
 import { ai } from "@workspace/integrations-gemini-ai";
+import { conversations } from "@workspace/db/schema";
 import designRouter from "./design";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { savePrivateImage } from "../../lib/privateImages";
+import { imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
@@ -23,8 +24,14 @@ router.post("/analyze", async (req, res) => {
       userId: string;
     };
 
-    if (!imageBase64 || !userId) {
+    if (typeof imageBase64 !== "string" || !isValidUserId(userId) || imageBase64.length > 7_000_000) {
       res.status(400).json({ error: "imageBase64 and userId are required" });
+      return;
+    }
+    const imageDataUri = imageDataUriFromBase64(imageBase64);
+    const imageMimeType = imageDataUri.match(/^data:(image\/(?:jpeg|png|webp));base64,/i)?.[1];
+    if (!imageMimeType) {
+      res.status(400).json({ error: "Valid image data is required" });
       return;
     }
 
@@ -72,7 +79,7 @@ Respond ONLY with valid JSON in this exact format:
       contents: [{
         role: "user",
         parts: [
-          { inlineData: { mimeType: "image/jpeg", data: imageBase64 } },
+          { inlineData: { mimeType: imageMimeType, data: imageDataUri.split(",")[1] } },
           { text: prompt },
         ],
       }],
@@ -199,9 +206,9 @@ router.post("/fits", async (req, res) => {
     }
 
     const uploadedImage = body.imageBase64
-      ? `data:image/jpeg;base64,${body.imageBase64}`
+      ? imageDataUriFromBase64(body.imageBase64)
       : body.imageUrl ?? null;
-    const privateImage = uploadedImage ? await savePrivateImage(uploadedImage) : null;
+    const privateImage = uploadedImage ? await savePrivateImage(uploadedImage, body.userId) : null;
 
     const [fit] = await db
       .insert(blouseFitsTable)
@@ -224,6 +231,7 @@ router.post("/fits", async (req, res) => {
           mimeType: privateImage.mimeType,
         }),
       );
+      console.info("image_upload_complete", { userId: body.userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
 
     res.status(201).json({
@@ -232,7 +240,7 @@ router.post("/fits", async (req, res) => {
     });
   } catch (error) {
     console.error("Error saving fit:", error);
-    if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP/.test(error.message)) {
+    if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP|extension|Upload limit/.test(error.message)) {
       res.status(400).json({ error: "Invalid image upload" });
       return;
     }
@@ -275,8 +283,8 @@ router.patch("/fits/:id/find-tailor", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
     const { userId } = req.body as { userId?: string };
-    if (!userId) {
-      res.status(400).json({ error: "userId is required" });
+    if (!isValidUserId(userId) || !Number.isSafeInteger(id) || id <= 0) {
+      res.status(400).json({ error: "Valid fit and user are required" });
       return;
     }
 
@@ -305,7 +313,19 @@ router.patch("/fits/:id/find-tailor", async (req, res) => {
 router.delete("/fits/:id", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
-    await db.delete(blouseFitsTable).where(eq(blouseFitsTable.id, id));
+    const { userId } = req.query as { userId?: string };
+    if (!isValidUserId(userId) || !Number.isSafeInteger(id) || id <= 0) {
+      res.status(400).json({ error: "Valid fit and user are required" });
+      return;
+    }
+    const deleted = await db
+      .delete(blouseFitsTable)
+      .where(and(eq(blouseFitsTable.id, id), eq(blouseFitsTable.userId, userId)))
+      .returning({ id: blouseFitsTable.id });
+    if (!deleted.length) {
+      res.status(404).json({ error: "Fit not found" });
+      return;
+    }
     res.json({ success: true });
   } catch (error) {
     console.error("Error deleting fit:", error);
@@ -316,7 +336,29 @@ router.delete("/fits/:id", async (req, res) => {
 router.patch("/fits/:id/notes", async (req, res) => {
   try {
     const id = parseInt(req.params["id"] ?? "0");
-    const { notes } = req.body as { notes: string };
+    const { userId, notes } = req.body as { userId?: string; notes?: string };
+    if (!isValidUserId(userId) || !Number.isSafeInteger(id) || id <= 0 || typeof notes !== "string" || notes.length > 4_000) {
+      res.status(400).json({ error: "Valid fit, user, and notes are required" });
+      return;
+    }
+    const [fit] = await db
+      .select({ userId: blouseFitsTable.userId })
+      .from(blouseFitsTable)
+      .where(eq(blouseFitsTable.id, id))
+      .limit(1);
+    if (!fit) {
+      res.status(404).json({ error: "Fit not found" });
+      return;
+    }
+    const [assignedConversation] = await db
+      .select({ id: conversations.id })
+      .from(conversations)
+      .where(and(eq(conversations.fitId, id), eq(conversations.tailorId, userId)))
+      .limit(1);
+    if (fit.userId !== userId && !assignedConversation) {
+      res.status(403).json({ error: "Not authorized to update this fit" });
+      return;
+    }
     const [updated] = await db
       .update(blouseFitsTable)
       .set({ notes, updatedAt: new Date() })
