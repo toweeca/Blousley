@@ -4,16 +4,20 @@ import cors from "cors";
 import fs from "fs";
 import path from "path";
 import router from "./routes";
+import { rateLimit, requireHttps, securityHeaders } from "./lib/security";
 
 const app: Express = express();
 
+app.disable("x-powered-by");
+app.set("trust proxy", 1);
+app.use(requireHttps);
+app.use(securityHeaders);
 app.use(cors());
-// Base64-encoded photos can be several MB, so raise the body size limit
-// well above Express's 100kb default to avoid PayloadTooLargeError.
-app.use(express.json({ limit: "25mb" }));
-app.use(express.urlencoded({ extended: true, limit: "25mb" }));
+// 5 MB binary images expand to about 6.7 MB as base64.
+app.use(express.json({ limit: "8mb" }));
+app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-app.use("/api", router);
+app.use("/api", rateLimit(60_000, 120, "api"), router);
 
 app.get("/api/diag", (_req, res) => {
   const p = path.join(process.cwd(), "../../artifacts/mobile/public/diag.html");

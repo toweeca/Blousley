@@ -4,8 +4,11 @@ import path from "node:path";
 
 const PRIVATE_IMAGE_DIR = path.resolve(process.cwd(), ".private-images");
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+const UPLOAD_WINDOW_MS = 60 * 60 * 1000;
+const MAX_UPLOADS_PER_USER = 20;
 const DATA_URI_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i;
 const KEY_RE = /^[0-9a-f-]{36}\.(?:jpg|png|webp)$/;
+const uploadBuckets = new Map<string, { startedAt: number; count: number }>();
 
 function extensionForMimeType(mimeType: string) {
   return mimeType === "image/jpeg" ? "jpg" : mimeType === "image/png" ? "png" : "webp";
@@ -17,19 +20,33 @@ function matchesImageSignature(buffer: Buffer, mimeType: string) {
   return buffer.length >= 12 && buffer.subarray(0, 4).equals(Buffer.from("RIFF")) && buffer.subarray(8, 12).equals(Buffer.from("WEBP"));
 }
 
-export async function savePrivateImage(image: string) {
+export async function savePrivateImage(image: string, userId: string, originalName?: string) {
   const match = image.match(DATA_URI_RE);
   if (!match) throw new Error("Only PNG, JPEG, and WebP image data is accepted");
 
   const mimeType = match[1].toLowerCase();
+  const extension = originalName?.toLowerCase().split(".").pop();
+  if (originalName && (!extension || !["jpg", "jpeg", "png", "webp"].includes(extension))) {
+    throw new Error("Invalid image extension");
+  }
   const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
   if (!buffer.length || buffer.length > MAX_IMAGE_BYTES || !matchesImageSignature(buffer, mimeType)) {
     throw new Error("Invalid or oversized image upload");
   }
 
+  const now = Date.now();
+  const bucket = uploadBuckets.get(userId);
+  if (!bucket || now - bucket.startedAt >= UPLOAD_WINDOW_MS) {
+    uploadBuckets.set(userId, { startedAt: now, count: 1 });
+  } else {
+    bucket.count += 1;
+    if (bucket.count > MAX_UPLOADS_PER_USER) throw new Error("Upload limit exceeded");
+  }
+
   await mkdir(PRIVATE_IMAGE_DIR, { recursive: true, mode: 0o700 });
   const storageKey = `${randomUUID()}.${extensionForMimeType(mimeType)}`;
   await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), buffer, { mode: 0o600, flag: "wx" });
+  console.info("image_upload", { userId, mimeType, size: buffer.length });
   return { storageKey, mimeType };
 }
 
