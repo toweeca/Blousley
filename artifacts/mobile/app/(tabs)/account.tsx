@@ -61,6 +61,8 @@ export default function AccountScreen() {
   const [email, setEmail] = useState(user?.email ?? "");
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState<UserRole | null>(user?.role ?? null);
+  const [password, setPassword] = useState("");
+  const [isLogin, setIsLogin] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [showMeasModal, setShowMeasModal] = useState(false);
@@ -83,13 +85,28 @@ export default function AccountScreen() {
     enabled: !!user,
   });
 
-  const handleCreate = () => {
-    if (!role) { Alert.alert("Choose account type", "Please select Customer or Tailor to continue."); return; }
-    if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
+  const handleCreate = async () => {
+    if (!isLogin && !role) { Alert.alert("Choose account type", "Please select Customer or Tailor to continue."); return; }
+    if (!isLogin && !name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
     if (!EMAIL_RE.test(email.trim())) { Alert.alert("Valid email required", "Please enter a valid email address."); return; }
-    const userId = `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
-    setUser({ id: userId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || undefined, role });
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    if (password.length < 12) { Alert.alert("Password required", "Use at least 12 characters."); return; }
+    try {
+      const response = await fetch(`${API_BASE}/api/auth/${isLogin ? "login" : "register"}`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(isLogin
+          ? { email: email.trim().toLowerCase(), password }
+          : { name: name.trim(), email: email.trim().toLowerCase(), password, phone: phone.trim() || undefined, role }),
+      });
+      const account = await response.json();
+      if (!response.ok) throw new Error(account.error ?? "Could not sign in");
+      await setUser(account);
+      setPassword("");
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+    } catch (error) {
+      Alert.alert(isLogin ? "Sign in failed" : "Account setup failed", error instanceof Error ? error.message : "Please try again.");
+    }
   };
 
   const handleUpdate = async () => {
@@ -169,13 +186,12 @@ export default function AccountScreen() {
         {!user ? (
           /* ── Not signed in ── */
           <Animated.View entering={FadeInDown.delay(100).springify()} style={{ gap: 16 }}>
-            <Text style={[styles.sectionTitle, { color: theme.text }]}>Create Profile</Text>
+            <Text style={[styles.sectionTitle, { color: theme.text }]}>{isLogin ? "Sign In" : "Create Profile"}</Text>
             <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
               Set up your profile to save fits, get AI recommendations, and connect with tailors.
             </Text>
 
-            {/* Step 1 — choose account type (required, shown first as squares) */}
-            <View style={styles.signupStepHeader}>
+            {!isLogin && <><View style={styles.signupStepHeader}>
               <View style={styles.signupStepNum}><Text style={styles.signupStepNumText}>1</Text></View>
               <Text style={[styles.signupStepLabel, { color: theme.text }]}>Choose your account type</Text>
             </View>
@@ -203,16 +219,16 @@ export default function AccountScreen() {
                   </TouchableOpacity>
                 );
               })}
-            </View>
+            </View></>}
 
             {/* Step 2 — details (only after a type is chosen) */}
-            {role && (
+            {(role || isLogin) && (
               <Animated.View entering={FadeInDown.springify()} style={{ gap: 16 }}>
                 <View style={styles.signupStepHeader}>
                   <View style={styles.signupStepNum}><Text style={styles.signupStepNumText}>2</Text></View>
                   <Text style={[styles.signupStepLabel, { color: theme.text }]}>Your details</Text>
                 </View>
-                <View style={styles.formField}>
+                {!isLogin && <View style={styles.formField}>
                   <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Your Name</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
@@ -223,7 +239,7 @@ export default function AccountScreen() {
                     autoCapitalize="words"
                     testID="name-input"
                   />
-                </View>
+                </View>}
                 <View style={styles.formField}>
                   <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Email</Text>
                   <TextInput
@@ -239,7 +255,7 @@ export default function AccountScreen() {
                     testID="email-input"
                   />
                 </View>
-                <View style={styles.formField}>
+                {!isLogin && <View style={styles.formField}>
                   <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
                   <TextInput
                     style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
@@ -249,19 +265,39 @@ export default function AccountScreen() {
                     placeholderTextColor={theme.textMuted}
                     keyboardType="phone-pad"
                   />
+                </View>}
+                <View style={styles.formField}>
+                  <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
+                  <TextInput
+                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+                    value={password}
+                    onChangeText={setPassword}
+                    placeholder="At least 12 characters"
+                    placeholderTextColor={theme.textMuted}
+                    secureTextEntry
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    autoComplete={isLogin ? "current-password" : "new-password"}
+                    testID="password-input"
+                  />
                 </View>
               </Animated.View>
             )}
 
             <TouchableOpacity
-              style={[styles.primaryBtn, { backgroundColor: role ? Colors.brand.primary : theme.border, opacity: role ? 1 : 0.55 }]}
+              style={[styles.primaryBtn, { backgroundColor: (role || isLogin) ? Colors.brand.primary : theme.border, opacity: (role || isLogin) ? 1 : 0.55 }]}
               onPress={handleCreate}
-              disabled={!role}
+              disabled={!role && !isLogin}
               testID="save-profile-button"
             >
               <Feather name={role ? "check" : "lock"} size={18} color="#fff" />
               <Text style={styles.primaryBtnText}>
-                {role ? `Continue as ${role === "tailor" ? "Tailor" : "Customer"}` : "Select an account type"}
+                {isLogin ? "Sign In" : role ? `Continue as ${role === "tailor" ? "Tailor" : "Customer"}` : "Select an account type"}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => { setIsLogin((value) => !value); setPassword(""); }}>
+              <Text style={[styles.sectionSub, { color: Colors.brand.primary, textAlign: "center" }]}>
+                {isLogin ? "Need an account? Create one" : "Already have an account? Sign in"}
               </Text>
             </TouchableOpacity>
 

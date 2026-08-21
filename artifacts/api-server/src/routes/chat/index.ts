@@ -6,6 +6,7 @@ import { conversations, messages, customerIdeasTable, blouseFitsTable } from "@w
 import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
 import { WebSocket, WebSocketServer } from "ws";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
+import { findSessionUser } from "../../lib/auth";
 
 const router = Router();
 const chatSockets = new Map<number, Set<WebSocket>>();
@@ -16,9 +17,10 @@ export function attachChatRealtime(server: Server) {
   wss.on("connection", async (socket, request) => {
     const url = new URL(request.url ?? "", `http://${request.headers.host ?? "localhost"}`);
     const conversationId = Number(url.searchParams.get("conversationId"));
-    const userId = url.searchParams.get("userId");
-    if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(userId)) {
-      socket.close(1008, "conversationId and userId required");
+    const claimedUserId = url.searchParams.get("userId");
+    const userId = await findSessionUser(request.headers.cookie);
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(userId) || (claimedUserId && claimedUserId !== userId)) {
+      socket.close(1008, "Authenticated conversation access required");
       return;
     }
 

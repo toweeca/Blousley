@@ -1,6 +1,7 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import express, { type Express } from "express";
 import cors from "cors";
+import cookieParser from "cookie-parser";
 import fs from "fs";
 import path from "path";
 import router from "./routes";
@@ -12,7 +13,8 @@ app.disable("x-powered-by");
 app.set("trust proxy", 1);
 app.use(requireHttps);
 app.use(securityHeaders);
-app.use(cors());
+app.use(cors({ origin: true, credentials: true }));
+app.use(cookieParser());
 // 5 MB binary images expand to about 6.7 MB as base64.
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
@@ -24,6 +26,7 @@ app.use("/api/tailor/fits", rateLimit(60 * 60 * 1000, 20, "upload-user", "user",
 app.use("/api/blouse/analyze", rateLimit(60 * 60 * 1000, 15, "analyze"));
 app.use("/api/generate-blouse-image", rateLimit(60 * 60 * 1000, 20, "generation"));
 app.use("/api/users", rateLimit(15 * 60 * 1000, 20, "identity"));
+app.use("/api/auth", rateLimit(15 * 60 * 1000, 10, "auth"));
 app.use("/api", rateLimit(60_000, 120, "api"), router);
 
 app.get("/api/diag", (_req, res) => {

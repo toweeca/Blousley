@@ -58,11 +58,15 @@ export function AppProvider({ children }: { children: ReactNode }) {
       if (u.email && API_BASE) {
         fetch(`${API_BASE}/api/users/me`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ id: u.id, name: u.name, email: u.email, role: u.role, phone: u.phone }),
         }).catch((e) => console.error("Failed to sync user to server", e));
       }
     } else {
+      if (API_BASE) {
+        await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
+      }
       await AsyncStorage.removeItem(USER_STORAGE_KEY);
     }
   };

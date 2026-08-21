@@ -10,10 +10,15 @@ import generateBlouseImageRouter from "./generate-blouse-image";
 import chatRouter from "./chat";
 import usersRouter from "./users";
 import imagesRouter from "./images";
+import authRouter from "./auth";
+import { requireMatchingIdentity, requireSession } from "../lib/auth";
 
 const router: IRouter = Router();
 
 router.use(healthRouter);
+router.use("/auth", authRouter);
+router.use(requireSession);
+router.use(requireMatchingIdentity);
 router.use("/blouse", blouseRouter);
 router.use("/tailor", tailorRouter);
 router.use("/preferences", preferencesRouter);
