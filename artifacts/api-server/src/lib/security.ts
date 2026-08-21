@@ -55,6 +55,13 @@ export function securityHeaders(req: Request, res: Response, next: NextFunction)
 }
 
 export function requireHttps(req: Request, res: Response, next: NextFunction) {
+  // The publisher probes the internal health endpoint over plain HTTP before
+  // TLS is terminated at the edge. Redirecting this request makes the probe
+  // follow HTTPS back to the internal HTTP router and fail readiness.
+  if (req.path === "/api/healthz" || req.path === "/healthz") {
+    next();
+    return;
+  }
   if (process.env.NODE_ENV === "production" && !req.secure && req.header("x-forwarded-proto") !== "https") {
     res.redirect(`https://${req.get("host")}${req.originalUrl}`);
     return;
