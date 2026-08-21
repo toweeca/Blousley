@@ -8,7 +8,7 @@ const router: IRouter = Router();
 
 router.get("/fits/:fitId", async (req, res) => {
   const fitId = Number(req.params.fitId);
-  const userId = req.query.userId;
+  const userId = req.userId;
   if (!Number.isSafeInteger(fitId) || fitId <= 0 || !isValidUserId(userId)) {
     res.status(400).json({ error: "Valid fit and user are required" });
     return;

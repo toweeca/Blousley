@@ -76,8 +76,9 @@ async function getConversationForParticipant(conversationId: number, userId: str
 }
 
 router.get("/conversations", async (req, res) => {
-  const { userId, fitId } = req.query as { userId?: string; fitId?: string };
-  if (!isValidUserId(userId)) return res.status(400).json({ error: "Valid userId required" });
+  const userId = req.userId;
+  const { fitId } = req.query as { fitId?: string };
+  if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required" });
   if (fitId && (!/^\d+$/.test(fitId) || !Number.isSafeInteger(Number(fitId)))) {
     return res.status(400).json({ error: "Valid fitId required" });
   }
@@ -126,9 +127,9 @@ router.get("/conversations", async (req, res) => {
 
 router.get("/conversations/:id/idea", async (req, res) => {
   const id = Number(req.params.id);
-  const { userId } = req.query as { userId?: string };
+  const userId = req.userId;
   if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "conversation id required" });
-  if (!isValidUserId(userId)) return res.status(400).json({ error: "Valid userId required" });
+  if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required" });
 
   try {
     const { convo, allowed } = await withRlsUser(userId, () => getConversationForParticipant(id, userId));
@@ -147,16 +148,16 @@ router.get("/conversations/:id/idea", async (req, res) => {
 });
 
 router.post("/conversations", async (req, res) => {
-  const { customerId, tailorId, requesterId, title, ideaId, fitId } = req.body as {
+  const { customerId, tailorId, title, ideaId, fitId } = req.body as {
     customerId: string;
     tailorId: string;
-    requesterId: string;
     title?: string;
     ideaId?: number;
     fitId?: number;
   };
+  const requesterId = req.userId;
   if (!isValidUserId(customerId) || !isValidUserId(tailorId) || !isValidUserId(requesterId))
-    return res.status(400).json({ error: "customerId, tailorId, and requesterId required" });
+    return res.status(400).json({ error: "customerId and tailorId required" });
   if (requesterId !== customerId && requesterId !== tailorId)
     return res.status(403).json({ error: "Requester is not a conversation participant" });
 
@@ -236,10 +237,11 @@ router.post("/conversations", async (req, res) => {
 });
 
 router.get("/messages", async (req, res) => {
-  const { conversationId, userId } = req.query as { conversationId?: string; userId?: string };
+  const { conversationId } = req.query as { conversationId?: string };
+  const userId = req.userId;
   const parsedConversationId = Number(conversationId);
   if (!Number.isSafeInteger(parsedConversationId) || parsedConversationId <= 0) return res.status(400).json({ error: "conversationId required" });
-  if (!isValidUserId(userId)) return res.status(400).json({ error: "Valid userId required" });
+  if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required" });
 
   try {
     const { convo, allowed } = await getConversationForParticipant(parsedConversationId, userId);
@@ -256,11 +258,11 @@ router.get("/messages", async (req, res) => {
 });
 
 router.post("/messages", async (req, res) => {
-  const { conversationId, senderId, content } = req.body as {
+  const { conversationId, content } = req.body as {
     conversationId: number;
-    senderId: string;
     content: string;
   };
+  const senderId = req.userId;
   if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(senderId) || typeof content !== "string")
     return res.status(400).json({ error: "conversationId, senderId, content required" });
   const safeContent = content.trim();
@@ -293,10 +295,10 @@ router.post("/messages", async (req, res) => {
 });
 
 router.patch("/messages/read", async (req, res) => {
-  const { conversationId, userId } = req.body as {
+  const { conversationId } = req.body as {
     conversationId: number;
-    userId: string;
   };
+  const userId = req.userId;
   if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(userId))
     return res.status(400).json({ error: "conversationId and userId required" });
 
