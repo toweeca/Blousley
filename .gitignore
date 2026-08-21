@@ -10,6 +10,7 @@ out-tsc
 
 # dependencies
 node_modules
+.private-images/
 
 # IDEs and editors
 /.idea

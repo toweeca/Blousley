@@ -1,10 +1,17 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router, type IRouter } from "express";
-import { db, blouseFitsTable, tailorsTable, usersTable } from "@workspace/db";
+import { db, blouseFitsTable, privateImages, tailorsTable, usersTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
 import { desc, eq, count, and, gte, lt } from "drizzle-orm";
+import { isValidUserId, withRlsUser } from "../../lib/rls";
+import { savePrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
+
+function privateImageUrl(req: any, fitId: number, userId: string) {
+  const protocol = (req.header("x-forwarded-proto") ?? req.protocol).split(",")[0];
+  return `${protocol}://${req.get("host")}/api/images/fits/${fitId}?userId=${encodeURIComponent(userId)}`;
+}
 
 router.get("/customers", async (req, res) => {
   try {
@@ -31,7 +38,25 @@ router.get("/customers", async (req, res) => {
         lt(blouseFitsTable.createdAt, startOfTomorrow),
       ))
       .orderBy(desc(blouseFitsTable.createdAt));
-    res.json(rows.map(({ fit, assignedTailorId }) => ({ ...fit, assignedTailorId })));
+    const securedRows = await Promise.all(rows.map(async ({ fit, assignedTailorId }) => {
+      if (assignedTailorId !== tailorId) {
+        return { ...fit, imageUrl: null, assignedTailorId };
+      }
+      const image = await withRlsUser(tailorId, async (tx) => {
+        const [row] = await tx
+          .select({ id: privateImages.id })
+          .from(privateImages)
+          .where(eq(privateImages.fitId, fit.id))
+          .limit(1);
+        return row;
+      });
+      return {
+        ...fit,
+        imageUrl: image ? privateImageUrl(req, fit.id, tailorId) : null,
+        assignedTailorId,
+      };
+    }));
+    res.json(securedRows);
   } catch (error) {
     console.error("Error fetching customer fits:", error);
     res.status(500).json({ error: "Failed to fetch customer fits" });
@@ -40,21 +65,42 @@ router.get("/customers", async (req, res) => {
 
 router.post("/fits", async (req, res) => {
   try {
-    const { userId, imageUrl, measurements, stylePrefs, notes, aiAnalysis } = req.body;
-    if (!userId) return res.status(400).json({ error: "userId is required" });
+    const { userId, imageUrl, imageBase64, measurements, stylePrefs, notes, aiAnalysis } = req.body;
+    if (!isValidUserId(userId)) return res.status(400).json({ error: "A valid userId is required" });
+    const upload = imageBase64
+      ? `data:image/jpeg;base64,${imageBase64}`
+      : imageUrl;
+    const privateImage = upload ? await savePrivateImage(upload) : null;
 
     const [fit] = await db.insert(blouseFitsTable).values({
       userId,
-      imageUrl: imageUrl ?? null,
+      imageUrl: null,
       measurements: measurements ?? null,
       stylePrefs: stylePrefs ?? null,
       aiAnalysis: aiAnalysis ?? null,
       notes: notes ?? null,
     }).returning();
 
-    res.json(fit);
+    if (privateImage) {
+      await withRlsUser(userId, (tx) =>
+        tx.insert(privateImages).values({
+          fitId: fit.id,
+          ownerId: userId,
+          storageKey: privateImage.storageKey,
+          mimeType: privateImage.mimeType,
+        }),
+      );
+    }
+    res.json({
+      ...fit,
+      imageUrl: privateImage ? privateImageUrl(req, fit.id, userId) : null,
+    });
   } catch (error) {
     console.error("Error adding fit:", error);
+    if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP/.test(error.message)) {
+      res.status(400).json({ error: "Invalid image upload" });
+      return;
+    }
     res.status(500).json({ error: "Failed to add fit" });
   }
 });

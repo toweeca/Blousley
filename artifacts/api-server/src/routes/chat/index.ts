@@ -5,6 +5,7 @@ import { db } from "@workspace/db";
 import { conversations, messages, customerIdeasTable, blouseFitsTable } from "@workspace/db/schema";
 import { eq, or, desc, and, ne, isNull } from "drizzle-orm";
 import { WebSocket, WebSocketServer } from "ws";
+import { isValidUserId, withRlsUser } from "../../lib/rls";
 
 const router = Router();
 const chatSockets = new Map<number, Set<WebSocket>>();
@@ -16,17 +17,20 @@ export function attachChatRealtime(server: Server) {
     const url = new URL(request.url ?? "", `http://${request.headers.host ?? "localhost"}`);
     const conversationId = Number(url.searchParams.get("conversationId"));
     const userId = url.searchParams.get("userId");
-    if (!conversationId || !userId) {
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(userId)) {
       socket.close(1008, "conversationId and userId required");
       return;
     }
 
     try {
-      const [conversation] = await db
-        .select({ customerId: conversations.customerId, tailorId: conversations.tailorId })
-        .from(conversations)
-        .where(eq(conversations.id, conversationId))
-        .limit(1);
+      const conversation = await withRlsUser(userId, async (tx) => {
+        const [row] = await tx
+          .select({ customerId: conversations.customerId, tailorId: conversations.tailorId })
+          .from(conversations)
+          .where(eq(conversations.id, conversationId))
+          .limit(1);
+        return row;
+      });
       if (!conversation || (conversation.customerId !== userId && conversation.tailorId !== userId)) {
         socket.close(1008, "Not a conversation participant");
         return;
@@ -71,7 +75,10 @@ async function getConversationForParticipant(conversationId: number, userId: str
 
 router.get("/conversations", async (req, res) => {
   const { userId, fitId } = req.query as { userId?: string; fitId?: string };
-  if (!userId) return res.status(400).json({ error: "userId required" });
+  if (!isValidUserId(userId)) return res.status(400).json({ error: "Valid userId required" });
+  if (fitId && (!/^\d+$/.test(fitId) || !Number.isSafeInteger(Number(fitId)))) {
+    return res.status(400).json({ error: "Valid fitId required" });
+  }
 
   try {
     const participantFilter = or(eq(conversations.customerId, userId), eq(conversations.tailorId, userId));
@@ -86,18 +93,20 @@ router.get("/conversations", async (req, res) => {
 
     const withUnread = await Promise.all(
       convos.map(async (c) => {
-        const unreadRows = await db
-          .select()
-          .from(messages)
-          .where(and(eq(messages.conversationId, c.id), eq(messages.isRead, false)));
-        const unread = unreadRows.filter((m) => m.senderId !== userId).length;
-
-        const lastMsgRows = await db
-          .select()
-          .from(messages)
-          .where(eq(messages.conversationId, c.id))
-          .orderBy(desc(messages.createdAt))
-          .limit(1);
+        const { unreadRows, lastMsgRows } = await withRlsUser(userId, async (tx) => {
+          const unreadRows = await tx
+            .select()
+            .from(messages)
+            .where(and(eq(messages.conversationId, c.id), eq(messages.isRead, false)));
+          const lastMsgRows = await tx
+            .select()
+            .from(messages)
+            .where(eq(messages.conversationId, c.id))
+            .orderBy(desc(messages.createdAt))
+            .limit(1);
+          return { unreadRows, lastMsgRows };
+        });
+        const unread = unreadRows.filter((m: any) => m.senderId !== userId).length;
 
         return {
           ...c,
@@ -116,20 +125,19 @@ router.get("/conversations", async (req, res) => {
 router.get("/conversations/:id/idea", async (req, res) => {
   const id = Number(req.params.id);
   const { userId } = req.query as { userId?: string };
-  if (!id) return res.status(400).json({ error: "conversation id required" });
-  if (!userId) return res.status(400).json({ error: "userId required" });
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: "conversation id required" });
+  if (!isValidUserId(userId)) return res.status(400).json({ error: "Valid userId required" });
 
   try {
-    const { convo, allowed } = await getConversationForParticipant(id, userId);
+    const { convo, allowed } = await withRlsUser(userId, () => getConversationForParticipant(id, userId));
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
     if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
-    if (!convo.ideaId) return res.json(null);
+    const ideaId = convo.ideaId;
+    if (!ideaId) return res.json(null);
 
-    const ideaRows = await db
-      .select()
-      .from(customerIdeasTable)
-      .where(eq(customerIdeasTable.id, convo.ideaId))
-      .limit(1);
+    const ideaRows = await withRlsUser<any[]>(userId, (tx) =>
+      tx.select().from(customerIdeasTable).where(eq(customerIdeasTable.id, ideaId)).limit(1),
+    );
     res.json(ideaRows[0] ?? null);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -145,7 +153,7 @@ router.post("/conversations", async (req, res) => {
     ideaId?: number;
     fitId?: number;
   };
-  if (!customerId || !tailorId || !requesterId)
+  if (!isValidUserId(customerId) || !isValidUserId(tailorId) || !isValidUserId(requesterId))
     return res.status(400).json({ error: "customerId, tailorId, and requesterId required" });
   if (requesterId !== customerId && requesterId !== tailorId)
     return res.status(403).json({ error: "Requester is not a conversation participant" });
@@ -227,19 +235,18 @@ router.post("/conversations", async (req, res) => {
 
 router.get("/messages", async (req, res) => {
   const { conversationId, userId } = req.query as { conversationId?: string; userId?: string };
-  if (!conversationId) return res.status(400).json({ error: "conversationId required" });
-  if (!userId) return res.status(400).json({ error: "userId required" });
+  const parsedConversationId = Number(conversationId);
+  if (!Number.isSafeInteger(parsedConversationId) || parsedConversationId <= 0) return res.status(400).json({ error: "conversationId required" });
+  if (!isValidUserId(userId)) return res.status(400).json({ error: "Valid userId required" });
 
   try {
-    const { convo, allowed } = await getConversationForParticipant(Number(conversationId), userId);
+    const { convo, allowed } = await getConversationForParticipant(parsedConversationId, userId);
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
     if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
 
-    const msgs = await db
-      .select()
-      .from(messages)
-      .where(eq(messages.conversationId, Number(conversationId)))
-      .orderBy(messages.createdAt);
+    const msgs = await withRlsUser(userId, (tx) =>
+      tx.select().from(messages).where(eq(messages.conversationId, parsedConversationId)).orderBy(messages.createdAt),
+    );
     res.json(msgs);
   } catch (e: any) {
     res.status(500).json({ error: e.message });
@@ -252,23 +259,29 @@ router.post("/messages", async (req, res) => {
     senderId: string;
     content: string;
   };
-  if (!conversationId || !senderId || !content)
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(senderId) || typeof content !== "string")
     return res.status(400).json({ error: "conversationId, senderId, content required" });
+  const safeContent = content.trim();
+  if (!safeContent || safeContent.length > 4_000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(safeContent)) {
+    return res.status(400).json({ error: "Message content is invalid" });
+  }
 
   try {
     const { convo, allowed } = await getConversationForParticipant(conversationId, senderId);
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
     if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
 
-    const [msg] = await db
-      .insert(messages)
-      .values({ conversationId, senderId, content, role: "user", isRead: false })
-      .returning();
-
-    await db
-      .update(conversations)
-      .set({ lastMessageAt: new Date() })
-      .where(eq(conversations.id, conversationId));
+    const msg = await withRlsUser(senderId, async (tx) => {
+      const [message] = await tx
+        .insert(messages)
+        .values({ conversationId, senderId, content: safeContent, role: "user", isRead: false })
+        .returning();
+      await tx
+        .update(conversations)
+        .set({ lastMessageAt: new Date() })
+        .where(eq(conversations.id, conversationId));
+      return message;
+    });
 
     broadcastChatMessage(conversationId, msg);
     res.status(201).json(msg);
@@ -282,7 +295,7 @@ router.patch("/messages/read", async (req, res) => {
     conversationId: number;
     userId: string;
   };
-  if (!conversationId || !userId)
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 || !isValidUserId(userId))
     return res.status(400).json({ error: "conversationId and userId required" });
 
   try {
@@ -290,16 +303,18 @@ router.patch("/messages/read", async (req, res) => {
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
     if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
 
-    await db
-      .update(messages)
-      .set({ isRead: true })
-      .where(
-        and(
-          eq(messages.conversationId, conversationId),
-          eq(messages.isRead, false),
-          or(ne(messages.senderId, userId), isNull(messages.senderId))
-        )
-      );
+    await withRlsUser(userId, (tx) =>
+      tx
+        .update(messages)
+        .set({ isRead: true })
+        .where(
+          and(
+            eq(messages.conversationId, conversationId),
+            eq(messages.isRead, false),
+            or(ne(messages.senderId, userId), isNull(messages.senderId))
+          )
+        ),
+    );
     res.json({ ok: true });
   } catch (e: any) {
     res.status(500).json({ error: e.message });

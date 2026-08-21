@@ -9,6 +9,7 @@ import measurementsRouter from "./measurements";
 import generateBlouseImageRouter from "./generate-blouse-image";
 import chatRouter from "./chat";
 import usersRouter from "./users";
+import imagesRouter from "./images";
 
 const router: IRouter = Router();
 
@@ -21,5 +22,6 @@ router.use("/measurements", measurementsRouter);
 router.use("/generate-blouse-image", generateBlouseImageRouter);
 router.use("/chat", chatRouter);
 router.use("/users", usersRouter);
+router.use("/images", imagesRouter);
 
 export default router;
