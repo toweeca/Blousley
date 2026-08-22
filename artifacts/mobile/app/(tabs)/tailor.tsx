@@ -521,6 +521,8 @@ export default function TailorScreen() {
   const [selectedIdea, setSelectedIdea] = useState<CustomerIdea | null>(null);
   const [offerText, setOfferText] = useState("");
   const [offerSending, setOfferSending] = useState(false);
+  const [requestSort, setRequestSort] = useState<"newest" | "oldest">("newest");
+  const [requestFilter, setRequestFilter] = useState<"all" | "today" | "7d" | "30d">("all");
 
   const apiBase = (() => {
     const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
@@ -541,9 +543,28 @@ export default function TailorScreen() {
   });
 
   const { data: designRequests = [], isLoading: ideasLoading, refetch: refetchIdeas } = useQuery<CustomerIdea[]>({
-    queryKey: ["tailor-design-requests"],
+    queryKey: ["tailor-design-requests", requestSort, requestFilter],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/ideas?userId=${user?.id ?? "guest"}&tailorView=true`);
+      const params = new URLSearchParams({
+        userId: user?.id ?? "guest",
+        tailorView: "true",
+        sort: requestSort,
+      });
+      if (requestFilter !== "all") {
+        const now = new Date();
+        const from = new Date(now);
+        if (requestFilter === "today") {
+          from.setHours(0, 0, 0, 0);
+          const to = new Date(from);
+          to.setDate(to.getDate() + 1);
+          params.set("from", from.toISOString());
+          params.set("to", to.toISOString());
+        } else {
+          from.setDate(from.getDate() - Number(requestFilter.replace("d", "")));
+          params.set("from", from.toISOString());
+        }
+      }
+      const res = await fetch(`${apiBase}/api/ideas?${params.toString()}`);
       return res.ok ? res.json() : [];
     },
     enabled: user?.role === "tailor",
@@ -685,6 +706,53 @@ export default function TailorScreen() {
               customerCount={fits?.length ?? 0}
             />
             {/* ── Design Requests section ── */}
+            <View style={[styles.requestControls, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.requestControlRow}>
+                <Text style={[styles.requestControlLabel, { color: theme.textMuted }]}>Sort</Text>
+                {(["newest", "oldest"] as const).map((value) => (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => setRequestSort(value)}
+                    style={[
+                      styles.requestControlButton,
+                      {
+                        backgroundColor: requestSort === value ? Colors.brand.primary : "transparent",
+                        borderColor: requestSort === value ? Colors.brand.primary : theme.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.requestControlText, { color: requestSort === value ? "#fff" : theme.text }]}>
+                      {value === "newest" ? "Newest" : "Oldest"}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+              <View style={styles.requestControlRow}>
+                <Text style={[styles.requestControlLabel, { color: theme.textMuted }]}>Show</Text>
+                {([
+                  ["all", "All"],
+                  ["today", "Today"],
+                  ["7d", "7 days"],
+                  ["30d", "30 days"],
+                ] as const).map(([value, label]) => (
+                  <TouchableOpacity
+                    key={value}
+                    onPress={() => setRequestFilter(value)}
+                    style={[
+                      styles.requestControlButton,
+                      {
+                        backgroundColor: requestFilter === value ? Colors.brand.gold : "transparent",
+                        borderColor: requestFilter === value ? Colors.brand.gold : theme.border,
+                      },
+                    ]}
+                  >
+                    <Text style={[styles.requestControlText, { color: requestFilter === value ? "#fff" : theme.text }]}>
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
             <View style={styles.sectionHeader}>
               <View style={[styles.sectionIconWrap, { backgroundColor: Colors.brand.gold + "20" }]}>
                 <Feather name="zap" size={15} color={Colors.brand.goldDark} />
@@ -912,6 +980,33 @@ const styles = StyleSheet.create({
     color: "#fff",
   },
   list: { padding: 20, gap: 16 },
+  requestControls: {
+    borderWidth: 1,
+    borderRadius: 14,
+    padding: 10,
+    gap: 8,
+  },
+  requestControlRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  requestControlLabel: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 12,
+    width: 38,
+  },
+  requestControlButton: {
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  requestControlText: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
+  },
   customerCard: {
     borderRadius: 20,
     borderWidth: 1,

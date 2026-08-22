@@ -1,7 +1,7 @@
 // Copyright © 2026 Blousley. All rights reserved.
 import { Router, type IRouter } from "express";
 import { db, customerIdeasTable } from "@workspace/db";
-import { eq, desc, and } from "drizzle-orm";
+import { eq, desc, asc, and, gte, lt } from "drizzle-orm";
 import { isValidUserId } from "../../lib/rls";
 
 const router: IRouter = Router();
@@ -11,9 +11,12 @@ const isSafeText = (value: unknown, maxLength: number) =>
 
 router.get("/", async (req, res) => {
   try {
-    const { userId, tailorView } = req.query as {
+    const { userId, tailorView, sort, from, to } = req.query as {
       userId?: string;
       tailorView?: string;
+      sort?: string;
+      from?: string;
+      to?: string;
     };
     if (!isValidUserId(userId)) {
       res.status(400).json({ error: "userId is required" });
@@ -21,11 +24,20 @@ router.get("/", async (req, res) => {
     }
 
     if (tailorView === "true") {
+      const dateFilters = [
+        eq(customerIdeasTable.sharedWithTailors, true),
+        ...(typeof from === "string" && !Number.isNaN(Date.parse(from))
+          ? [gte(customerIdeasTable.createdAt, new Date(from))]
+          : []),
+        ...(typeof to === "string" && !Number.isNaN(Date.parse(to))
+          ? [lt(customerIdeasTable.createdAt, new Date(to))]
+          : []),
+      ];
       const ideas = await db
         .select()
         .from(customerIdeasTable)
-        .where(eq(customerIdeasTable.sharedWithTailors, true))
-        .orderBy(desc(customerIdeasTable.createdAt));
+        .where(and(...dateFilters))
+        .orderBy(sort === "oldest" ? asc(customerIdeasTable.createdAt) : desc(customerIdeasTable.createdAt));
       res.json(ideas);
     } else {
       const ideas = await db
