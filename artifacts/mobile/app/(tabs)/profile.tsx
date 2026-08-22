@@ -1037,6 +1037,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [addedIdeaIds, setAddedIdeaIds] = useState<Set<number>>(new Set());
   const [ideaBorderPattern, setIdeaBorderPattern] = useState("None");
   const [ideaBorderPatternCustomUri, setIdeaBorderPatternCustomUri] = useState<string | null>(null);
+  const [ideasRefreshing, setIdeasRefreshing] = useState(false);
+  const [ideasRefreshError, setIdeasRefreshError] = useState(false);
 
   const addIdeaToFitsMutation = useMutation({
     mutationFn: async ({ ideaId, imageUrl }: { ideaId: number; imageUrl: string }) => {
@@ -1119,13 +1121,24 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     }
   };
 
-  const { data: ideas = [], isLoading } = useQuery({
+  const { data: ideas = [], isLoading, refetch: refetchIdeas } = useQuery({
     queryKey: ["ideas", user.id],
     queryFn: async () => {
       const r = await fetch(`${domain}/api/ideas?userId=${user.id}`);
       return r.ok ? r.json() : [];
     },
   });
+
+  const refreshIdeas = async () => {
+    setIdeasRefreshing(true);
+    setIdeasRefreshError(false);
+    try {
+      const result = await refetchIdeas();
+      if (result.error) setIdeasRefreshError(true);
+    } finally {
+      setIdeasRefreshing(false);
+    }
+  };
 
   const pickImage = async (fromCamera: boolean, forSketch = false) => {
     const fn = fromCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
@@ -1557,6 +1570,18 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           <Text style={styles.addIdeaBtnText}>Type your idea</Text>
         </TouchableOpacity>
       </View>
+      <View style={styles.ideaRefreshRow}>
+        <Text style={[styles.groupLabel, { color: theme.text, flex: 1 }]}>Your Requests</Text>
+        <TouchableOpacity
+          onPress={refreshIdeas}
+          disabled={ideasRefreshing}
+          style={[styles.ideaRefreshButton, { borderColor: theme.border, opacity: ideasRefreshing ? 0.7 : 1 }]}
+        >
+          {ideasRefreshing ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="refresh-cw" size={14} color={Colors.brand.primary} />}
+          <Text style={[styles.ideaRefreshText, { color: theme.text }]}>Refresh</Text>
+        </TouchableOpacity>
+      </View>
+      {ideasRefreshError ? <Text style={styles.ideaRefreshError}>Failed to refresh</Text> : null}
 
       {isLoading ? (
         <View style={styles.centerLoader}><ActivityIndicator color={Colors.brand.primary} /></View>
@@ -3512,6 +3537,10 @@ const styles = StyleSheet.create({
   primaryBtn: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 10, paddingVertical: 16, borderRadius: 16, ...Platform.select({ web: { boxShadow: "0px 4px 8px rgba(139,34,82,0.3)" }, default: { shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 } }) },
   primaryBtnText: { fontFamily: "Inter_700Bold", fontSize: 16, color: "#fff" },
   groupLabel: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  ideaRefreshRow: { flexDirection: "row", alignItems: "center" },
+  ideaRefreshButton: { flexDirection: "row", alignItems: "center", gap: 6, borderWidth: 1, borderRadius: 10, paddingHorizontal: 10, paddingVertical: 6 },
+  ideaRefreshText: { fontFamily: "Inter_500Medium", fontSize: 12 },
+  ideaRefreshError: { color: "#B42318", fontFamily: "Inter_500Medium", fontSize: 12 },
   savedBanner: { flexDirection: "row", alignItems: "center", gap: 8, padding: 12, borderRadius: 12, borderWidth: 1 },
   savedBannerText: { fontFamily: "Inter_500Medium", fontSize: 13, flex: 1 },
   centerLoader: { padding: 40, alignItems: "center", gap: 12 },

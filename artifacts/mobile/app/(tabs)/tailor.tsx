@@ -8,6 +8,7 @@ import {
   View,
   Text,
   StyleSheet,
+  ActivityIndicator,
   TouchableOpacity,
   FlatList,
   ScrollView,
@@ -523,6 +524,8 @@ export default function TailorScreen() {
   const [offerSending, setOfferSending] = useState(false);
   const [requestSort, setRequestSort] = useState<"newest" | "oldest">("newest");
   const [requestFilter, setRequestFilter] = useState<"all" | "today" | "7d" | "30d">("all");
+  const [requestRefreshing, setRequestRefreshing] = useState(false);
+  const [requestRefreshError, setRequestRefreshError] = useState(false);
 
   const apiBase = (() => {
     const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
@@ -570,6 +573,17 @@ export default function TailorScreen() {
     enabled: user?.role === "tailor",
     refetchInterval: 30000,
   });
+
+  const refreshDesignRequests = async () => {
+    setRequestRefreshing(true);
+    setRequestRefreshError(false);
+    try {
+      const result = await refetchIdeas();
+      if (result.error) setRequestRefreshError(true);
+    } finally {
+      setRequestRefreshing(false);
+    }
+  };
 
   const noteMutation = useMutation({
     mutationFn: async ({ id, notes }: { id: number; notes: string }) => {
@@ -707,6 +721,18 @@ export default function TailorScreen() {
             />
             {/* ── Design Requests section ── */}
             <View style={[styles.requestControls, { backgroundColor: theme.card, borderColor: theme.border }]}>
+              <View style={styles.requestRefreshRow}>
+                <Text style={[styles.requestControlLabel, { color: theme.textMuted, flex: 1, width: undefined }]}>Requests</Text>
+                <TouchableOpacity
+                  onPress={refreshDesignRequests}
+                  disabled={requestRefreshing}
+                  style={[styles.requestRefreshButton, { borderColor: theme.border, opacity: requestRefreshing ? 0.7 : 1 }]}
+                >
+                  {requestRefreshing ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="refresh-cw" size={14} color={Colors.brand.primary} />}
+                  <Text style={[styles.requestControlText, { color: theme.text }]}>Refresh</Text>
+                </TouchableOpacity>
+              </View>
+              {requestRefreshError ? <Text style={styles.requestRefreshError}>Failed to refresh</Text> : null}
               <View style={styles.requestControlRow}>
                 <Text style={[styles.requestControlLabel, { color: theme.textMuted }]}>Sort</Text>
                 {(["newest", "oldest"] as const).map((value) => (
@@ -985,6 +1011,24 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 10,
     gap: 8,
+  },
+  requestRefreshRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  requestRefreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  requestRefreshError: {
+    color: "#B42318",
+    fontFamily: "Inter_500Medium",
+    fontSize: 12,
   },
   requestControlRow: {
     flexDirection: "row",
