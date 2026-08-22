@@ -3427,18 +3427,17 @@ export default function ProfileScreen() {
               <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Phone (Optional)</Text>
               <TextInput style={[styles.textInput, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]} value={phone} onChangeText={setPhone} placeholder="+91 98765 43210" placeholderTextColor={theme.textMuted} keyboardType="phone-pad" />
             </View>
-            <Text style={[styles.fieldLabel, { color: theme.textSecondary, marginBottom: 8 }]}>I am a…</Text>
-            <View style={styles.roleCards}>
-              {ROLES.map((r) => (
-                <TouchableOpacity key={r.value} style={[styles.roleCard, { backgroundColor: role === r.value ? Colors.brand.primary + "15" : theme.card, borderColor: role === r.value ? Colors.brand.primary : theme.border, borderWidth: role === r.value ? 2 : 1 }]} onPress={() => { setRole(r.value); Haptics.selectionAsync(); }}>
-                  <MaterialCommunityIcons name={r.icon as any} size={24} color={role === r.value ? Colors.brand.primary : theme.textSecondary} />
-                  <View style={styles.roleCardText}>
-                    <Text style={[styles.roleCardTitle, { color: role === r.value ? Colors.brand.primary : theme.text }]}>{r.label}</Text>
-                    <Text style={[styles.roleCardDesc, { color: theme.textMuted }]}>{r.desc}</Text>
-                  </View>
-                  {role === r.value && <Feather name="check-circle" size={20} color={Colors.brand.primary} />}
-                </TouchableOpacity>
-              ))}
+            <View style={[styles.infoCard, { backgroundColor: theme.card, borderColor: theme.border, marginTop: 4 }]}>
+              <View style={styles.infoRow}>
+                <Feather name="user-check" size={16} color={Colors.brand.gold} />
+                <Text style={[styles.infoLabel, { color: theme.textSecondary }]}>Account role</Text>
+                <Text style={[styles.infoValue, { color: theme.text }]}>
+                  {user?.role === "tailor" ? "Tailor" : "Customer"}
+                </Text>
+              </View>
+              <Text style={[styles.roleCardDesc, { color: theme.textMuted, marginTop: 4 }]}>
+                Your account role is fixed. To switch between customer and tailor, please contact support.
+              </Text>
             </View>
 
             <TouchableOpacity style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary }]} onPress={handleSave}>
