@@ -128,6 +128,7 @@ export default function ChatScreen() {
   const { user } = useApp();
 
   const [openConvo, setOpenConvo] = useState<Conversation | null>(null);
+  const [filter, setFilter] = useState<"all" | "unread" | "read">("all");
 
   const apiBase = (() => {
     const d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
@@ -145,6 +146,9 @@ export default function ChatScreen() {
     enabled: !!user?.id,
   });
   const totalUnread = convos.reduce((total, convo) => total + convo.unreadCount, 0);
+  const visibleConvos = convos.filter((convo) =>
+    filter === "all" ? true : filter === "unread" ? convo.unreadCount > 0 : convo.unreadCount === 0,
+  );
 
   const partnerName = openConvo
     ? openConvo.customerId === user?.id
@@ -195,43 +199,73 @@ export default function ChatScreen() {
           </Text>
         </Animated.View>
       ) : (
-        <FlatList
-          data={convos}
-          keyExtractor={(c) => c.id.toString()}
-          renderItem={({ item, index }) => (
-            <ConvoCard
-              convo={item}
-              currentUserId={user.id}
-              onOpen={() => setOpenConvo(item)}
-              delay={index * 50}
-            />
-          )}
-          contentContainerStyle={[styles.list, { paddingBottom: 120 + bottomPad }]}
-          showsVerticalScrollIndicator={false}
-          refreshControl={
-            <RefreshControl
-              refreshing={isLoading}
-              onRefresh={refetch}
-              tintColor={Colors.brand.primary}
-            />
-          }
-          ListEmptyComponent={
-            !isLoading ? (
-              <Animated.View entering={FadeInDown.springify()} style={styles.emptyState}>
-                <View style={[styles.emptyIcon, { backgroundColor: Colors.brand.primary + "12" }]}>
-                  <Feather name="message-circle" size={48} color={Colors.brand.primary + "60"} />
-                </View>
-                <Text style={[styles.emptyTitle, { color: theme.text }]}>No conversations yet</Text>
-                <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                  {user.role === "tailor"
-                    ? "Go to the Tailor tab and tap 'Message' on a customer fit to start chatting"
-                    : "Your tailor will message you after reviewing your fit profile"}
+        <>
+          <View style={styles.filterRow}>
+            {(["all", "unread", "read"] as const).map((value) => (
+              <TouchableOpacity
+                key={value}
+                onPress={() => setFilter(value)}
+                style={[
+                  styles.filterPill,
+                  {
+                    backgroundColor: filter === value ? Colors.brand.primary : theme.card,
+                    borderColor: filter === value ? Colors.brand.primary : theme.border,
+                  },
+                ]}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    { color: filter === value ? "#fff" : theme.textMuted },
+                  ]}
+                >
+                  {value[0].toUpperCase() + value.slice(1)}
                 </Text>
-              </Animated.View>
-            ) : null
-          }
-          ListFooterComponent={<CopyrightNotice />}
-        />
+              </TouchableOpacity>
+            ))}
+          </View>
+          <FlatList
+            data={visibleConvos}
+            keyExtractor={(c) => c.id.toString()}
+            renderItem={({ item, index }) => (
+              <ConvoCard
+                convo={item}
+                currentUserId={user.id}
+                onOpen={() => setOpenConvo(item)}
+                delay={index * 50}
+              />
+            )}
+            contentContainerStyle={[styles.list, { paddingBottom: 120 + bottomPad }]}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={isLoading}
+                onRefresh={refetch}
+                tintColor={Colors.brand.primary}
+              />
+            }
+            ListEmptyComponent={
+              !isLoading ? (
+                <Animated.View entering={FadeInDown.springify()} style={styles.emptyState}>
+                  <View style={[styles.emptyIcon, { backgroundColor: Colors.brand.primary + "12" }]}>
+                    <Feather name="message-circle" size={48} color={Colors.brand.primary + "60"} />
+                  </View>
+                  <Text style={[styles.emptyTitle, { color: theme.text }]}>
+                    {convos.length === 0 ? "No conversations yet" : `No ${filter} conversations`}
+                  </Text>
+                  <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
+                    {convos.length === 0
+                      ? user.role === "tailor"
+                        ? "Go to the Tailor tab and tap 'Message' on a customer fit to start chatting"
+                        : "Your tailor will message you after reviewing your fit profile"
+                      : "Try another filter to view your other conversations"}
+                  </Text>
+                </Animated.View>
+              ) : null
+            }
+            ListFooterComponent={<CopyrightNotice />}
+          />
+        </>
       )}
 
       {openConvo && user && (
@@ -294,6 +328,20 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#fff",
   },
+  filterRow: {
+    flexDirection: "row",
+    gap: 8,
+    paddingHorizontal: 16,
+    paddingTop: 14,
+    paddingBottom: 4,
+  },
+  filterPill: {
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  filterText: { fontFamily: "Inter_600SemiBold", fontSize: 12 },
   list: { padding: 16, gap: 10 },
   convoCard: {
     flexDirection: "row",
