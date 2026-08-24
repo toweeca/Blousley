@@ -4,3 +4,4 @@
 - [Drizzle schema drift](db-schema-drift.md) — never accept a destructive drizzle push; diff live columns vs schema files and add missing columns first.
 - [PostgreSQL RLS policies](postgres-rls-policies.md) — verify live policy predicates after Drizzle push; enforce user context with transaction-local app.user_id.
 - [API deployment health checks](api-deployment-health-checks.md) — publisher probes the internal API over HTTP before edge TLS; never HTTPS-redirect the health path.
+- [Expo Metro image-size](expo-metro-image-size.md) — Metro’s `image-size` 1.x contract must not be overridden with 2.x; it fails static mobile bundles.

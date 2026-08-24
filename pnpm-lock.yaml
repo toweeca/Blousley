@@ -68,7 +68,7 @@ catalogs:
       version: 3.25.76
 
 overrides:
-  image-size: 2.0.2
+  image-size: 1.2.1
   brace-expansion: 5.0.9
   picomatch: 4.0.5
   ws: 8.21.3
@@ -4738,8 +4738,8 @@ packages:
     resolution: {integrity: sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg==}
     engines: {node: '>= 4'}
 
-  image-size@2.0.2:
-    resolution: {integrity: sha512-IRqXKlaXwgSMAMtpNzZa1ZAe8m+Sa1770Dhk8VkSsP9LS+iHD62Zd8FQKs8fbPiagBE7BzoFX23cxFnwshpV6w==}
+  image-size@1.2.1:
+    resolution: {integrity: sha512-rH+46sQJ2dlwfjfhCyNx5thzrv+dtmBIhPHk0zgRUukHzZ/kRueTJXoYYsclBaKcSMBWuGbOFXtioLpzTb5euw==}
     engines: {node: '>=16.x'}
     hasBin: true
 
@@ -5720,6 +5720,9 @@ packages:
 
   queue-microtask@1.2.3:
     resolution: {integrity: sha512-NuaNSa6flKT5JaSYQzJok04JzTL1CA6aGhv5rfLW3PgqA+M2ChpZQnAC8h8i4ZFkBS8X5RqkDBHA7r4hej3K9A==}
+
+  queue@6.0.2:
+    resolution: {integrity: sha512-iHZWu+q3IdFZFX36ro/lKBkSvfkztY5Y7HMiPlOUjhupPcG2JMfst2KKEpu5XndviX/3UhFbRngUPNKtgvtZiA==}
 
   quick-lru@5.1.1:
     resolution: {integrity: sha512-WuyALRjWPDGtt/wzJiadO5AXY+8hZ80hVpe6MyivgraREW751X3SbhRvG3eLKOYN+8VEvqLcf3wdnt44Z4S4SA==}
@@ -11497,7 +11500,9 @@ snapshots:
 
   ignore@7.0.5: {}
 
-  image-size@2.0.2: {}
+  image-size@1.2.1:
+    dependencies:
+      queue: 6.0.2
 
   imurmurhash@0.1.4: {}
 
@@ -12129,7 +12134,7 @@ snapshots:
       flow-enums-runtime: 0.0.6
       graceful-fs: 4.2.11
       hermes-parser: 0.32.0
-      image-size: 2.0.2
+      image-size: 1.2.1
       invariant: 2.2.4
       jest-worker: 29.7.0
       jsc-safe-url: 0.2.4
@@ -12176,7 +12181,7 @@ snapshots:
       flow-enums-runtime: 0.0.6
       graceful-fs: 4.2.11
       hermes-parser: 0.33.3
-      image-size: 2.0.2
+      image-size: 1.2.1
       invariant: 2.2.4
       jest-worker: 29.7.0
       jsc-safe-url: 0.2.4
@@ -12635,6 +12640,10 @@ snapshots:
       strict-uri-encode: 2.0.0
 
   queue-microtask@1.2.3: {}
+
+  queue@6.0.2:
+    dependencies:
+      inherits: 2.0.4
 
   quick-lru@5.1.1: {}
 

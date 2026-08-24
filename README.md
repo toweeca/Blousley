@@ -18,12 +18,12 @@ Tailor, Messages, Design, and Profile.
 
 ## Known dependency audit exception
 
-`image-size@2.0.2` remains a high-severity transitive dependency of the Expo
+`image-size@1.2.1` remains a high-severity transitive dependency of the Expo
 toolchain (`@expo/cli → @expo/metro → metro → image-size`). The audit reports
 parser denial-of-service risks for ICNS, JXL, and HEIF inputs, and currently
-lists no patched release. It is intentionally left unchanged: do not add an
-override or speculative replacement unless a compatible Expo/Metro update
-removes the dependency.
+lists no patched release. It is pinned to the latest Metro-compatible 1.x
+release because `image-size@2.0.2` breaks Expo static bundling. Remove the pin
+only when a compatible Expo/Metro update provides a non-vulnerable release.
 
 ## License
 
