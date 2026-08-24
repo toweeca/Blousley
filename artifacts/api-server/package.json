@@ -18,6 +18,7 @@
     "drizzle-orm": "catalog:",
     "express": "^5",
     "multer": "^2.2.0",
+    "sharp": "^0.35.3",
     "ws": "8.21.3"
   },
   "devDependencies": {

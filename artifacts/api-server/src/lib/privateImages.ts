@@ -1,6 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
+import sharp from "sharp";
 
 const PRIVATE_IMAGE_DIR = path.resolve(process.cwd(), ".private-images");
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -61,10 +62,18 @@ export async function savePrivateImage(image: string, userId: string, originalNa
     if (bucket.count > MAX_UPLOADS_PER_USER) throw new Error("Upload limit exceeded");
   }
 
+  const sanitizedBuffer = await sharp(buffer, {
+    failOn: "error",
+    limitInputPixels: 40_000_000,
+  })[mimeType === "image/jpeg" ? "jpeg" : mimeType === "image/png" ? "png" : "webp"]().toBuffer();
+  if (!sanitizedBuffer.length || sanitizedBuffer.length > MAX_IMAGE_BYTES) {
+    throw new Error("Invalid or oversized image upload");
+  }
+
   await mkdir(PRIVATE_IMAGE_DIR, { recursive: true, mode: 0o700 });
   const storageKey = `${randomUUID()}.${extensionForMimeType(mimeType)}`;
-  await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), buffer, { mode: 0o600, flag: "wx" });
-  console.info("image_upload", { userId, mimeType, size: buffer.length });
+  await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), sanitizedBuffer, { mode: 0o600, flag: "wx" });
+  console.info("image_upload", { userId, mimeType, size: sanitizedBuffer.length });
   return { storageKey, mimeType };
 }
 
