@@ -16,14 +16,13 @@ Tailor, Messages, Design, and Profile.
 - **API**: Express, TypeScript, PostgreSQL (Drizzle ORM)
 - **AI**: OpenAI `gpt-image-1` via Replit AI Integration
 
-## Known dependency audit exception
+## Dependency security patch
 
-`image-size@1.2.1` remains a high-severity transitive dependency of the Expo
-toolchain (`@expo/cli → @expo/metro → metro → image-size`). The audit reports
-parser denial-of-service risks for ICNS, JXL, and HEIF inputs, and currently
-lists no patched release. It is pinned to the latest Metro-compatible 1.x
-release because `image-size@2.0.2` breaks Expo static bundling. Remove the pin
-only when a compatible Expo/Metro update provides a non-vulnerable release.
+Expo's Metro toolchain depends on `image-size@1.2.1`, while the published 2.x
+line remains affected by the same parser denial-of-service advisories. The
+workspace applies a pnpm patch that rejects malformed zero-length ICNS entries
+and JXL/HEIF boxes before they can cause non-advancing parser loops. Keep the
+patch until a compatible Expo/Metro update includes an upstream fixed release.
 
 ## License
 

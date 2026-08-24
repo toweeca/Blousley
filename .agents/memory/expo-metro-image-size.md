@@ -3,13 +3,15 @@ name: Expo Metro image-size compatibility
 description: The static Expo bundler requires the Metro-compatible image-size 1.x release.
 ---
 
-Keep `image-size` pinned to the latest 1.x release compatible with Metro rather
-than overriding it to 2.x.
+Keep `image-size` on Metro-compatible 1.x and retain the workspace pnpm patch
+that rejects malformed zero-length ICNS entries and JXL/HEIF boxes.
 
-**Why:** Metro declares an `image-size` 1.x contract. Version 2’s typed-array
-implementation causes Expo static bundle generation to fail while reading
-Expo Router's built-in image asset.
+**Why:** Metro declares an `image-size` 1.x contract, and the CVE-2025-71329
+advisory affects every published `image-size` release through 2.0.2 with no
+upstream patched version. Version 2 also breaks Expo static bundle generation
+while reading Expo Router's built-in image asset.
 
 **How to apply:** If a dependency audit flags `image-size`, do not raise its
-major version speculatively. Verify a newer Expo/Metro release has compatible,
-patched support before removing or changing the pin.
+major version speculatively or suppress the alert. Keep the patch in place and
+verify a newer Expo/Metro release has compatible, patched support before
+removing it.

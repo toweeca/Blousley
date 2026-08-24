@@ -87,6 +87,11 @@ overrides:
   js-yaml@4: 4.3.1
   lodash: 4.18.0
 
+patchedDependencies:
+  image-size@1.2.1:
+    hash: c0fde580cc249a6e26c543033b15a95c13a816b66a66621aa39ccce9f30f90c5
+    path: patches/image-size@1.2.1.patch
+
 importers:
 
   .:
@@ -11500,7 +11505,7 @@ snapshots:
 
   ignore@7.0.5: {}
 
-  image-size@1.2.1:
+  image-size@1.2.1(patch_hash=c0fde580cc249a6e26c543033b15a95c13a816b66a66621aa39ccce9f30f90c5):
     dependencies:
       queue: 6.0.2
 
@@ -12134,7 +12139,7 @@ snapshots:
       flow-enums-runtime: 0.0.6
       graceful-fs: 4.2.11
       hermes-parser: 0.32.0
-      image-size: 1.2.1
+      image-size: 1.2.1(patch_hash=c0fde580cc249a6e26c543033b15a95c13a816b66a66621aa39ccce9f30f90c5)
       invariant: 2.2.4
       jest-worker: 29.7.0
       jsc-safe-url: 0.2.4
@@ -12181,7 +12186,7 @@ snapshots:
       flow-enums-runtime: 0.0.6
       graceful-fs: 4.2.11
       hermes-parser: 0.33.3
-      image-size: 1.2.1
+      image-size: 1.2.1(patch_hash=c0fde580cc249a6e26c543033b15a95c13a816b66a66621aa39ccce9f30f90c5)
       invariant: 2.2.4
       jest-worker: 29.7.0
       jsc-safe-url: 0.2.4
