@@ -80,7 +80,9 @@ export default function ChatThread({
   const { data: msgs = [], isLoading } = useQuery<Message[]>({
     queryKey: ["chat-messages", conversationId],
     queryFn: async () => {
-      const r = await fetch(`${apiBase}/api/chat/messages?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`);
+      const r = await fetch(`${apiBase}/api/chat/messages?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`, {
+        credentials: "include",
+      });
       return r.json();
     },
     enabled: visible && conversationId > 0,
@@ -89,7 +91,9 @@ export default function ChatThread({
   const { data: idea } = useQuery<IdeaSummary | null>({
     queryKey: ["chat-idea", conversationId],
     queryFn: async () => {
-      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/idea?userId=${encodeURIComponent(currentUserId)}`);
+      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/idea?userId=${encodeURIComponent(currentUserId)}`, {
+        credentials: "include",
+      });
       if (!r.ok) return null;
       return r.json();
     },
@@ -100,6 +104,7 @@ export default function ChatThread({
     if (!visible || conversationId <= 0 || !currentUserId) return;
     fetch(`${apiBase}/api/chat/messages/read`, {
       method: "PATCH",
+      credentials: "include",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversationId, userId: currentUserId }),
     })
@@ -138,6 +143,7 @@ export default function ChatThread({
     mutationFn: async (content: string) => {
       const r = await fetch(`${apiBase}/api/chat/messages`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversationId, senderId: currentUserId, content }),
       });

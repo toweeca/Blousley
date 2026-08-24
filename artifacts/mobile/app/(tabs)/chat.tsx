@@ -139,7 +139,10 @@ export default function ChatScreen() {
     queryKey: ["chat-conversations", user?.id],
     queryFn: async () => {
       if (!user?.id) return [];
-      const r = await fetch(`${apiBase}/api/chat/conversations?userId=${user.id}`);
+      const r = await fetch(`${apiBase}/api/chat/conversations?userId=${user.id}`, {
+        credentials: "include",
+      });
+      if (!r.ok) return [];
       return r.json();
     },
     refetchInterval: 10000,
