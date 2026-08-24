@@ -62,10 +62,15 @@ export async function savePrivateImage(image: string, userId: string, originalNa
     if (bucket.count > MAX_UPLOADS_PER_USER) throw new Error("Upload limit exceeded");
   }
 
-  const sanitizedBuffer = await sharp(buffer, {
-    failOn: "error",
-    limitInputPixels: 40_000_000,
-  })[mimeType === "image/jpeg" ? "jpeg" : mimeType === "image/png" ? "png" : "webp"]().toBuffer();
+  let sanitizedBuffer: Buffer;
+  try {
+    sanitizedBuffer = await sharp(buffer, {
+      failOn: "error",
+      limitInputPixels: 40_000_000,
+    })[mimeType === "image/jpeg" ? "jpeg" : mimeType === "image/png" ? "png" : "webp"]().toBuffer();
+  } catch {
+    throw new Error("Invalid image upload");
+  }
   if (!sanitizedBuffer.length || sanitizedBuffer.length > MAX_IMAGE_BYTES) {
     throw new Error("Invalid or oversized image upload");
   }
