@@ -144,6 +144,7 @@ export default function ChatScreen() {
     refetchInterval: 10000,
     enabled: !!user?.id,
   });
+  const totalUnread = convos.reduce((total, convo) => total + convo.unreadCount, 0);
 
   const partnerName = openConvo
     ? openConvo.customerId === user?.id
@@ -157,12 +158,30 @@ export default function ChatScreen() {
         colors={[Colors.brand.primaryDark, Colors.brand.primary]}
         style={[styles.header, { paddingTop: topPad + 16 }]}
       >
-        <Text style={styles.headerTitle}>Messages</Text>
-        <Text style={styles.headerSubtitle}>
-          {convos.length > 0
-            ? `${convos.length} conversation${convos.length > 1 ? "s" : ""}`
-            : "Your chat threads appear here"}
-        </Text>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerTitle}>Messages</Text>
+            <Text style={styles.headerSubtitle}>
+              {convos.length > 0
+                ? `${convos.length} conversation${convos.length > 1 ? "s" : ""}`
+                : "Your chat threads appear here"}
+            </Text>
+          </View>
+          <View
+            accessibilityLabel={`${totalUnread} unread messages`}
+            accessibilityRole="image"
+            style={styles.bellButton}
+          >
+            <Feather name="bell" size={22} color="#fff" />
+            {totalUnread > 0 && (
+              <View style={styles.headerUnreadBadge}>
+                <Text style={styles.headerUnreadBadgeText}>
+                  {totalUnread > 99 ? "99+" : totalUnread}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
       </LinearGradient>
 
       {!user ? (
@@ -237,12 +256,43 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
   headerTitle: { fontFamily: "Inter_700Bold", fontSize: 28, color: "#fff" },
   headerSubtitle: {
     fontFamily: "Inter_400Regular",
     fontSize: 14,
     color: "rgba(255,255,255,0.75)",
     marginTop: 2,
+  },
+  bellButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "rgba(255,255,255,0.16)",
+    position: "relative",
+  },
+  headerUnreadBadge: {
+    position: "absolute",
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: 9,
+    paddingHorizontal: 4,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.brand.gold,
+  },
+  headerUnreadBadgeText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 10,
+    color: "#fff",
   },
   list: { padding: 16, gap: 10 },
   convoCard: {

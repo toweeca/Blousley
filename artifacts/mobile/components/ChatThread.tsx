@@ -102,8 +102,15 @@ export default function ChatThread({
       method: "PATCH",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ conversationId, userId: currentUserId }),
-    }).catch(() => null);
-  }, [msgs.length, visible, conversationId, currentUserId, apiBase]);
+    })
+      .then((response) => {
+        if (response.ok) {
+          qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+          qc.invalidateQueries({ queryKey: ["chat-conversations-badge"] });
+        }
+      })
+      .catch(() => null);
+  }, [msgs.length, visible, conversationId, currentUserId, apiBase, qc]);
 
   useEffect(() => {
     if (!visible || conversationId <= 0 || !currentUserId) return;
