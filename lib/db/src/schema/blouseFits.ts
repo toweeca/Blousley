@@ -14,6 +14,7 @@ export const blouseFitsTable = pgTable("blouse_fits", {
   id: serial("id").primaryKey(),
   userId: text("user_id").notNull(),
   imageUrl: text("image_url"),
+  thumbnailUrl: text("thumbnail_url"),
   measurements: jsonb("measurements").$type<{
     bust?: number;
     waist?: number;

@@ -29,6 +29,7 @@ interface BlouseFit {
   id: number;
   userId: string;
   imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number } | null;
   bodyShape?: string | null;
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
@@ -181,9 +182,9 @@ export default function FitDetailScreen() {
         contentContainerStyle={{ paddingBottom: 60 + bottomPad, gap: 16, paddingHorizontal: 20 }}
       >
         {/* ── Photo banner ── */}
-        {!!fit.imageUrl && (
+        {!!fit.thumbnailUrl && (
           <Animated.View entering={FadeInDown.delay(60).springify()} style={[styles.photoBannerWrap, { marginHorizontal: -20 }]}>
-            <Image source={{ uri: fit.imageUrl }} style={styles.photoBanner} resizeMode="cover" />
+            <Image source={{ uri: fit.thumbnailUrl }} style={styles.photoBanner} resizeMode="cover" />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.6)"]}
               style={styles.photoBannerGradient}
@@ -202,7 +203,7 @@ export default function FitDetailScreen() {
           entering={FadeInDown.delay(100).springify()}
           style={[styles.shapeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
         >
-          {!fit.imageUrl && (
+          {!fit.thumbnailUrl && (
             <View style={styles.shapeRow}>
               <View style={[styles.shapeIconCircle, { backgroundColor: Colors.brand.primary + "15" }]}>
                 <MaterialCommunityIcons name="human-female" size={36} color={Colors.brand.primary} />

@@ -27,6 +27,7 @@ interface BlouseFit {
   id: number;
   userId: string;
   imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number } | null;
   bodyShape?: string | null;
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
@@ -60,7 +61,7 @@ function FitCard({
     month: "short",
     year: "numeric",
   });
-  const hasImage = !!fit.imageUrl;
+  const hasImage = !!fit.thumbnailUrl;
 
   const handleDeletePress = (e: any) => {
     // Stop the card navigation from firing on web
@@ -86,7 +87,7 @@ function FitCard({
         {/* ── Photo / placeholder banner ── */}
         {hasImage ? (
           <View style={styles.fitImageWrap}>
-            <Image source={{ uri: fit.imageUrl! }} style={styles.fitImage} resizeMode="cover" />
+            <Image source={{ uri: fit.thumbnailUrl! }} style={styles.fitImage} resizeMode="cover" />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.55)"]}
               style={styles.fitImageGradient}

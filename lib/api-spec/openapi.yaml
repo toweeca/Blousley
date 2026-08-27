@@ -247,6 +247,9 @@ components:
         imageUrl:
           type: string
           nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
         measurements:
           $ref: "#/components/schemas/Measurements"
           nullable: true

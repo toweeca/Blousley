@@ -57,6 +57,7 @@ export const GetBlouseFitsResponseItem = zod.object({
   id: zod.number(),
   userId: zod.string(),
   imageUrl: zod.string().nullish(),
+  thumbnailUrl: zod.string().nullish(),
   measurements: zod
     .object({
       bust: zod.number().optional(),
@@ -127,6 +128,7 @@ export const GetBlouseFitResponse = zod.object({
   id: zod.number(),
   userId: zod.string(),
   imageUrl: zod.string().nullish(),
+  thumbnailUrl: zod.string().nullish(),
   measurements: zod
     .object({
       bust: zod.number().optional(),
@@ -180,6 +182,7 @@ export const SubmitFitToTailorsResponse = zod.object({
   id: zod.number(),
   userId: zod.string(),
   imageUrl: zod.string().nullish(),
+  thumbnailUrl: zod.string().nullish(),
   measurements: zod
     .object({
       bust: zod.number().optional(),
@@ -224,6 +227,7 @@ export const UpdateFitNotesResponse = zod.object({
   id: zod.number(),
   userId: zod.string(),
   imageUrl: zod.string().nullish(),
+  thumbnailUrl: zod.string().nullish(),
   measurements: zod
     .object({
       bust: zod.number().optional(),
@@ -264,6 +268,7 @@ export const GetTailorCustomersResponseItem = zod.object({
   id: zod.number(),
   userId: zod.string(),
   imageUrl: zod.string().nullish(),
+  thumbnailUrl: zod.string().nullish(),
   measurements: zod
     .object({
       bust: zod.number().optional(),

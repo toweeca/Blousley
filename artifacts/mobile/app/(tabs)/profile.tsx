@@ -1052,6 +1052,8 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     },
     onSuccess: (ideaId) => {
       setAddedIdeaIds((prev) => new Set(prev).add(ideaId));
+      qc.invalidateQueries({ queryKey: ["blouse-fits"] });
+      qc.invalidateQueries({ queryKey: ["blouse-fits-count"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Added to Fits! ✓", "This idea is now visible to your tailor.");
     },
@@ -2406,6 +2408,7 @@ function DesignMeasureRow({ label, value, onChange, hint, unit, theme, accentCol
 }
 
 function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: NonNullable<ReturnType<typeof useApp>["user"]> }) {
+  const qc = useQueryClient();
   const [step, setStep] = useState(0);
   const [measEditing, setMeasEditing] = useState(true);
   const [guideOpen, setGuideOpen] = useState(false);
@@ -2453,6 +2456,8 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
     },
     onSuccess: () => {
       setFitAdded(true);
+      qc.invalidateQueries({ queryKey: ["blouse-fits"] });
+      qc.invalidateQueries({ queryKey: ["blouse-fits-count"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Added to Fits! ✓", "This design is now visible to your tailor under Customer Fits.");
     },

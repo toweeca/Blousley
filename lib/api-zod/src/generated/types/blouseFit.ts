@@ -12,6 +12,7 @@ export interface BlouseFit {
   id: number;
   userId: string;
   imageUrl?: string | null;
+  thumbnailUrl?: string | null;
   measurements?: Measurements | null;
   bodyShape?: string | null;
   stylePrefs?: StylePrefs | null;

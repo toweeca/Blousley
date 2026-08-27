@@ -17,6 +17,10 @@ function privateImageUrl(req: any, fitId: number, userId: string) {
   return `${protocol}://${req.get("host")}/api/images/fits/${fitId}?userId=${encodeURIComponent(userId)}`;
 }
 
+function privateImagePath(fitId: number) {
+  return `/api/images/fits/${fitId}`;
+}
+
 router.post("/analyze", async (req, res) => {
   try {
     const { imageBase64, userId } = req.body as {
@@ -178,7 +182,8 @@ router.get("/fits", async (req, res) => {
             .limit(1);
           return row;
         });
-        return { ...fit, imageUrl: image ? privateImageUrl(req, fit.id, userId) : null };
+        const imageUrl = image ? privateImageUrl(req, fit.id, userId) : null;
+        return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null };
       }),
     );
     res.json(securedFits);
@@ -235,9 +240,20 @@ router.post("/fits", async (req, res) => {
       console.info("image_upload_complete", { userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
 
+    const thumbnailUrl = privateImage ? privateImagePath(fit.id) : null;
+    const [savedFit] = thumbnailUrl
+      ? await db
+          .update(blouseFitsTable)
+          .set({ thumbnailUrl, updatedAt: new Date() })
+          .where(eq(blouseFitsTable.id, fit.id))
+          .returning()
+      : [fit];
+    const imageUrl = privateImage ? privateImageUrl(req, fit.id, userId) : null;
+
     res.status(201).json({
-      ...fit,
-      imageUrl: privateImage ? privateImageUrl(req, fit.id, userId) : null,
+      ...savedFit,
+      imageUrl,
+      thumbnailUrl: savedFit.thumbnailUrl ? imageUrl : null,
     });
   } catch (error) {
     console.error("Error saving fit:", error);
@@ -273,7 +289,8 @@ router.get("/fits/:id", async (req, res) => {
         .limit(1);
       return row;
     });
-    res.json({ ...fit, imageUrl: image ? privateImageUrl(req, fit.id, userId) : null });
+    const imageUrl = image ? privateImageUrl(req, fit.id, userId) : null;
+    res.json({ ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null });
   } catch (error) {
     console.error("Error fetching fit:", error);
     res.status(500).json({ error: "Failed to fetch fit" });

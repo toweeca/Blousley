@@ -13,6 +13,10 @@ function privateImageUrl(req: any, fitId: number, userId: string) {
   return `${protocol}://${req.get("host")}/api/images/fits/${fitId}?userId=${encodeURIComponent(userId)}`;
 }
 
+function privateImagePath(fitId: number) {
+  return `/api/images/fits/${fitId}`;
+}
+
 router.get("/customers", async (req, res) => {
   try {
     const { tailorId } = req.query as { tailorId?: string };
@@ -40,7 +44,7 @@ router.get("/customers", async (req, res) => {
       .orderBy(desc(blouseFitsTable.createdAt));
     const securedRows = await Promise.all(rows.map(async ({ fit, assignedTailorId }) => {
       if (assignedTailorId !== tailorId) {
-        return { ...fit, imageUrl: null, assignedTailorId };
+        return { ...fit, imageUrl: null, thumbnailUrl: null, assignedTailorId };
       }
       const image = await withRlsUser(tailorId, async (tx) => {
         const [row] = await tx
@@ -50,11 +54,8 @@ router.get("/customers", async (req, res) => {
           .limit(1);
         return row;
       });
-      return {
-        ...fit,
-        imageUrl: image ? privateImageUrl(req, fit.id, tailorId) : null,
-        assignedTailorId,
-      };
+      const imageUrl = image ? privateImageUrl(req, fit.id, tailorId) : null;
+      return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null, assignedTailorId };
     }));
     res.json(securedRows);
   } catch (error) {
@@ -92,9 +93,19 @@ router.post("/fits", async (req, res) => {
       );
       console.info("image_upload_complete", { userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
+    const thumbnailUrl = privateImage ? privateImagePath(fit.id) : null;
+    const [savedFit] = thumbnailUrl
+      ? await db
+          .update(blouseFitsTable)
+          .set({ thumbnailUrl, updatedAt: new Date() })
+          .where(eq(blouseFitsTable.id, fit.id))
+          .returning()
+      : [fit];
+    const savedImageUrl = privateImage ? privateImageUrl(req, fit.id, userId) : null;
     res.json({
-      ...fit,
-      imageUrl: privateImage ? privateImageUrl(req, fit.id, userId) : null,
+      ...savedFit,
+      imageUrl: savedImageUrl,
+      thumbnailUrl: savedFit.thumbnailUrl ? savedImageUrl : null,
     });
   } catch (error) {
     console.error("Error adding fit:", error);
