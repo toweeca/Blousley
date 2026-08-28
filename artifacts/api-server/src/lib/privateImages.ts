@@ -40,12 +40,18 @@ export function imageDataUriFromBase64(base64: string) {
   return `data:${mimeType};base64,${normalized}`;
 }
 
-export async function savePrivateImage(image: string, userId: string, originalName?: string) {
+export async function savePrivateImage(
+  image: string,
+  userId: string,
+  originalName?: string,
+  options?: { format?: "png" },
+) {
   const match = image.match(DATA_URI_RE);
   const svgMatch = image.match(SVG_DATA_URI_RE);
   if (!match && !svgMatch) throw new Error("Only PNG, JPEG, WebP, and SVG image data is accepted");
 
-  const mimeType = svgMatch ? "image/png" : match![1].toLowerCase();
+  const sourceMimeType = svgMatch ? "image/png" : match![1].toLowerCase();
+  const mimeType = options?.format === "png" ? "image/png" : sourceMimeType;
   const extension = originalName?.toLowerCase().split(".").pop();
   if (originalName && (!extension || !["jpg", "jpeg", "png", "webp"].includes(extension))) {
     throw new Error("Invalid image extension");
