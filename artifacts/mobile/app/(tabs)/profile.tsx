@@ -1144,13 +1144,14 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 
   const pickImage = async (fromCamera: boolean, forSketch = false) => {
     const fn = fromCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
-    const result = await fn({ mediaTypes: ["images"], allowsEditing: true, quality: 0.8 });
+    const result = await fn({ mediaTypes: ["images"], allowsEditing: true, quality: 0.8, base64: true });
     if (!result.canceled && result.assets[0]) {
-      if (forSketch) {
-        setSketchBackground(result.assets[0].uri);
-      } else {
-        setImageUri(result.assets[0].uri);
-      }
+      const asset = result.assets[0];
+      const uri = asset.base64
+        ? `data:${asset.mimeType ?? "image/jpeg"};base64,${asset.base64}`
+        : asset.uri;
+      if (forSketch) setSketchBackground(uri);
+      else setImageUri(uri);
     }
   };
 
