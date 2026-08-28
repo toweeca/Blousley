@@ -182,8 +182,8 @@ router.get("/fits", async (req, res) => {
             .limit(1);
           return row;
         });
-        const imageUrl = image ? privateImageUrl(req, fit.id, userId) : null;
-        return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null };
+        const imageUrl = image ? privateImageUrl(req, fit.id, userId) : fit.imageUrl;
+        return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : fit.imageUrl };
       }),
     );
     res.json(securedFits);
@@ -289,8 +289,8 @@ router.get("/fits/:id", async (req, res) => {
         .limit(1);
       return row;
     });
-    const imageUrl = image ? privateImageUrl(req, fit.id, userId) : null;
-    res.json({ ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null });
+    const imageUrl = image ? privateImageUrl(req, fit.id, userId) : fit.imageUrl;
+    res.json({ ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : fit.imageUrl });
   } catch (error) {
     console.error("Error fetching fit:", error);
     res.status(500).json({ error: "Failed to fetch fit" });

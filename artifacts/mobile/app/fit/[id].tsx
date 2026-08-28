@@ -106,6 +106,7 @@ export default function FitDetailScreen() {
 
   const [addedToTailorFits, setAddedToTailorFits] = React.useState(false);
   const [chatVisible, setChatVisible] = React.useState(false);
+  const [imageFailed, setImageFailed] = React.useState(false);
   const addToTailorFitsMutation = useMutation({
     mutationFn: async () => {
       const res = await fetch(`${apiBase}/api/blouse/fits/${id}/find-tailor`, {
@@ -184,17 +185,32 @@ export default function FitDetailScreen() {
         {/* ── Photo banner ── */}
         {!!fit.thumbnailUrl && (
           <Animated.View entering={FadeInDown.delay(60).springify()} style={[styles.photoBannerWrap, { marginHorizontal: -20 }]}>
-            <Image source={{ uri: fit.thumbnailUrl }} style={styles.photoBanner} resizeMode="cover" />
-            <LinearGradient
-              colors={["transparent", "rgba(0,0,0,0.6)"]}
-              style={styles.photoBannerGradient}
-            />
-            <View style={styles.photoBannerOverlay}>
-              <Text style={styles.photoBannerShape}>
-                {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
-              </Text>
-              <Text style={styles.photoBannerDate}>{date}</Text>
-            </View>
+            {imageFailed ? (
+              <View style={[styles.photoBanner, styles.centered, { backgroundColor: theme.card }]}>
+                <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>Image unavailable</Text>
+              </View>
+            ) : (
+              <Image
+                source={{ uri: fit.thumbnailUrl }}
+                style={styles.photoBanner}
+                resizeMode="cover"
+                onError={() => setImageFailed(true)}
+              />
+            )}
+            {!imageFailed && (
+              <>
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.6)"]}
+                  style={styles.photoBannerGradient}
+                />
+                <View style={styles.photoBannerOverlay}>
+                  <Text style={styles.photoBannerShape}>
+                    {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
+                  </Text>
+                  <Text style={styles.photoBannerDate}>{date}</Text>
+                </View>
+              </>
+            )}
           </Animated.View>
         )}
 
