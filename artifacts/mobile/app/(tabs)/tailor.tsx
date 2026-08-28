@@ -27,6 +27,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import ChatThread from "@/components/ChatThread";
+import PrivateFitImage from "@/components/PrivateFitImage";
 
 interface BlouseFit {
   id: number;
@@ -78,7 +79,12 @@ function CustomerCard({
     <Animated.View entering={FadeInDown.delay(delay).springify()}>
       <View style={[styles.customerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
         {fit.imageUrl ? (
-          <Image source={{ uri: fit.imageUrl }} style={styles.customerFitImage} resizeMode="cover" />
+          <PrivateFitImage
+            source={{ uri: fit.imageUrl }}
+            style={styles.customerFitImage}
+            resizeMode="cover"
+            fallbackColor={theme.card}
+          />
         ) : null}
         <View style={styles.cardTopRow}>
           <View style={[styles.customerAvatar, { backgroundColor: Colors.brand.primary + "20" }]}>
