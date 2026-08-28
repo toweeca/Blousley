@@ -24,6 +24,7 @@ import { useQuery, useMutation } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import ChatThread from "@/components/ChatThread";
+import PrivateFitImage from "@/components/PrivateFitImage";
 
 interface BlouseFit {
   id: number;
@@ -190,10 +191,11 @@ export default function FitDetailScreen() {
                 <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>Image unavailable</Text>
               </View>
             ) : (
-              <Image
+              <PrivateFitImage
                 source={{ uri: fit.thumbnailUrl }}
                 style={styles.photoBanner}
                 resizeMode="cover"
+                fallbackColor={theme.card}
                 onError={() => setImageFailed(true)}
               />
             )}

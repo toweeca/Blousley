@@ -22,6 +22,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
+import PrivateFitImage from "@/components/PrivateFitImage";
 
 interface BlouseFit {
   id: number;
@@ -87,7 +88,12 @@ function FitCard({
         {/* ── Photo / placeholder banner ── */}
         {hasImage ? (
           <View style={styles.fitImageWrap}>
-            <Image source={{ uri: fit.thumbnailUrl! }} style={styles.fitImage} resizeMode="cover" />
+            <PrivateFitImage
+              source={{ uri: fit.thumbnailUrl! }}
+              style={styles.fitImage}
+              resizeMode="cover"
+              fallbackColor={theme.card}
+            />
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.55)"]}
               style={styles.fitImageGradient}
