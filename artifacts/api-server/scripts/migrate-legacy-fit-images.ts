@@ -3,7 +3,7 @@ import path from "node:path";
 import { desc, eq, isNotNull } from "drizzle-orm";
 import { blouseFitsTable, db, privateImages } from "@workspace/db";
 import { savePrivateImage } from "../src/lib/privateImages";
-import { withRlsUser } from "../src/lib/rls";
+import { isValidUserId, withRlsUser } from "../src/lib/rls";
 
 const privateImageDir = path.resolve(process.cwd(), ".private-images");
 
@@ -15,13 +15,18 @@ const legacyFits = await db
 
 const migrated: number[] = [];
 const repaired: number[] = [];
-const skipped: number[] = [];
+const skipped: { fitId: number; reason: string }[] = [];
 const failed: { fitId: number; error: string }[] = [];
 
 for (const { fit } of legacyFits) {
   if (!fit.imageUrl) continue;
 
   try {
+    if (!isValidUserId(fit.userId)) {
+      skipped.push({ fitId: fit.id, reason: `invalid owner id: ${fit.userId}` });
+      continue;
+    }
+
     const privateImage = await withRlsUser(fit.userId, async (tx) => {
       const [row] = await tx
         .select({ id: privateImages.id })
@@ -39,7 +44,7 @@ for (const { fit } of legacyFits) {
           .where(eq(blouseFitsTable.id, fit.id));
         repaired.push(fit.id);
       } else {
-        skipped.push(fit.id);
+        skipped.push({ fitId: fit.id, reason: "already migrated" });
       }
       continue;
     }
