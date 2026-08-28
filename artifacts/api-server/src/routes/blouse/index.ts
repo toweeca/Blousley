@@ -6,7 +6,7 @@ import { ai } from "@workspace/integrations-gemini-ai";
 import { conversations } from "@workspace/db/schema";
 import designRouter from "./design";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
+import { imageDataUriFromBase64, normalizeLegacyImageDataUri, savePrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
@@ -182,8 +182,9 @@ router.get("/fits", async (req, res) => {
             .limit(1);
           return row;
         });
-        const imageUrl = image ? privateImageUrl(req, fit.id, userId) : fit.imageUrl;
-        return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : fit.imageUrl };
+        const legacyImageUrl = fit.imageUrl ? await normalizeLegacyImageDataUri(fit.imageUrl) : null;
+        const imageUrl = image ? privateImageUrl(req, fit.id, userId) : legacyImageUrl;
+        return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : legacyImageUrl };
       }),
     );
     res.json(securedFits);
@@ -289,8 +290,9 @@ router.get("/fits/:id", async (req, res) => {
         .limit(1);
       return row;
     });
-    const imageUrl = image ? privateImageUrl(req, fit.id, userId) : fit.imageUrl;
-    res.json({ ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : fit.imageUrl });
+    const legacyImageUrl = fit.imageUrl ? await normalizeLegacyImageDataUri(fit.imageUrl) : null;
+    const imageUrl = image ? privateImageUrl(req, fit.id, userId) : legacyImageUrl;
+    res.json({ ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : legacyImageUrl });
   } catch (error) {
     console.error("Error fetching fit:", error);
     res.status(500).json({ error: "Failed to fetch fit" });
