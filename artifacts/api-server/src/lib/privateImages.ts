@@ -8,6 +8,7 @@ const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
 const UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 const MAX_UPLOADS_PER_USER = 20;
 const DATA_URI_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i;
+const SVG_DATA_URI_RE = /^data:image\/svg\+xml;base64,([A-Za-z0-9+/=\s]+)$/i;
 const KEY_RE = /^[0-9a-f-]{36}\.(?:jpg|png|webp)$/;
 const uploadBuckets = new Map<string, { startedAt: number; count: number }>();
 
@@ -41,15 +42,16 @@ export function imageDataUriFromBase64(base64: string) {
 
 export async function savePrivateImage(image: string, userId: string, originalName?: string) {
   const match = image.match(DATA_URI_RE);
-  if (!match) throw new Error("Only PNG, JPEG, and WebP image data is accepted");
+  const svgMatch = image.match(SVG_DATA_URI_RE);
+  if (!match && !svgMatch) throw new Error("Only PNG, JPEG, WebP, and SVG image data is accepted");
 
-  const mimeType = match[1].toLowerCase();
+  const mimeType = svgMatch ? "image/png" : match![1].toLowerCase();
   const extension = originalName?.toLowerCase().split(".").pop();
   if (originalName && (!extension || !["jpg", "jpeg", "png", "webp"].includes(extension))) {
     throw new Error("Invalid image extension");
   }
-  const buffer = Buffer.from(match[2].replace(/\s/g, ""), "base64");
-  if (!buffer.length || buffer.length > MAX_IMAGE_BYTES || !matchesImageSignature(buffer, mimeType)) {
+  const sourceBuffer = Buffer.from((svgMatch ? svgMatch[1] : match![2]).replace(/\s/g, ""), "base64");
+  if (!sourceBuffer.length || sourceBuffer.length > MAX_IMAGE_BYTES) {
     throw new Error("Invalid or oversized image upload");
   }
 
@@ -64,7 +66,7 @@ export async function savePrivateImage(image: string, userId: string, originalNa
 
   let sanitizedBuffer: Buffer;
   try {
-    sanitizedBuffer = await sharp(buffer, {
+    sanitizedBuffer = await sharp(sourceBuffer, {
       failOn: "error",
       limitInputPixels: 40_000_000,
     })[mimeType === "image/jpeg" ? "jpeg" : mimeType === "image/png" ? "png" : "webp"]().toBuffer();
@@ -80,6 +82,20 @@ export async function savePrivateImage(image: string, userId: string, originalNa
   await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), sanitizedBuffer, { mode: 0o600, flag: "wx" });
   console.info("image_upload", { userId, mimeType, size: sanitizedBuffer.length });
   return { storageKey, mimeType };
+}
+
+export async function normalizeLegacyImageDataUri(image: string) {
+  const match = image.match(SVG_DATA_URI_RE);
+  if (!match) return image;
+  try {
+    const png = await sharp(Buffer.from(match[1].replace(/\s/g, ""), "base64"), {
+      failOn: "error",
+      limitInputPixels: 40_000_000,
+    }).png().toBuffer();
+    return `data:image/png;base64,${png.toString("base64")}`;
+  } catch {
+    return null;
+  }
 }
 
 export async function readPrivateImage(storageKey: string) {
