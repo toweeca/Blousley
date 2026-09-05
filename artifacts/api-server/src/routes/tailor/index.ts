@@ -2,7 +2,7 @@
 import { Router, type IRouter } from "express";
 import { db, blouseFitsTable, privateImages, tailorsTable, usersTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
-import { desc, eq, count, and, gte, lt } from "drizzle-orm";
+import { desc, eq, count, and, gte, lt, or } from "drizzle-orm";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
 
@@ -36,10 +36,13 @@ router.get("/customers", async (req, res) => {
       .select({ fit: blouseFitsTable, assignedTailorId: conversations.tailorId })
       .from(blouseFitsTable)
       .leftJoin(conversations, eq(conversations.fitId, blouseFitsTable.id))
-      .where(and(
-        eq(blouseFitsTable.findMyTailor, true),
-        gte(blouseFitsTable.createdAt, startOfToday),
-        lt(blouseFitsTable.createdAt, startOfTomorrow),
+      .where(or(
+        and(
+          eq(blouseFitsTable.findMyTailor, true),
+          gte(blouseFitsTable.createdAt, startOfToday),
+          lt(blouseFitsTable.createdAt, startOfTomorrow),
+        ),
+        eq(conversations.tailorId, tailorId),
       ))
       .orderBy(desc(blouseFitsTable.createdAt));
     const securedRows = await Promise.all(rows.map(async ({ fit, assignedTailorId }) => {
