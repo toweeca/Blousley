@@ -35,7 +35,7 @@ export function LegalFooter({ theme }: { theme: Theme }) {
         <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Terms of Service</Text>
       </TouchableOpacity>
       <Text style={[styles.footerDot, { color: theme.textMuted }]}>·</Text>
-      <TouchableOpacity onPress={() => Linking.openURL("mailto:legal@yourdomain.com")}>
+      <TouchableOpacity onPress={() => Linking.openURL("mailto:legal@blousley.com")}>
         <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Contact</Text>
       </TouchableOpacity>
       <Text style={[styles.copyright, { width: "100%", textAlign: "center", marginTop: 4 }]}>

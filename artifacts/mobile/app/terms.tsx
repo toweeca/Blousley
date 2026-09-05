@@ -75,7 +75,7 @@ Users should verify critical measurements and sewing decisions before cutting fa
   {
     heading: "11. Contact",
     body: "For legal questions, contact:\n\nBlousley Legal Contact",
-    email: "legal@yourdomain.com",
+    email: "legal@blousley.com",
   },
 ];
 

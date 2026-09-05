@@ -108,8 +108,8 @@ You may also withdraw consent for future use of your information, although some 
   },
   {
     heading: "12. Contact",
-    body: `For privacy requests or questions, contact:\n\nBlousley Privacy Contact\nEmail: privacy@yourdomain.com`,
-    email: "privacy@yourdomain.com",
+    body: `For privacy requests or questions, contact:\n\nBlousley Privacy Contact\nEmail: privacy@blousley.com`,
+    email: "privacy@blousley.com",
   },
 ];
 
