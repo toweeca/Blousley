@@ -27,6 +27,12 @@ export function CopyrightNotice() {
 export function LegalFooter({ theme }: { theme: Theme }) {
   return (
     <View style={[styles.footer, { borderTopColor: theme.border }]}>
+      <Text style={[styles.footerTagline, { color: Colors.brand.primary }]}>
+        Design → Matchmaking → Booking
+      </Text>
+      <Text style={[styles.footerDescription, { color: theme.textMuted }]}>
+        Blousley turns blouse ideas into clear designs, tailor matches, and fixed-rate bookings.
+      </Text>
       <TouchableOpacity onPress={() => router.push("/privacy" as any)}>
         <Text style={[styles.footerLink, { color: Colors.brand.primary }]}>Privacy Policy</Text>
       </TouchableOpacity>
@@ -123,6 +129,21 @@ const styles = StyleSheet.create({
   footerLink: {
     fontFamily: "Inter_500Medium",
     fontSize: 12,
+  },
+  footerTagline: {
+    width: "100%",
+    fontFamily: "Inter_700Bold",
+    fontSize: 13,
+    textAlign: "center",
+  },
+  footerDescription: {
+    width: "100%",
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
+    textAlign: "center",
+    paddingHorizontal: 20,
+    marginBottom: 4,
   },
   footerDot: {
     fontSize: 12,

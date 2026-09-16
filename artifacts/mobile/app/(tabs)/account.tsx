@@ -186,6 +186,22 @@ export default function AccountScreen() {
         {!user ? (
           /* ── Not signed in ── */
           <Animated.View entering={FadeInDown.delay(100).springify()} style={{ gap: 16 }}>
+            <View style={styles.signupFlow}>
+              {["Design", "Matchmaking", "Booking"].map((step, i) => (
+                <React.Fragment key={step}>
+                  <View style={styles.signupFlowStep}>
+                    <View style={styles.signupFlowDot}>
+                      <Text style={styles.signupFlowNum}>{i + 1}</Text>
+                    </View>
+                    <Text style={[styles.signupFlowLabel, { color: theme.text }]}>{step}</Text>
+                  </View>
+                  {i < 2 && <Feather name="arrow-right" size={14} color={Colors.brand.primary} />}
+                </React.Fragment>
+              ))}
+            </View>
+            <Text style={[styles.signupFlowCopy, { color: theme.textSecondary }]}>
+              Design your idea → Match with a tailor → Book a fixed-rate job
+            </Text>
             <Text style={[styles.sectionTitle, { color: theme.text }]}>{isLogin ? "Sign In" : "Create Profile"}</Text>
             <Text style={[styles.sectionSub, { color: theme.textSecondary }]}>
               Set up your profile to save fits, get AI recommendations, and connect with tailors.
@@ -746,6 +762,12 @@ const styles = StyleSheet.create({
   signupStepNum: { width: 22, height: 22, borderRadius: 11, backgroundColor: Colors.brand.primary, alignItems: "center", justifyContent: "center" },
   signupStepNumText: { fontFamily: "Inter_700Bold", fontSize: 12, color: "#fff" },
   signupStepLabel: { fontFamily: "Inter_600SemiBold", fontSize: 15 },
+  signupFlow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: -4 },
+  signupFlowStep: { alignItems: "center", gap: 5 },
+  signupFlowDot: { width: 28, height: 28, borderRadius: 14, backgroundColor: Colors.brand.primary + "15", alignItems: "center", justifyContent: "center" },
+  signupFlowNum: { fontFamily: "Inter_700Bold", fontSize: 12, color: Colors.brand.primary },
+  signupFlowLabel: { fontFamily: "Inter_600SemiBold", fontSize: 11 },
+  signupFlowCopy: { fontFamily: "Inter_400Regular", fontSize: 12, lineHeight: 18, textAlign: "center", marginTop: -6 },
   roleSquares: { flexDirection: "row", gap: 12 },
   roleSquare: { flex: 1, aspectRatio: 0.92, borderRadius: 18, padding: 14, alignItems: "center", justifyContent: "center", gap: 8 },
   roleSquareCheck: { position: "absolute", top: 10, right: 10 },

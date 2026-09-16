@@ -211,10 +211,20 @@ export default function HomeScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(180).springify()}>
-            <Text style={styles.headerTitle}>Your Perfect Blouse,{"\n"}Crafted for You</Text>
+            <Text style={styles.headerTitle}>Design your blouse.{"\n"}Get matched. Book with a fixed price.</Text>
             <Text style={styles.headerSubtitle}>
-              AI-powered saree blouse fitting for your unique shape
+              Turn your blouse idea into a design, a tailor match, and a faster next step.
             </Text>
+            <View style={styles.flowBadges}>
+              {FLOW_STEPS.map((step, i) => (
+                <React.Fragment key={step}>
+                  <View style={styles.flowBadge}>
+                    <Text style={styles.flowBadgeText}>{step}</Text>
+                  </View>
+                  {i < FLOW_STEPS.length - 1 && <Feather name="arrow-right" size={13} color={Colors.brand.goldLight} />}
+                </React.Fragment>
+              ))}
+            </View>
           </Animated.View>
 
           {/* Blouse Image Carousel */}
@@ -234,7 +244,7 @@ export default function HomeScreen() {
                 testID="analyze-button"
               >
                 <Feather name="camera" size={20} color={Colors.brand.primaryDark} />
-                <Text style={styles.analyzeButtonText}>Analyze My Fit</Text>
+                <Text style={styles.analyzeButtonText}>Start your design</Text>
               </TouchableOpacity>
             </Animated.View>
           </Animated.View>
@@ -310,6 +320,26 @@ export default function HomeScreen() {
             </Animated.View>
           ))}
         </View>
+        <View style={styles.section}>
+          <Animated.Text
+            entering={FadeInDown.delay(1050).springify()}
+            style={[styles.sectionTitle, { color: theme.text }]}
+          >
+            Features
+          </Animated.Text>
+          <View style={styles.featureGrid}>
+            {FEATURES.map((feature, i) => (
+              <Animated.View
+                key={feature}
+                entering={FadeInDown.delay(1100 + i * 60).springify()}
+                style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+              >
+                <Feather name="check" size={15} color={Colors.brand.primary} />
+                <Text style={[styles.featureText, { color: theme.text }]}>{feature}</Text>
+              </Animated.View>
+            ))}
+          </View>
+        </View>
         <LegalFooter theme={theme} />
       </ScrollView>
     </View>
@@ -317,10 +347,20 @@ export default function HomeScreen() {
 }
 
 const HOW_IT_WORKS = [
-  { title: "Upload Photo", desc: "Take or upload a photo showing your shoulders", icon: "upload", route: "/analyze" },
-  { title: "AI Analysis", desc: "Our AI detects body measurements & shape", icon: "zap", route: "/analyze" },
-  { title: "Customize", desc: "Choose neckline, sleeves, back & fabric", icon: "sliders", route: "/(tabs)/profile" },
-  { title: "Share", desc: "Send your fit profile to your tailor", icon: "send", route: "/(tabs)/tailor" },
+  { title: "Design", desc: "Turn an idea into a usable design, or bring an existing one to life with sketching and alteration ideas.", icon: "edit-3", route: "/analyze" },
+  { title: "Matchmaking", desc: "Get tailor feedback, clear prices, and less back-and-forth before you choose.", icon: "users", route: "/(tabs)/tailor" },
+  { title: "Booking", desc: "Book a fixed-rate job and move from design to a finished blouse faster.", icon: "calendar", route: "/(tabs)/tailor" },
+];
+
+const FLOW_STEPS = ["Design", "Matchmaking", "Booking"];
+
+const FEATURES = [
+  "Turn a blouse idea into a usable design.",
+  "Create innovative designs and get matched with a tailor.",
+  "Bring current designs to life with sketching and alteration ideas.",
+  "Follow steps to sew your own blouse pieces.",
+  "Get tailor feedback and fixed-rate job quotes.",
+  "Less back-and-forth, clear price, faster designs.",
 ];
 
 const CARD_WIDTH = SCREEN_WIDTH - 48;
@@ -379,6 +419,25 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.7)",
     lineHeight: 20,
     marginTop: -4,
+  },
+  flowBadges: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: 2,
+  },
+  flowBadge: {
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.brand.gold + "80",
+    backgroundColor: "rgba(201,169,110,0.18)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+  },
+  flowBadgeText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    color: Colors.brand.goldLight,
   },
   carouselWrapper: {
     gap: 10,
@@ -526,4 +585,19 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   stepIconRow: { flexDirection: "row", alignItems: "center", gap: 6 },
+  featureGrid: { gap: 8, marginTop: 2 },
+  featureCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: 10,
+    padding: 13,
+    borderRadius: 14,
+    borderWidth: 1,
+  },
+  featureText: {
+    flex: 1,
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 18,
+  },
 });
