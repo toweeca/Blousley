@@ -170,6 +170,86 @@ function StyleCard({
   );
 }
 
+function FeatureCarousel({
+  theme,
+}: {
+  theme: { card: string; border: string; text: string; textSecondary: string };
+}) {
+  const flatListRef = useRef<FlatList<(typeof FEATURES)[number]>>(null);
+  const [activeIndex, setActiveIndex] = useState(0);
+  const [paused, setPaused] = useState(false);
+  const visibleCount = SCREEN_WIDTH >= 900 ? 3 : 2;
+  const itemWidth = (SCREEN_WIDTH - 48 - (visibleCount - 1) * 10) / visibleCount;
+  const maxStart = Math.max(0, FEATURES.length - visibleCount);
+
+  useEffect(() => {
+    if (paused) return;
+    const interval = setInterval(() => {
+      setActiveIndex((current) => {
+        const next = current >= maxStart ? 0 : current + 1;
+        flatListRef.current?.scrollToIndex({ index: next, animated: true });
+        return next;
+      });
+    }, 2600);
+    return () => clearInterval(interval);
+  }, [maxStart, paused]);
+
+  return (
+    <View style={styles.featureCarousel}>
+      <View style={styles.featureControls}>
+        <Text style={[styles.sectionSubtitle, { color: theme.textSecondary }]}>
+          Design, refine, sew, and connect with the right tailor.
+        </Text>
+        <TouchableOpacity
+          style={[styles.pauseButton, { borderColor: theme.border }]}
+          onPress={() => setPaused((value) => !value)}
+          accessibilityLabel={paused ? "Play features carousel" : "Pause features carousel"}
+        >
+          <Feather name={paused ? "play" : "pause"} size={13} color={Colors.brand.primary} />
+          <Text style={styles.pauseButtonText}>{paused ? "Play" : "Pause"}</Text>
+        </TouchableOpacity>
+      </View>
+      <FlatList
+        ref={flatListRef}
+        data={FEATURES}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        keyExtractor={(feature) => feature.title}
+        snapToInterval={itemWidth + 10}
+        decelerationRate="fast"
+        contentContainerStyle={{ gap: 10 }}
+        onScrollBeginDrag={() => setPaused(true)}
+        onMomentumScrollEnd={(event) => {
+          const index = Math.round(event.nativeEvent.contentOffset.x / (itemWidth + 10));
+          setActiveIndex(Math.min(index, maxStart));
+        }}
+        getItemLayout={(_, index) => ({
+          length: itemWidth + 10,
+          offset: index * (itemWidth + 10),
+          index,
+        })}
+        onScrollToIndexFailed={() => {}}
+        renderItem={({ item, index }) => (
+          <View
+            style={[
+              styles.featureCard,
+              { width: itemWidth, backgroundColor: theme.card, borderColor: theme.border },
+            ]}
+          >
+            <View style={styles.featureNumber}>
+              <Text style={styles.featureNumberText}>{index + 1}</Text>
+            </View>
+            <View style={styles.featureContent}>
+              <Text style={[styles.featureTitle, { color: theme.text }]}>{item.title}</Text>
+              <Text style={[styles.featureText, { color: theme.textSecondary }]}>{item.desc}</Text>
+            </View>
+          </View>
+        )}
+      />
+    </View>
+  );
+}
+
 export default function HomeScreen() {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -239,6 +319,16 @@ export default function HomeScreen() {
             </Animated.View>
           </Animated.View>
         </LinearGradient>
+
+        <View style={styles.section}>
+          <Animated.Text
+            entering={FadeInDown.springify()}
+            style={[styles.sectionTitle, { color: theme.text }]}
+          >
+            What you can do
+          </Animated.Text>
+          <FeatureCarousel theme={theme} />
+        </View>
 
         <TouchableOpacity
           style={[styles.designTile, { backgroundColor: theme.card, borderColor: theme.border }]}
@@ -328,30 +418,13 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.section}>
-          <Animated.Text
-            entering={FadeInDown.delay(160).springify()}
-            style={[styles.sectionTitle, { color: theme.text }]}
-          >
-            What you can do
-          </Animated.Text>
-          <View style={styles.featureGrid}>
-            {FEATURES.map((feature, i) => (
-              <Animated.View
-                key={feature.title}
-                entering={FadeInDown.delay(180 + i * 30).springify()}
-                style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}
-              >
-                <View style={styles.featureNumber}>
-                  <Text style={styles.featureNumberText}>{i + 1}</Text>
-                </View>
-                <View style={styles.featureContent}>
-                  <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
-                  <Text style={[styles.featureText, { color: theme.textSecondary }]}>{feature.desc}</Text>
-                </View>
-              </Animated.View>
-            ))}
-          </View>
+        <View style={[styles.bottomValueSection, { backgroundColor: theme.card, borderColor: theme.border }]}>
+          <Text style={[styles.bottomValueTitle, { color: theme.text }]}>
+            Match with a tailor.{"\n"}Book at a clear price.
+          </Text>
+          <Text style={[styles.bottomValueText, { color: theme.textSecondary }]}>
+            Less back-and-forth from design to booking.
+          </Text>
         </View>
         <LegalFooter theme={theme} />
       </ScrollView>
@@ -628,13 +701,30 @@ const styles = StyleSheet.create({
   },
   stepIconRow: { flexDirection: "row", alignItems: "center", gap: 6 },
   featureGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
     gap: 10,
     marginTop: 2,
   },
+  featureCarousel: { gap: 10 },
+  featureControls: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  pauseButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    borderWidth: 1,
+    borderRadius: 14,
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+  },
+  pauseButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 11,
+    color: Colors.brand.primary,
+  },
   featureCard: {
-    width: (SCREEN_WIDTH - 58) / 2,
     minHeight: 112,
     alignItems: "flex-start",
     gap: 10,
@@ -665,5 +755,26 @@ const styles = StyleSheet.create({
     fontFamily: "Inter_400Regular",
     fontSize: 11,
     lineHeight: 15,
+  },
+  bottomValueSection: {
+    marginHorizontal: 24,
+    marginTop: 32,
+    padding: 20,
+    borderRadius: 18,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  bottomValueTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 20,
+    lineHeight: 27,
+    textAlign: "center",
+  },
+  bottomValueText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    lineHeight: 19,
+    textAlign: "center",
+    marginTop: 5,
   },
 });
