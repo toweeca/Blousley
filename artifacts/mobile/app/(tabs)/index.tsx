@@ -253,7 +253,7 @@ export default function HomeScreen() {
         {/* How It Works */}
         <View style={styles.section}>
           <Animated.Text
-            entering={FadeInDown.delay(400).springify()}
+            entering={FadeInDown.springify()}
             style={[styles.sectionTitle, { color: theme.text }]}
           >
             How It Works
@@ -261,7 +261,7 @@ export default function HomeScreen() {
           {HOW_IT_WORKS.map((step, i) => (
             <Animated.View
               key={step.title}
-              entering={FadeInDown.delay(450 + i * 80).springify()}
+              entering={FadeInDown.delay(40 + i * 40).springify()}
             >
               <TouchableOpacity
                 style={[
@@ -302,13 +302,13 @@ export default function HomeScreen() {
         {/* Blouse Styles */}
         <View style={styles.section}>
           <Animated.Text
-            entering={FadeInDown.delay(750).springify()}
+            entering={FadeInDown.delay(80).springify()}
             style={[styles.sectionTitle, { color: theme.text }]}
           >
             Blouse Styles
           </Animated.Text>
           <Animated.Text
-            entering={FadeInDown.delay(800).springify()}
+            entering={FadeInDown.delay(100).springify()}
             style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
           >
             Explore traditional South Asian and modern neckline designs
@@ -316,14 +316,14 @@ export default function HomeScreen() {
 
           <View style={styles.stylesGrid}>
             {STYLE_CARDS.map((item, i) => (
-              <StyleCard key={item.title} item={item} delay={850 + i * 80} />
+              <StyleCard key={item.title} item={item} delay={120 + i * 40} />
             ))}
           </View>
         </View>
 
         <View style={styles.section}>
           <Animated.Text
-            entering={FadeInDown.delay(1050).springify()}
+            entering={FadeInDown.delay(160).springify()}
             style={[styles.sectionTitle, { color: theme.text }]}
           >
             What you can do
@@ -332,7 +332,7 @@ export default function HomeScreen() {
             {FEATURES.map((feature, i) => (
               <Animated.View
                 key={feature.title}
-                entering={FadeInDown.delay(1100 + i * 60).springify()}
+                entering={FadeInDown.delay(180 + i * 30).springify()}
                 style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}
               >
                 <View style={styles.featureNumber}>
