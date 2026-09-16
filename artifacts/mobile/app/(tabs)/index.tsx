@@ -211,9 +211,9 @@ export default function HomeScreen() {
           </Animated.View>
 
           <Animated.View entering={FadeInDown.delay(180).springify()} style={styles.heroCopy}>
-            <Text style={styles.headerTitle}>Design your blouse.</Text>
+            <Text style={styles.headerTitle}>Match with a tailor.{"\n"}Book at a clear price.</Text>
             <Text style={styles.headerSubtitle}>
-              Match with a tailor. Book at a clear price.
+              Less back-and-forth from design to booking.
             </Text>
             <View style={styles.flowBadges}>
               {FLOW_STEPS.map((step, i) => (
@@ -249,6 +249,23 @@ export default function HomeScreen() {
             </Animated.View>
           </Animated.View>
         </LinearGradient>
+
+        <TouchableOpacity
+          style={[styles.designTile, { backgroundColor: theme.card, borderColor: theme.border }]}
+          activeOpacity={0.8}
+          onPress={() => router.push("/analyze")}
+        >
+          <View style={styles.designTileIcon}>
+            <Feather name="edit-3" size={19} color={Colors.brand.primary} />
+          </View>
+          <View style={styles.designTileContent}>
+            <Text style={[styles.designTileTitle, { color: theme.text }]}>Design your blouse.</Text>
+            <Text style={[styles.designTileText, { color: theme.textSecondary }]}>
+              Turn your idea into a usable design.
+            </Text>
+          </View>
+          <Feather name="chevron-right" size={17} color={theme.textMuted} />
+        </TouchableOpacity>
 
         {/* How It Works */}
         <View style={styles.section}>
@@ -421,6 +438,34 @@ const styles = StyleSheet.create({
   },
   heroCopy: {
     marginTop: 12,
+  },
+  designTile: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginHorizontal: 24,
+    marginTop: 20,
+    padding: 14,
+    borderRadius: 16,
+    borderWidth: 1,
+  },
+  designTileIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.brand.primary + "15",
+  },
+  designTileContent: { flex: 1, gap: 3 },
+  designTileTitle: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 15,
+  },
+  designTileText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 12,
+    lineHeight: 17,
   },
   headerSubtitle: {
     fontFamily: "Inter_400Regular",
