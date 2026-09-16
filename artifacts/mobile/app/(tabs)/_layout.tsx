@@ -2,7 +2,7 @@
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";
-import { Icon, Label, NativeTabs } from "expo-router/unstable-native-tabs";
+import { NativeTabs } from "expo-router/unstable-native-tabs";
 import { SymbolView } from "expo-symbols";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import React from "react";
@@ -42,28 +42,28 @@ function NativeTabLayout() {
   return (
     <NativeTabs>
       <NativeTabs.Trigger name="index">
-        <Icon sf={{ default: "house", selected: "house.fill" }} />
-        <Label>Home</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "house", selected: "house.fill" }} />
+        <NativeTabs.Trigger.Label>Home</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="history">
-        <Icon sf={{ default: "heart", selected: "heart.fill" }} />
-        <Label>My Fits</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "heart", selected: "heart.fill" }} />
+        <NativeTabs.Trigger.Label>My Fits</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="tailor">
-        <Icon sf={{ default: "scissors", selected: "scissors" }} />
-        <Label>Tailor</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "scissors", selected: "scissors" }} />
+        <NativeTabs.Trigger.Label>Tailor</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="chat">
-        <Icon sf={{ default: "message", selected: "message.fill" }} />
-        <Label>Messages</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "message", selected: "message.fill" }} />
+        <NativeTabs.Trigger.Label>Messages</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="profile">
-        <Icon sf={{ default: "scissors", selected: "scissors" }} />
-        <Label>Design</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "scissors", selected: "scissors" }} />
+        <NativeTabs.Trigger.Label>Design</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
       <NativeTabs.Trigger name="account">
-        <Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
-        <Label>Profile</Label>
+        <NativeTabs.Trigger.Icon sf={{ default: "person.circle", selected: "person.circle.fill" }} />
+        <NativeTabs.Trigger.Label>Profile</NativeTabs.Trigger.Label>
       </NativeTabs.Trigger>
     </NativeTabs>
   );

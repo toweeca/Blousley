@@ -2,7 +2,7 @@
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
-import * as MediaLibrary from "expo-media-library";
+import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
 import * as FileSystem from "expo-file-system";
 import { LinearGradient } from "expo-linear-gradient";
