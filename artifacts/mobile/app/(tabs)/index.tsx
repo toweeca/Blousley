@@ -250,32 +250,10 @@ export default function HomeScreen() {
           </Animated.View>
         </LinearGradient>
 
-        {/* Blouse Styles */}
-        <View style={styles.section}>
-          <Animated.Text
-            entering={FadeInDown.delay(400).springify()}
-            style={[styles.sectionTitle, { color: theme.text }]}
-          >
-            Blouse Styles
-          </Animated.Text>
-          <Animated.Text
-            entering={FadeInDown.delay(450).springify()}
-            style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
-          >
-            Explore traditional South Asian and modern neckline designs
-          </Animated.Text>
-
-          <View style={styles.stylesGrid}>
-            {STYLE_CARDS.map((item, i) => (
-              <StyleCard key={item.title} item={item} delay={500 + i * 80} />
-            ))}
-          </View>
-        </View>
-
         {/* How It Works */}
         <View style={styles.section}>
           <Animated.Text
-            entering={FadeInDown.delay(700).springify()}
+            entering={FadeInDown.delay(400).springify()}
             style={[styles.sectionTitle, { color: theme.text }]}
           >
             How It Works
@@ -283,7 +261,7 @@ export default function HomeScreen() {
           {HOW_IT_WORKS.map((step, i) => (
             <Animated.View
               key={step.title}
-              entering={FadeInDown.delay(750 + i * 80).springify()}
+              entering={FadeInDown.delay(450 + i * 80).springify()}
             >
               <TouchableOpacity
                 style={[
@@ -320,6 +298,29 @@ export default function HomeScreen() {
             </Animated.View>
           ))}
         </View>
+
+        {/* Blouse Styles */}
+        <View style={styles.section}>
+          <Animated.Text
+            entering={FadeInDown.delay(750).springify()}
+            style={[styles.sectionTitle, { color: theme.text }]}
+          >
+            Blouse Styles
+          </Animated.Text>
+          <Animated.Text
+            entering={FadeInDown.delay(800).springify()}
+            style={[styles.sectionSubtitle, { color: theme.textSecondary }]}
+          >
+            Explore traditional South Asian and modern neckline designs
+          </Animated.Text>
+
+          <View style={styles.stylesGrid}>
+            {STYLE_CARDS.map((item, i) => (
+              <StyleCard key={item.title} item={item} delay={850 + i * 80} />
+            ))}
+          </View>
+        </View>
+
         <View style={styles.section}>
           <Animated.Text
             entering={FadeInDown.delay(1050).springify()}
