@@ -215,16 +215,6 @@ export default function HomeScreen() {
             <Text style={styles.headerSubtitle}>
               Less back-and-forth from design to booking.
             </Text>
-            <View style={styles.flowBadges}>
-              {FLOW_STEPS.map((step, i) => (
-                <React.Fragment key={step}>
-                  <View style={styles.flowBadge}>
-                    <Text style={styles.flowBadgeText}>{step}</Text>
-                  </View>
-                  {i < FLOW_STEPS.length - 1 && <Feather name="arrow-right" size={13} color={Colors.brand.goldLight} />}
-                </React.Fragment>
-              ))}
-            </View>
           </Animated.View>
 
           {/* Blouse Image Carousel */}
@@ -374,8 +364,6 @@ const HOW_IT_WORKS = [
   { title: "Matchmaking", desc: "Get tailor feedback, clear prices, and less back-and-forth before you choose.", icon: "users", route: "/(tabs)/tailor" },
   { title: "Booking", desc: "Book a fixed-rate job and move from design to a finished blouse faster.", icon: "calendar", route: "/(tabs)/tailor" },
 ];
-
-const FLOW_STEPS = ["Design", "Matchmaking", "Booking"];
 
 const FEATURES = [
   { title: "Shape an idea", desc: "Turn a blouse idea into a usable design." },
