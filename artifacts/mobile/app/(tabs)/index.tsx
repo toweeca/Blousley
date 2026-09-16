@@ -290,13 +290,6 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(180).springify()} style={styles.heroCopy}>
-            <Text style={styles.headerTitle}>Match with a tailor.{"\n"}Book at a clear price.</Text>
-            <Text style={styles.headerSubtitle}>
-              Less back-and-forth from design to booking.
-            </Text>
-          </Animated.View>
-
           {/* Blouse Image Carousel */}
           <Animated.View entering={FadeInUp.delay(250).springify()}>
             <BlouseCarousel />
