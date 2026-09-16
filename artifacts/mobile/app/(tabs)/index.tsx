@@ -210,10 +210,10 @@ export default function HomeScreen() {
             </View>
           </Animated.View>
 
-          <Animated.View entering={FadeInDown.delay(180).springify()}>
-            <Text style={styles.headerTitle}>Design your blouse.{"\n"}Get matched. Book with a fixed price.</Text>
+          <Animated.View entering={FadeInDown.delay(180).springify()} style={styles.heroCopy}>
+            <Text style={styles.headerTitle}>Design your blouse.</Text>
             <Text style={styles.headerSubtitle}>
-              Turn your blouse idea into a design, a tailor match, and a faster next step.
+              Match with a tailor. Book at a clear price.
             </Text>
             <View style={styles.flowBadges}>
               {FLOW_STEPS.map((step, i) => (
@@ -326,17 +326,22 @@ export default function HomeScreen() {
             entering={FadeInDown.delay(1050).springify()}
             style={[styles.sectionTitle, { color: theme.text }]}
           >
-            Features
+            What you can do
           </Animated.Text>
           <View style={styles.featureGrid}>
             {FEATURES.map((feature, i) => (
               <Animated.View
-                key={feature}
+                key={feature.title}
                 entering={FadeInDown.delay(1100 + i * 60).springify()}
                 style={[styles.featureCard, { backgroundColor: theme.card, borderColor: theme.border }]}
               >
-                <Feather name="check" size={15} color={Colors.brand.primary} />
-                <Text style={[styles.featureText, { color: theme.text }]}>{feature}</Text>
+                <View style={styles.featureNumber}>
+                  <Text style={styles.featureNumberText}>{i + 1}</Text>
+                </View>
+                <View style={styles.featureContent}>
+                  <Text style={[styles.featureTitle, { color: theme.text }]}>{feature.title}</Text>
+                  <Text style={[styles.featureText, { color: theme.textSecondary }]}>{feature.desc}</Text>
+                </View>
               </Animated.View>
             ))}
           </View>
@@ -356,12 +361,12 @@ const HOW_IT_WORKS = [
 const FLOW_STEPS = ["Design", "Matchmaking", "Booking"];
 
 const FEATURES = [
-  "Turn a blouse idea into a usable design.",
-  "Create innovative designs and get matched with a tailor.",
-  "Bring current designs to life with sketching and alteration ideas.",
-  "Follow steps to sew your own blouse pieces.",
-  "Get tailor feedback and fixed-rate job quotes.",
-  "Less back-and-forth, clear price, faster designs.",
+  { title: "Shape an idea", desc: "Turn a blouse idea into a usable design." },
+  { title: "Try something new", desc: "Create fresh designs and find a tailor match." },
+  { title: "Refine what you have", desc: "Sketch alterations for a current design." },
+  { title: "Sew it yourself", desc: "Follow steps for your own blouse pieces." },
+  { title: "Get a clear quote", desc: "Hear from tailors with fixed-rate jobs." },
+  { title: "Move faster", desc: "Less back-and-forth, clearer next steps." },
 ];
 
 const CARD_WIDTH = SCREEN_WIDTH - 48;
@@ -413,6 +418,9 @@ const styles = StyleSheet.create({
     fontSize: 26,
     color: "#FFFFFF",
     lineHeight: 34,
+  },
+  heroCopy: {
+    marginTop: 12,
   },
   headerSubtitle: {
     fontFamily: "Inter_400Regular",
@@ -586,19 +594,43 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
   stepIconRow: { flexDirection: "row", alignItems: "center", gap: 6 },
-  featureGrid: { gap: 8, marginTop: 2 },
-  featureCard: {
+  featureGrid: {
     flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginTop: 2,
+  },
+  featureCard: {
+    width: (SCREEN_WIDTH - 58) / 2,
+    minHeight: 112,
     alignItems: "flex-start",
     gap: 10,
-    padding: 13,
+    padding: 12,
     borderRadius: 14,
     borderWidth: 1,
   },
-  featureText: {
-    flex: 1,
-    fontFamily: "Inter_400Regular",
+  featureNumber: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.brand.primary + "15",
+  },
+  featureNumberText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 11,
+    color: Colors.brand.primary,
+  },
+  featureContent: { flex: 1, gap: 4 },
+  featureTitle: {
+    fontFamily: "Inter_600SemiBold",
     fontSize: 13,
-    lineHeight: 18,
+    lineHeight: 17,
+  },
+  featureText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    lineHeight: 15,
   },
 });
