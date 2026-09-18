@@ -549,7 +549,7 @@ const styles = StyleSheet.create({
   },
   carouselWrapper: {
     gap: 10,
-    marginTop: 14,
+    marginTop: 22,
   },
   carouselCard: {
     width: CARD_WIDTH,
