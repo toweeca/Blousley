@@ -7,3 +7,4 @@
 - [Expo Metro image-size](expo-metro-image-size.md) — Metro’s `image-size` 1.x contract must not be overridden with 2.x; it fails static mobile bundles.
 - [Expo 57 media library](expo-57-media-library.md) — existing permission/save calls must use the legacy export; the package root loads the new native module and breaks web.
 - [Fit thumbnail URLs](fit-thumbnail-urls.md) — persist stable private-image route paths, then make host-specific thumbnail URLs only in API responses.
+- [GitHub connector repository bootstrap](github-connector-repository-bootstrap.md) — empty repos require a Contents API bootstrap before Git Database uploads; throttle blob writes below connector RPS limits.
