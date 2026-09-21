@@ -1,0 +1,43 @@
+Task: Confirm and fix the Blousley landing setup for Netlify.
+
+1) Check the current file structure in this Replit project.
+   - List all top-level folders and files.
+   - Specifically check if there is a folder named `blousley-landing`.
+   - Inside `blousley-landing` (if it exists), confirm whether these files exist:
+     - index.html
+     - privacy.html
+     - terms.html
+
+2) If `blousley-landing` exists and contains those 3 HTML files:
+   - Confirm that this project is connected to a GitHub repo.
+   - Tell me the GitHub repo name and URL.
+   - Confirm whether that repo contains only these 3 files (no netlify.toml, no netlify/functions, no large app code).
+   - If the repo has extra app code or functions, propose creating a new clean GitHub repo (e.g. `blousley-landing`) that contains only the landing files, and explain the minimal steps to do that.
+
+3) If `blousley-landing` does NOT exist or does not contain the 3 HTML files:
+   - Create a folder named `blousley-landing`.
+   - Inside it, create:
+     - index.html
+     - privacy.html
+     - terms.html
+   - Fill them with simple static HTML for a landing page, privacy policy, and terms of service for “Blousley” (a blouse design + tailor marketplace).
+   - Keep copy short and clear, no lorem ipsum.
+
+4) Netlify / GitHub goal:
+   - The end goal is to have a GitHub repo that contains ONLY:
+     - index.html
+     - privacy.html
+     - terms.html
+   - No netlify.toml, no netlify/functions, no complex build.
+   - This repo will be deployed to Netlify as a static site and connected to blousley.com.
+
+5) After doing the above:
+   - Tell me:
+     - Whether `blousley-landing` exists now.
+     - What files are inside it.
+     - Which GitHub repo (name + URL) should be connected to Netlify for the landing site.
+   - If needed, give me the exact minimal steps to:
+     - Push this folder to a clean GitHub repo
+     - Deploy that repo to Netlify as a static site (no build command, no functions).
+
+Do not change any other parts of the app (backend, mobile code, etc.). Only work on the landing files and repo structure needed for a simple static site on Netlify.
