@@ -1,0 +1,49 @@
+In the blousley project, fix the issue where saved “fits” (design ideas) do not show the generated image thumbnail on the list and detail pages.
+
+Requirements:
+
+Do not redesign the UI or change features—only fix the data flow and rendering so the generated image appears as a thumbnail on fit cards and fit detail pages.
+
+Keep changes minimal and localized.
+
+Steps:
+
+Locate the code that generates the fit image (AI image, fabric mockup, or design preview). Confirm it returns an image URL (e.g. from Cloudinary, Supabase Storage, or another service).
+
+Ensure that when a fit is saved (create or update), the generated image URL is written to the fit record in the database:
+Use a single canonical field, e.g. thumbnail_url (TEXT / VARCHAR) in the fits table.
+
+If the field doesn’t exist, add it via migration or schema update: ALTER TABLE fits ADD COLUMN thumbnail_url TEXT; (or via Drizzle/Supabase schema).
+
+In the save/create mutation, set thumbnail_url to the generated image URL before inserting/updating the fit.
+
+
+In the fits list page (e.g. /fits, /dashboard/fits, or wherever fit cards are rendered):
+Update the card component to read fit.thumbnail_url.
+
+Render an <img> tag with src={fit.thumbnail_url} and a fallback (e.g. a placeholder SVG) if it’s missing.
+
+Add basic styling so it appears as a small thumbnail (e.g. 80–120px width, object-fit: cover).
+
+
+In the fit detail page:
+Ensure the main image uses fit.thumbnail_url (or a higher-res version if you store both, but for now just use thumbnail_url).
+
+
+If the image is generated asynchronously (e.g. after the fit is first saved), ensure the flow is:
+Create fit (without image) → generate image → update fit with thumbnail_url → UI reflects the new image.
+
+If needed, trigger a refetch or navigation after the update so the thumbnail appears.
+
+
+Test:
+Create a new fit, generate an image, save it.
+
+Confirm the fit card in the list shows the thumbnail.
+
+Confirm the fit detail page shows the same image.
+
+Confirm existing fits without thumbnail_url show a harmless placeholder instead of breaking.
+
+
+Commit message: “fix: save and display generated image thumbnail on fit cards and detail page”.

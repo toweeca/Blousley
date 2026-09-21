@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8">
+<style>
+*{margin:0;padding:0;box-sizing:border-box;}
+body{background:#1a1a1a;font:11px monospace;color:#ccc;padding:12px;}
+h2{color:#C9A96E;font-size:12px;margin:8px 0 4px;}
+p{font-size:10px;color:#999;margin-bottom:8px;line-height:1.5;}
+.row{display:flex;gap:16px;flex-wrap:wrap;margin-bottom:16px;}
+.cell{background:#111;border:1px solid #444;padding:8px;}
+canvas{display:block;}
+pre{font-size:9px;color:#aaa;line-height:1.4;margin-top:6px;background:#0a0a0a;padding:6px;max-width:380px;}
+</style></head>
+<body>
+<h2>GLSL VERTEX SHADER BUG — JavaScript Simulation (no WebGL required)</h2>
+<p>
+  The Three.js vertex shader had: <code style="color:#ff6b6b">pow(position.x / 1.1, 2.0)</code><br>
+  In GLSL ES 1.0, pow(x,y) is UNDEFINED when x &lt; 0. The plane is 2.2 units wide, so position.x ∈ [−1.1, +1.1].<br>
+  Any vertex with position.x &lt; 0 (the entire LEFT HALF of the plane) triggers undefined behavior.<br>
+  On many mobile GPUs, pow(negative, 2.0) returns NaN → the vertex position becomes NaN → triangle is clipped → dark area.
+</p>
+<div class="row">
+  <div class="cell">
+    <h2>BUGGY: pow(x/1.1, 2.0) — left half undefined (red = NaN/wrong)</h2>
+    <canvas id="c_bug" width="360" height="460"></canvas>
+    <pre id="log_bug"></pre>
+  </div>
+  <div class="cell">
+    <h2>FIXED: pnx*pnx — all vertices safe (all green)</h2>
+    <canvas id="c_fix" width="360" height="460"></canvas>
+    <pre id="log_fix"></pre>
+  </div>
+  <div class="cell">
+    <h2>Vertex grid overlay: RED = NaN (degenerate), GREEN = valid</h2>
+    <canvas id="c_grid" width="360" height="460"></canvas>
+  </div>
+</div>
+<script>
+// Simulate the 28x28 PlaneGeometry vertices
+// PlaneGeometry(2.2, 2.8, 28, 28): x ∈ [-1.1, 1.1], y ∈ [-1.4, 1.4]
+var W=28, H=28;
+var pw=2.2, ph=2.8;
+var cx=360/2, cy=460/2;
+
+function vertexX(i){ return -pw/2 + i*(pw/W); } // i=0..28
+function vertexY(j){ return -ph/2 + j*(ph/H); }  // j=0..28
+
+// BUGGY cv computation — simulates what GLSL does on a "strict" GPU returning NaN for pow(neg,y)
+// In GLSL: exp(y*log(x)) where x<0 → log(x) = NaN → NaN * y = NaN → exp(NaN) = NaN
+function buggy_cv(x) {
+  var xnorm = x / 1.1;
+  // Simulate GPU: log of negative number → NaN
+  if (xnorm < 0) return NaN; // This is what strict GLSL does
+  var p = Math.exp(2.0 * Math.log(xnorm)); // = xnorm^2 for xnorm >= 0
+  return 1.0 - p;
+}
+
+// Note: Chrome JS Math.pow handles negative correctly (returns correct positive),
+// but GLSL pow does NOT. We simulate the GLSL behavior above.
+
+// FIXED cv computation
+function fixed_cv(x) {
+  var pnx = x / 1.1;
+  return 1.0 - pnx * pnx; // always safe: pnx^2 >= 0
+}
+
+function toScreen(wx, wy, canvas) {
+  // world [-1.1,1.1] → canvas [0,360], world [-1.4,1.4] → canvas [0,460]
+  var sx = (wx + 1.1) / 2.2 * canvas.width;
+  var sy = (1.4 - wy) / 2.8 * canvas.height; // flip Y
+  return [sx, sy];
+}
+
+function drawMesh(canvas, cvFn, logEl) {
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#0D0508';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  var nanCount = 0, validCount = 0;
+  var u_curve = 0.20;
+  
+  // Draw quads
+  for (var j = 0; j < H; j++) {
+    for (var i = 0; i < W; i++) {
+      // Four corners of this quad
+      var corners = [[i,j],[i+1,j],[i+1,j+1],[i,j+1]];
+      var pts = corners.map(function(c) {
+        var x = vertexX(c[0]), y = vertexY(c[1]);
+        var cv = cvFn(x);
+        var normY = Math.max(0, Math.min(1, (y+1.4)/2.8));
+        var hem = (1-normY)*(1-normY);
+        var t = 0.5; // fixed time
+        var wz = !isNaN(cv) ? cv * u_curve + Math.sin(t*0.8 + x*1.8)*0.048*hem : NaN;
+        return { x:x, y:y, z:wz, nan: isNaN(cv) || isNaN(wz) };
+      });
+      
+      var anyNaN = pts.some(function(p){return p.nan;});
+      
+      // Draw quad outline
+      ctx.beginPath();
+      pts.forEach(function(p, k) {
+        var s = toScreen(p.x, p.y, canvas);
+        if (k===0) ctx.moveTo(s[0], s[1]); else ctx.lineTo(s[0], s[1]);
+      });
+      ctx.closePath();
+      
+      if (anyNaN) {
+        ctx.fillStyle = 'rgba(180,40,40,0.55)';
+        nanCount++;
+      } else {
+        // Color by cv value (lighter = more forward curve)
+        var cv0 = cvFn(vertexX(i));
+        var shade = isNaN(cv0) ? 0 : Math.round(cv0 * 80);
+        ctx.fillStyle = 'rgba(139,34,82,'+(0.5+cv0*0.5)+')';
+        validCount++;
+      }
+      ctx.fill();
+      ctx.strokeStyle = anyNaN ? 'rgba(255,80,80,0.3)' : 'rgba(255,255,255,0.06)';
+      ctx.lineWidth = 0.5;
+      ctx.stroke();
+    }
+  }
+  
+  if (logEl) {
+    logEl.textContent =
+      'Vertices total: '+(W+1)*(H+1)+'\n'+
+      'NaN/degenerate quads: '+nanCount+' ('+Math.round(nanCount/(W*H)*100)+'%)\n'+
+      'Valid quads: '+validCount+' ('+Math.round(validCount/(W*H)*100)+'%)\n'+
+      (nanCount > 0 ? '→ DARK AREA covers '+Math.round(nanCount/(W*H)*100)+'% of blouse' : '→ All geometry valid — no dark strip');
+  }
+}
+
+// Draw grid showing which vertices are NaN
+function drawGrid(canvas) {
+  var ctx = canvas.getContext('2d');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle = '#0D0508';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+  
+  for (var j = 0; j <= H; j++) {
+    for (var i = 0; i <= W; i++) {
+      var x = vertexX(i), y = vertexY(j);
+      var cv_bug = buggy_cv(x);
+      var isNan = isNaN(cv_bug);
+      var s = toScreen(x, y, canvas);
+      ctx.beginPath();
+      ctx.arc(s[0], s[1], 4, 0, Math.PI*2);
+      ctx.fillStyle = isNan ? '#ff4444' : '#44ff44';
+      ctx.fill();
+    }
+  }
+  
+  // Legend
+  ctx.fillStyle = '#ff4444'; ctx.fillRect(10,canvas.height-40,14,14);
+  ctx.fillStyle = '#ccc'; ctx.font='9px monospace'; ctx.fillText('NaN vertex (pow bug) — '+((W/2+1)*(H+1))+' affected', 28, canvas.height-30);
+  ctx.fillStyle = '#44ff44'; ctx.fillRect(10,canvas.height-22,14,14);
+  ctx.fillStyle = '#ccc'; ctx.fillText('Valid vertex (fixed) — '+((W/2)*(H+1))+' on right half', 28, canvas.height-12);
+  
+  // Mark center line
+  var sc = toScreen(0, 0, canvas);
+  ctx.strokeStyle = 'rgba(255,255,0,0.5)'; ctx.lineWidth = 1.5; ctx.setLineDash([4,4]);
+  ctx.beginPath(); ctx.moveTo(sc[0], 0); ctx.lineTo(sc[0], canvas.height); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#ffff00'; ctx.font='9px monospace';
+  ctx.fillText('x=0 center', sc[0]+3, 12);
+}
+
+drawMesh(document.getElementById('c_bug'), buggy_cv, document.getElementById('log_bug'));
+drawMesh(document.getElementById('c_fix'), fixed_cv, document.getElementById('log_fix'));
+drawGrid(document.getElementById('c_grid'));
+</script>
+</body></html>

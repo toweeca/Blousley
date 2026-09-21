@@ -1,0 +1,103 @@
+I need a minimal update to my existing app. Do not redesign, do not refactor unrelated code, and do not create new features beyond what I list. Keep changes as small and credit-efficient as possible.
+
+Goal
+Replace all branding references from “Blousify” to “Blousley” across the entire app and make sure the legal pages are visible and accessible.
+
+Scope
+Please only make the following changes:
+
+Replace every visible instance of:
+
+Blousify
+
+blousify
+
+BLOUSIFY
+
+with:
+
+Blousley
+
+blousley
+
+BLOUSLEY
+
+Also check for brand references in:
+
+page titles
+
+navbar/header
+
+footer
+
+homepage hero
+
+login/signup pages
+
+profile/account pages
+
+email text/templates if they exist
+
+metadata/SEO title and description
+
+favicon/app name/manifest if present
+
+environment-facing public app name strings if present
+
+Make sure Privacy Policy and Terms & Conditions / Terms of Service are both clearly visible to users:
+
+add links in the footer on all pages
+
+add links on signup/login pages
+
+if a checkout/account creation/measurement submission consent area exists, add a simple checkbox text like:
+“I agree to the Terms & Conditions and Privacy Policy”
+
+do not write fake legal content; if pages already exist, link them properly
+
+if pages do not exist, create simple placeholder pages/components with headings:
+
+Privacy Policy
+
+Terms & Conditions
+and add a note inside each page saying “Content to be finalized”
+
+Keep the UI minimalistic:
+
+no redesign
+
+no animation
+
+no style overhaul
+
+no new libraries unless absolutely necessary
+
+reuse existing components/styles
+
+preserve current layout
+
+Do not change any business logic unless required for the links/pages to work.
+
+Technical instructions
+Search the entire codebase for “Blousify” references and update them carefully.
+
+Keep file edits minimal.
+
+Do not rename files unless necessary.
+
+Do not restructure the project.
+
+If routes for legal pages are missing, add the smallest working implementation.
+
+Make sure all links work and no page crashes.
+
+Deliverables
+When done, give me:
+
+a short list of files changed
+
+what was renamed
+
+where the Privacy Policy and Terms pages are now linked
+
+anything you could not safely change without my approval

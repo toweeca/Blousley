@@ -1,0 +1,541 @@
+// Copyright © 2026 Blousley. All rights reserved.
+import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
+import { CopyrightNotice } from "@/components/LegalLinks";
+import { LinearGradient } from "expo-linear-gradient";
+import { router, useLocalSearchParams } from "expo-router";
+import React from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  TouchableOpacity,
+  ScrollView,
+  useColorScheme,
+  Platform,
+  Share,
+  ActivityIndicator,
+  Image,
+  Alert,
+} from "react-native";
+import Animated, { FadeInDown } from "react-native-reanimated";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useQuery, useMutation } from "@tanstack/react-query";
+
+import Colors from "@/constants/colors";
+import { useApp } from "@/context/AppContext";
+import ChatThread from "@/components/ChatThread";
+import PrivateFitImage from "@/components/PrivateFitImage";
+
+interface BlouseFit {
+  id: number;
+  userId: string;
+  imageUrl?: string | null;
+  thumbnailUrl?: string | null;
+  measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number } | null;
+  bodyShape?: string | null;
+  stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
+  aiAnalysis?: string | null;
+  notes?: string | null;
+  findMyTailor?: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+interface FitConversation {
+  id: number;
+  tailorId: string | null;
+}
+
+function DetailRow({ label, value, icon }: { label: string; value?: string | number | null; icon: string }) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+
+  if (!value) return null;
+  return (
+    <View style={[styles.detailRow, { borderBottomColor: theme.border }]}>
+      <Feather name={icon as any} size={16} color={Colors.brand.gold} />
+      <Text style={[styles.detailLabel, { color: theme.textSecondary }]}>{label}</Text>
+      <Text style={[styles.detailValue, { color: theme.text }]}>{value}</Text>
+    </View>
+  );
+}
+
+function MeasBadge({ label, value }: { label: string; value?: number }) {
+  return (
+    <View style={styles.measBadge}>
+      <Text style={styles.measBadgeVal}>{value ? `${value}cm` : "—"}</Text>
+      <Text style={styles.measBadgeLabel}>{label}</Text>
+    </View>
+  );
+}
+
+export default function FitDetailScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const { user } = useApp();
+  const fitUserId = user?.id ?? "guest";
+  const apiBase = process.env.EXPO_PUBLIC_DOMAIN?.startsWith("http") ? process.env.EXPO_PUBLIC_DOMAIN : `https://${process.env.EXPO_PUBLIC_DOMAIN ?? ""}`;
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const insets = useSafeAreaInsets();
+  const theme = isDark ? Colors.dark : Colors.light;
+  const isWeb = Platform.OS === "web";
+  const topPad = isWeb ? 67 : insets.top;
+  const bottomPad = isWeb ? 34 : insets.bottom;
+
+  const { data: fit, isLoading } = useQuery<BlouseFit>({
+     queryKey: ["blouse-fit", id, fitUserId],
+    queryFn: async () => {
+       const res = await fetch(`${apiBase}/api/blouse/fits/${id}?userId=${encodeURIComponent(fitUserId)}`);
+      if (!res.ok) throw new Error("Not found");
+      return res.json();
+    },
+     enabled: !!id,
+  });
+
+  const { data: fitConversation } = useQuery<FitConversation | null>({
+    queryKey: ["chat-conversation-fit", id, fitUserId],
+    queryFn: async () => {
+      const res = await fetch(`${apiBase}/api/chat/conversations?userId=${encodeURIComponent(fitUserId)}&fitId=${id}`);
+      if (!res.ok) return null;
+      const conversations = await res.json();
+      return conversations[0] ?? null;
+    },
+    enabled: !!id && !!fit,
+    refetchInterval: 5000,
+  });
+
+  const [addedToTailorFits, setAddedToTailorFits] = React.useState(false);
+  const [chatVisible, setChatVisible] = React.useState(false);
+  const [imageFailed, setImageFailed] = React.useState(false);
+  const addToTailorFitsMutation = useMutation({
+    mutationFn: async () => {
+      const res = await fetch(`${apiBase}/api/blouse/fits/${id}/find-tailor`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: fitUserId }),
+      });
+      if (!res.ok) throw new Error("Could not add fit");
+      return res.json();
+    },
+    onSuccess: () => setAddedToTailorFits(true),
+    onError: () => Alert.alert("Error", "Could not add this fit to Tailor Fits."),
+  });
+
+  const handleShare = async () => {
+    if (!fit) return;
+    const message = `My Saree Blouse Fit Profile\n\nBody Shape: ${fit.bodyShape ?? "Unknown"}\n${
+      fit.measurements
+        ? `Measurements: B:${fit.measurements.bust}cm W:${fit.measurements.waist}cm S:${fit.measurements.shoulder}cm`
+        : ""
+    }\n${
+      fit.stylePrefs
+        ? `Style: ${fit.stylePrefs.neckline} neck, ${fit.stylePrefs.sleeves} sleeves, ${fit.stylePrefs.fabric} fabric`
+        : ""
+    }\n\nGenerated by Blousley AI`;
+
+    await Share.share({ message, title: "My Blouse Fit Profile" });
+  };
+
+  if (isLoading) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <ActivityIndicator size="large" color={Colors.brand.primary} />
+      </View>
+    );
+  }
+
+  if (!fit) {
+    return (
+      <View style={[styles.container, styles.centered, { backgroundColor: theme.background }]}>
+        <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>Fit not found</Text>
+        <TouchableOpacity onPress={() => router.back()}>
+          <Text style={{ color: Colors.brand.primary, fontFamily: "Inter_500Medium", marginTop: 12 }}>
+            Go back
+          </Text>
+        </TouchableOpacity>
+      </View>
+    );
+  }
+
+  const date = new Date(fit.createdAt).toLocaleDateString("en-IN", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <LinearGradient
+        colors={[Colors.brand.primaryDark, Colors.brand.primary]}
+        style={[styles.topBar, { paddingTop: topPad + 8 }]}
+      >
+        <TouchableOpacity style={styles.backBtn} onPress={() => router.back()}>
+          <Feather name="arrow-left" size={22} color="#fff" />
+        </TouchableOpacity>
+        <Text style={styles.topBarTitle}>Fit Details</Text>
+        <TouchableOpacity style={styles.shareBtn} onPress={handleShare}>
+          <Feather name="share-2" size={20} color="#fff" />
+        </TouchableOpacity>
+      </LinearGradient>
+
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ paddingBottom: 60 + bottomPad, gap: 16, paddingHorizontal: 20 }}
+      >
+        {/* ── Photo banner ── */}
+        {!!fit.thumbnailUrl && (
+          <Animated.View entering={FadeInDown.delay(60).springify()} style={[styles.photoBannerWrap, { marginHorizontal: -20 }]}>
+            {imageFailed ? (
+              <View style={[styles.photoBanner, styles.centered, { backgroundColor: theme.card }]}>
+                <Text style={[styles.notFoundText, { color: theme.textSecondary }]}>Image unavailable</Text>
+              </View>
+            ) : (
+              <PrivateFitImage
+                source={{ uri: fit.thumbnailUrl }}
+                style={styles.photoBanner}
+                resizeMode="cover"
+                fallbackColor={theme.card}
+                onError={() => setImageFailed(true)}
+              />
+            )}
+            {!imageFailed && (
+              <>
+                <LinearGradient
+                  colors={["transparent", "rgba(0,0,0,0.6)"]}
+                  style={styles.photoBannerGradient}
+                />
+                <View style={styles.photoBannerOverlay}>
+                  <Text style={styles.photoBannerShape}>
+                    {fit.bodyShape ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1) : "Unknown"} Shape
+                  </Text>
+                  <Text style={styles.photoBannerDate}>{date}</Text>
+                </View>
+              </>
+            )}
+          </Animated.View>
+        )}
+
+        {/* Body Shape Card */}
+        <Animated.View
+          entering={FadeInDown.delay(100).springify()}
+          style={[styles.shapeCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+        >
+          {!fit.thumbnailUrl && (
+            <View style={styles.shapeRow}>
+              <View style={[styles.shapeIconCircle, { backgroundColor: Colors.brand.primary + "15" }]}>
+                <MaterialCommunityIcons name="human-female" size={36} color={Colors.brand.primary} />
+              </View>
+              <View style={styles.shapeInfo}>
+                <Text style={[styles.shapeLabel, { color: theme.textSecondary }]}>Body Shape</Text>
+                <Text style={[styles.shapeValue, { color: theme.text }]}>
+                  {fit.bodyShape
+                    ? fit.bodyShape.charAt(0).toUpperCase() + fit.bodyShape.slice(1)
+                    : "Unknown"}
+                </Text>
+                <Text style={[styles.shapeDate, { color: theme.textMuted }]}>{date}</Text>
+              </View>
+            </View>
+          )}
+
+          {fit.measurements && (
+            <View style={styles.measRow}>
+              <MeasBadge label="Bust" value={fit.measurements.bust} />
+              <MeasBadge label="Waist" value={fit.measurements.waist} />
+              <MeasBadge label="Shoulder" value={fit.measurements.shoulder} />
+              <MeasBadge label="Hip" value={fit.measurements.hip} />
+            </View>
+          )}
+        </Animated.View>
+
+        {/* AI Analysis */}
+        {fit.aiAnalysis && (
+          <Animated.View
+            entering={FadeInDown.delay(200).springify()}
+            style={[styles.analysisCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <View style={styles.analysisHeader}>
+              <MaterialCommunityIcons name="brain" size={18} color={Colors.brand.primary} />
+              <Text style={[styles.analysisTitle, { color: theme.text }]}>AI Analysis</Text>
+            </View>
+            <Text style={[styles.analysisText, { color: theme.textSecondary }]}>
+              {fit.aiAnalysis}
+            </Text>
+          </Animated.View>
+        )}
+
+        {/* Style Preferences */}
+        {fit.stylePrefs && (
+          <Animated.View
+            entering={FadeInDown.delay(300).springify()}
+            style={[styles.prefsCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <Text style={[styles.prefsTitle, { color: theme.text }]}>Style Preferences</Text>
+            <DetailRow label="Neckline" value={fit.stylePrefs.neckline} icon="circle" />
+            <DetailRow label="Sleeves" value={fit.stylePrefs.sleeves} icon="wind" />
+            <DetailRow label="Back" value={fit.stylePrefs.back} icon="arrow-left" />
+            <DetailRow label="Fabric" value={fit.stylePrefs.fabric} icon="layers" />
+            <DetailRow label="Fit" value={fit.stylePrefs.fit} icon="sliders" />
+          </Animated.View>
+        )}
+
+        {/* Tailor Notes */}
+        {fit.notes && (
+          <Animated.View
+            entering={FadeInDown.delay(400).springify()}
+            style={[
+              styles.notesCard,
+              {
+                backgroundColor: Colors.brand.gold + "10",
+                borderColor: Colors.brand.gold + "30",
+              },
+            ]}
+          >
+            <View style={styles.notesHeader}>
+              <MaterialCommunityIcons name="scissors-cutting" size={16} color={Colors.brand.gold} />
+              <Text style={[styles.notesTitle, { color: Colors.brand.goldDark }]}>Tailor Notes</Text>
+            </View>
+            <Text style={[styles.notesText, { color: theme.textSecondary }]}>{fit.notes}</Text>
+          </Animated.View>
+        )}
+
+        {/* Share Button */}
+        <Animated.View entering={FadeInDown.delay(500).springify()}>
+          <TouchableOpacity
+            style={[styles.shareFullBtn, { backgroundColor: Colors.brand.primary }]}
+            onPress={handleShare}
+          >
+            <Feather name="share-2" size={18} color="#fff" />
+            <Text style={styles.shareFullBtnText}>Send to Tailor</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.shareFullBtn, { backgroundColor: Colors.brand.gold, marginTop: 10, opacity: addToTailorFitsMutation.isPending ? 0.7 : 1 }]}
+            onPress={() => addToTailorFitsMutation.mutate()}
+            disabled={addToTailorFitsMutation.isPending || !!fit.findMyTailor || addedToTailorFits}
+          >
+            <Feather name={fit.findMyTailor || addedToTailorFits ? "check-circle" : "plus-circle"} size={18} color={Colors.brand.primaryDark} />
+            <Text style={[styles.shareFullBtnText, { color: Colors.brand.primaryDark }]}>
+              {fit.findMyTailor || addedToTailorFits ? "Added to Tailor Fits" : "Add to Tailor Fits"}
+            </Text>
+          </TouchableOpacity>
+          {fitConversation && (
+            <TouchableOpacity
+              style={[styles.shareFullBtn, { backgroundColor: Colors.brand.primaryDark, marginTop: 10 }]}
+              onPress={() => setChatVisible(true)}
+            >
+              <Feather name="message-circle" size={18} color="#fff" />
+              <Text style={styles.shareFullBtnText}>Message Tailor</Text>
+            </TouchableOpacity>
+          )}
+        </Animated.View>
+        <CopyrightNotice />
+      </ScrollView>
+      {fitConversation && fitConversation.tailorId && (
+        <ChatThread
+          visible={chatVisible}
+          onClose={() => setChatVisible(false)}
+          conversationId={fitConversation.id}
+          partnerName={`Tailor #${fitConversation.tailorId.slice(-6)}`}
+          currentUserId={fitUserId}
+          apiBase={apiBase}
+        />
+      )}
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: { flex: 1 },
+  centered: { alignItems: "center", justifyContent: "center" },
+  // ── Photo banner ──────────────────────────────────────────────────────────
+  photoBannerWrap: {
+    width: "100%",
+    height: 260,
+    position: "relative",
+  },
+  photoBanner: {
+    width: "100%",
+    height: "100%",
+  },
+  photoBannerGradient: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 100,
+  },
+  photoBannerOverlay: {
+    position: "absolute",
+    bottom: 16,
+    left: 20,
+    gap: 4,
+  },
+  photoBannerShape: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    color: "#fff",
+    textTransform: "capitalize",
+  },
+  photoBannerDate: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    color: "rgba(255,255,255,0.8)",
+  },
+  notFoundText: { fontFamily: "Inter_400Regular", fontSize: 16 },
+  topBar: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  backBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  topBarTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 17,
+    color: "#fff",
+  },
+  shareBtn: {
+    width: 40,
+    height: 40,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 20,
+    backgroundColor: "rgba(255,255,255,0.15)",
+  },
+  shapeCard: {
+    borderRadius: 20,
+    padding: 20,
+    borderWidth: 1,
+    gap: 16,
+  },
+  shapeRow: { flexDirection: "row", alignItems: "center", gap: 16 },
+  shapeIconCircle: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  shapeInfo: { flex: 1, gap: 3 },
+  shapeLabel: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  shapeValue: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 22,
+    textTransform: "capitalize",
+  },
+  shapeDate: { fontFamily: "Inter_400Regular", fontSize: 12 },
+  measRow: {
+    flexDirection: "row",
+    gap: 8,
+  },
+  measBadge: {
+    flex: 1,
+    alignItems: "center",
+    backgroundColor: Colors.brand.primary + "10",
+    borderRadius: 12,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: Colors.brand.primary + "20",
+    gap: 3,
+  },
+  measBadgeVal: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 14,
+    color: Colors.brand.primary,
+  },
+  measBadgeLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 11,
+    color: Colors.brand.gold,
+  },
+  analysisCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    gap: 12,
+  },
+  analysisHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  analysisTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+  },
+  analysisText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  prefsCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    gap: 0,
+  },
+  prefsTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 16,
+    marginBottom: 12,
+  },
+  detailRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+    paddingVertical: 12,
+    borderBottomWidth: 1,
+  },
+  detailLabel: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 13,
+    width: 72,
+  },
+  detailValue: {
+    fontFamily: "Inter_500Medium",
+    fontSize: 14,
+    flex: 1,
+  },
+  notesCard: {
+    borderRadius: 20,
+    padding: 18,
+    borderWidth: 1,
+    gap: 10,
+  },
+  notesHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  notesTitle: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 15,
+  },
+  notesText: {
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+    lineHeight: 22,
+  },
+  shareFullBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 10,
+    paddingVertical: 16,
+    borderRadius: 16,
+    ...Platform.select({ web: { boxShadow: "0px 4px 8px rgba(139,34,82,0.3)" }, default: { shadowColor: Colors.brand.primary, shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8, elevation: 6 } }),
+  },
+  shareFullBtnText: {
+    fontFamily: "Inter_700Bold",
+    fontSize: 16,
+    color: "#fff",
+  },
+});

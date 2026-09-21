@@ -1,0 +1,51 @@
+Use the smallest possible set of code changes and lowest-credit approach.
+Do not redesign anything, do not refactor unrelated code, and do not change unrelated features.
+
+I need a minimal but strong security hardening pass for Blousley before launch.
+The app has: user auth, conversations between customers and tailors, real-time chat, image uploads, and AI-generated images.
+
+Apply these improvements only:
+
+File uploads & images
+
+validate uploaded files server-side using magic bytes + MIME + extension allowlist (images only: jpeg/png/webp)
+
+enforce max file size and per-user upload limits
+
+rename all files to UUIDs, never trust original filenames
+
+store files outside the web root or in private storage; serve via an authenticated route that checks the user is a participant in that conversation/order
+
+set safe headers when serving images (X-Content-Type-Options: nosniff, correct Content-Type)
+
+Auth & sessions
+
+ensure passwords are hashed with bcrypt/Argon2 (cost ≥ 12 for bcrypt)
+
+use short-lived access tokens and refresh tokens in httpOnly, Secure, SameSite cookies
+
+add rate limiting and basic lockout on login, register, and password reset endpoints
+
+Authorization
+
+keep the existing RLS on conversations/messages/images, and ensure every API route also explicitly checks that the user is a participant in that conversation/order before reading/writing
+
+Input / output
+
+add server-side validation on all user inputs (length, allowed characters, no raw HTML where not needed)
+
+ensure all user-generated content is properly escaped when rendered to prevent XSS
+
+Headers & transport
+
+enable HTTPS everywhere and add baseline security headers: HSTS, X-Content-Type-Options: nosniff, X-Frame-Options, Referrer-Policy, Permissions-Policy, and a basic CSP
+
+Rate limiting
+
+add simple per-IP / per-user rate limits on /api/*, stricter on auth and upload endpoints
+
+Logging
+
+log auth events (login success/failure, password reset) and upload events (who, what type, size, conversation/order ID), without logging sensitive data
+
+Reuse the existing auth, conversations, and chat flow. No redesign, no refactor beyond what’s needed for these security improvements.

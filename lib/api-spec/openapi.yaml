@@ -1,0 +1,374 @@
+openapi: 3.1.0
+info:
+  title: Api
+  version: 0.1.0
+  description: Saree Blouse Fitter API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: blouse
+    description: Blouse fitting operations
+  - name: tailor
+    description: Tailor operations
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+
+  /blouse/analyze:
+    post:
+      operationId: analyzeBlouse
+      tags: [blouse]
+      summary: Analyze blouse photo with AI
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/AnalyzeBlouseRequest"
+      responses:
+        "200":
+          description: Analysis result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AnalyzeBlouseResponse"
+
+  /blouse/fits:
+    get:
+      operationId: getBlouseFits
+      tags: [blouse]
+      summary: Get all blouse fits for a user
+      parameters:
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of fits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlouseFit"
+    post:
+      operationId: saveBlouseFit
+      tags: [blouse]
+      summary: Save a blouse fit
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SaveBlouseFitRequest"
+      responses:
+        "201":
+          description: Saved fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlouseFit"
+
+  /blouse/fits/{id}:
+    get:
+      operationId: getBlouseFit
+      tags: [blouse]
+      summary: Get a single blouse fit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: userId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Blouse fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlouseFit"
+    delete:
+      operationId: deleteBlouseFit
+      tags: [blouse]
+      summary: Delete a blouse fit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Deleted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DeleteResponse"
+
+  /blouse/fits/{id}/find-tailor:
+    patch:
+      operationId: submitFitToTailors
+      tags: [blouse]
+      summary: Submit an owned fit to the tailor list
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [userId]
+              properties:
+                userId:
+                  type: string
+      responses:
+        "200":
+          description: Submitted fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlouseFit"
+
+  /blouse/fits/{id}/notes:
+    patch:
+      operationId: updateFitNotes
+      tags: [blouse]
+      summary: Update tailor notes for a fit
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/UpdateNotesRequest"
+      responses:
+        "200":
+          description: Updated fit
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/BlouseFit"
+
+  /tailor/customers:
+    get:
+      operationId: getTailorCustomers
+      tags: [tailor]
+      summary: Get fits submitted to the tailor list
+      parameters:
+        - name: tailorId
+          in: query
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: List of all fits
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/BlouseFit"
+
+components:
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+
+    Measurements:
+      type: object
+      properties:
+        bust:
+          type: number
+        waist:
+          type: number
+        shoulder:
+          type: number
+        hip:
+          type: number
+
+    StylePrefs:
+      type: object
+      properties:
+        neckline:
+          type: string
+        sleeves:
+          type: string
+        back:
+          type: string
+        fabric:
+          type: string
+        fit:
+          type: string
+
+    BlouseFit:
+      type: object
+      properties:
+        id:
+          type: integer
+        userId:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        thumbnailUrl:
+          type: string
+          nullable: true
+        measurements:
+          $ref: "#/components/schemas/Measurements"
+          nullable: true
+        bodyShape:
+          type: string
+          nullable: true
+        stylePrefs:
+          $ref: "#/components/schemas/StylePrefs"
+          nullable: true
+        aiAnalysis:
+          type: string
+          nullable: true
+        notes:
+          type: string
+          nullable: true
+        findMyTailor:
+          type: boolean
+          default: false
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        - id
+        - userId
+        - findMyTailor
+        - createdAt
+        - updatedAt
+
+    AnalyzeBlouseRequest:
+      type: object
+      properties:
+        imageBase64:
+          type: string
+        userId:
+          type: string
+      required:
+        - imageBase64
+        - userId
+
+    AnalysisPoint:
+      type: object
+      properties:
+        label:
+          type: string
+        detail:
+          type: string
+      required:
+        - label
+        - detail
+
+    AnalyzeBlouseResponse:
+      type: object
+      properties:
+        imageType:
+          type: string
+          enum:
+            - person
+            - blouse
+        measurements:
+          allOf:
+            - $ref: "#/components/schemas/Measurements"
+          nullable: true
+        bodyShape:
+          type: string
+        aiAnalysis:
+          type: string
+        analysisPoints:
+          type: array
+          items:
+            $ref: "#/components/schemas/AnalysisPoint"
+        suggestedStyles:
+          type: array
+          items:
+            type: string
+      required:
+        - imageType
+        - bodyShape
+        - aiAnalysis
+        - analysisPoints
+        - suggestedStyles
+
+    SaveBlouseFitRequest:
+      type: object
+      properties:
+        userId:
+          type: string
+        imageUrl:
+          type: string
+          nullable: true
+        measurements:
+          $ref: "#/components/schemas/Measurements"
+          nullable: true
+        bodyShape:
+          type: string
+          nullable: true
+        stylePrefs:
+          $ref: "#/components/schemas/StylePrefs"
+          nullable: true
+        aiAnalysis:
+          type: string
+          nullable: true
+      required:
+        - userId
+
+    UpdateNotesRequest:
+      type: object
+      properties:
+        notes:
+          type: string
+      required:
+        - notes
+
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+      required:
+        - success

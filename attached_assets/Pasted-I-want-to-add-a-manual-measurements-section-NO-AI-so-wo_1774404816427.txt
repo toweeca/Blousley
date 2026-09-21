@@ -1,0 +1,60 @@
+I want to add a **manual measurements** section (NO AI) so women can enter their own body measurements, plus a simple “how to measure” guide with diagrams.
+
+Please implement:
+
+1) Manual measurement form
+- Fields (cm or inches):
+  - Above bust (high bust)
+  - Bust (full chest)
+  - Under bust
+  - Shoulder width
+  - Armhole / sleeve length
+  - Blouse length
+- Simple validation (required + numeric).
+- Save button that stores these measurements for the logged-in user.
+
+2) Database
+- Add a `blouse_measurements` table:
+  - id
+  - user_id (FK to users)
+  - above_bust
+  - bust
+  - under_bust
+  - shoulder_width
+  - armhole
+  - blouse_length
+  - created_at / updated_at
+- Use Drizzle schema + migration, or plain SQL if easier.
+
+3) “How to measure” diagrams/guide
+- On the same page, add a right-side (or top) panel with:
+  - Simple diagrams or silhouette images (can be placeholder SVGs or boxes with labels) showing:
+    - Above bust: tape around upper chest, above the bust.
+    - Bust: tape around the fullest part of the chest.
+    - Under bust: tape around ribcage just under the bust.
+    - Shoulder width: from shoulder tip to shoulder tip.
+    - Armhole: around the top of the arm.
+    - Blouse length: from shoulder down to where blouse ends.
+  - Short step-by-step text instructions under each diagram:
+    - “Keep the tape level and snug but not tight.”
+    - “Measure over a thin blouse or innerwear, not a thick sweater.”
+
+4) Profile integration
+- Add a “My Measurements” tab on the profile/dashboard:
+  - Shows the latest saved measurements.
+  - “Edit measurements” button → opens the form with existing values pre-filled.
+  - Optional: note like “These measurements are used for blouse fit suggestions.”
+
+Please give:
+
+- Drizzle schema + migration for `blouse_measurements`.
+- Express routes:
+  - GET /api/measurements/me
+  - POST/PUT /api/measurements/me
+- React components:
+  - MeasurementsForm.jsx (manual inputs + save)
+  - HowToMeasure panel with diagrams/labels (can be simple SVG/boxes with labels)
+  - Profile integration (add “My Measurements” section/tab).
+
+My current profile component is here — integrate with this, don’t rewrite everything:
+[PASTE your Profile/Account component code here]
