@@ -1,0 +1,9 @@
+[build]
+  base = "artifacts/mobile"
+  command = "EXPO_PUBLIC_DOMAIN=$EXPO_PUBLIC_DOMAIN npx expo export --platform web"
+  publish = "dist"
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200
