@@ -8,9 +8,13 @@
     "scheme": "mobile",
     "userInterfaceStyle": "automatic",
     "ios": {
+      "bundleIdentifier": "com.blousley.app",
+      "buildNumber": "1",
       "supportsTablet": false
     },
     "android": {
+      "package": "com.blousley.app",
+      "versionCode": 1,
       "backgroundColor": "#0D0508"
     },
     "web": {
