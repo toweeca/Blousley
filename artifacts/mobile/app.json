@@ -49,6 +49,12 @@
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
-    }
+    },
+    "extra": {
+      "eas": {
+        "projectId": "04c3b1de-738c-43f1-9627-91153f4aea59"
+      }
+    },
+    "owner": "blousleys-team"
   }
 }
