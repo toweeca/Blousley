@@ -1,0 +1,40 @@
+Fix the Android-only “Save image” and “Share design” failures in the full Blousley Expo app.
+
+Observed on the installed Android preview APK:
+- Tapping Save image shows: “Could not save image”
+- Tapping Share design shows: “Could not share design”
+
+Work only in the full `toweeca/Blousley` repository, primarily under:
+artifacts/mobile
+
+Do not modify Blousley-landing.
+Do not modify Netlify configuration.
+Do not change unrelated app features, screens, backend logic, or styling.
+Do not start an EAS build, submit to Google Play/Apple, publish an Expo update, or create store credentials.
+
+First investigate the exact code paths used for:
+1. Saving a generated design image to the Android device.
+2. Sharing a generated design image from Android.
+
+Check specifically:
+- Whether the generated/exported image is a real local file URI beginning with `file:///` on Android.
+- Whether the filename has a valid `.png` or `.jpg` extension.
+- Whether a remote URL, data URI, `content://` URI, or cache URI is being incorrectly passed into MediaLibrary or Sharing.
+- Whether the app asks for and correctly handles media-library/photo permission before saving.
+- Whether `expo-media-library`, `expo-sharing`, and any required file/image-rendering packages are installed and correctly configured for Expo SDK 57.
+- Whether Android app permissions/config plugins are necessary in app.json.
+- Whether generated images need to be converted/copied/exported first to a local PNG or JPEG before saving/sharing.
+- Whether errors are being swallowed instead of logging the actual Android error.
+
+Do not edit files yet.
+
+Report:
+- The exact files/functions causing each failure.
+- The exact root cause for Save image.
+- The exact root cause for Share design.
+- The smallest specific changes needed.
+- Whether a new Android preview APK will be required to test the fix.
+- Any app.json permissions or plugin changes required.
+- A test plan for Android.
+
+Stop and wait for my approval before changing code, dependencies, app.json, or running a build.
