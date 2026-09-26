@@ -4,7 +4,7 @@ import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
 import * as MediaLibrary from "expo-media-library/legacy";
 import * as Sharing from "expo-sharing";
-import * as FileSystem from "expo-file-system";
+import * as FileSystem from "expo-file-system/legacy";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
 import React, { useState, useRef } from "react";
@@ -59,6 +59,171 @@ function isSvgUri(uri: string) {
   return uri.startsWith("data:image/svg") || uri.endsWith(".svg");
 }
 
+type ImageFileFormat = {
+  mimeType: "image/png" | "image/jpeg";
+  extension: "png" | "jpg";
+};
+
+type NormalizedImageFile = ImageFileFormat & {
+  uri: string;
+  sourceScheme: string;
+};
+
+function getUriScheme(uri: string): string {
+  return /^([a-z][a-z\d+.-]*):/i.exec(uri)?.[1]?.toLowerCase() ?? "unknown";
+}
+
+function imageFormatFromMime(mimeType: string | undefined): ImageFileFormat | null {
+  const normalizedMime = mimeType?.split(";")[0].trim().toLowerCase();
+  if (normalizedMime === "image/png") return { mimeType: "image/png", extension: "png" };
+  if (normalizedMime === "image/jpeg" || normalizedMime === "image/jpg") {
+    return { mimeType: "image/jpeg", extension: "jpg" };
+  }
+  return null;
+}
+
+function imageFormatFromUri(uri: string): ImageFileFormat | null {
+  const path = uri.split(/[?#]/, 1)[0].toLowerCase();
+  if (path.endsWith(".png")) return { mimeType: "image/png", extension: "png" };
+  if (path.endsWith(".jpg") || path.endsWith(".jpeg")) {
+    return { mimeType: "image/jpeg", extension: "jpg" };
+  }
+  return null;
+}
+
+function imageFormatFromSource(uri: string): ImageFileFormat | null {
+  if (getUriScheme(uri) === "data") {
+    return imageFormatFromMime(/^data:([^;,]+)/i.exec(uri)?.[1]);
+  }
+  return imageFormatFromUri(uri);
+}
+
+function cacheDirectoryUri(): string {
+  const directory = FileSystem.cacheDirectory;
+  if (!directory || !directory.startsWith("file:///")) {
+    throw new Error("The app cache directory is not available as a local file URI.");
+  }
+  return directory.endsWith("/") ? directory : `${directory}/`;
+}
+
+function safeImageExportError(error: unknown): string {
+  const message = error instanceof Error ? error.message : String(error);
+  return message
+    .replace(/data:[^\s"'<>]*/gi, "data:[redacted]")
+    .replace(/\bhttps?:\/\/[^\s"'<>]*/gi, "[remote URL]")
+    .replace(/\bcontent:\/\/[^\s"'<>]+/gi, "[content URI]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/\b(authorization|auth|token|secret|api[_-]?key)\s*[:=]\s*\S+/gi, "$1=[redacted]")
+    .slice(0, 240);
+}
+
+function cacheImageUri(label: string, extension: string): string {
+  const safeLabel = label.replace(/[^a-z0-9_-]/gi, "-").slice(0, 40) || "image";
+  const uniqueId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${cacheDirectoryUri()}blousley-${safeLabel}-${uniqueId}.${extension}`;
+}
+
+async function verifyLocalImageUri(uri: string, expectedFormat: ImageFileFormat): Promise<string> {
+  if (!uri.startsWith("file:///")) {
+    throw new Error("Image export did not produce a file:/// URI.");
+  }
+  const actualFormat = imageFormatFromUri(uri);
+  if (!actualFormat || actualFormat.extension !== expectedFormat.extension) {
+    throw new Error("Image export must end in .png, .jpg, or .jpeg with a matching format.");
+  }
+  const info = await FileSystem.getInfoAsync(uri);
+  if (!info.exists || info.isDirectory || (typeof info.size === "number" && info.size <= 0)) {
+    throw new Error("The exported image file does not exist or is empty.");
+  }
+  return uri;
+}
+
+async function normalizeNativeImageUri(uri: string, label: string): Promise<NormalizedImageFile> {
+  const sourceScheme = getUriScheme(uri);
+  let format: ImageFileFormat | null = null;
+  let normalizedUri: string | null = null;
+  let temporaryUri: string | null = null;
+
+  try {
+    if (sourceScheme === "content") {
+      throw new Error("Unsupported content:// image URI; export a local PNG or JPEG file first.");
+    }
+
+    if (sourceScheme === "data") {
+      const match = /^data:(image\/(?:png|jpeg|jpg));base64,([a-z0-9+/=\r\n]+)$/i.exec(uri);
+      format = imageFormatFromMime(match?.[1]);
+      const base64 = match?.[2]?.replace(/\s/g, "");
+      if (!format || !base64) {
+        throw new Error("Only non-empty PNG or JPEG base64 data URIs can be exported.");
+      }
+      normalizedUri = cacheImageUri(label, format.extension);
+      await FileSystem.writeAsStringAsync(normalizedUri, base64, {
+        encoding: FileSystem.EncodingType.Base64,
+      });
+    } else if (sourceScheme === "http" || sourceScheme === "https") {
+      const urlFormat = imageFormatFromUri(uri);
+      temporaryUri = cacheImageUri(label, "download");
+      const downloaded = await FileSystem.downloadAsync(uri, temporaryUri);
+      if (downloaded.status < 200 || downloaded.status >= 300) {
+        throw new Error(`Image download returned HTTP status ${downloaded.status}.`);
+      }
+
+      const contentType = Object.entries(downloaded.headers ?? {}).find(
+        ([key]) => key.toLowerCase() === "content-type",
+      )?.[1];
+      const responseMime = contentType?.split(";")[0].trim().toLowerCase();
+      const responseFormat = imageFormatFromMime(responseMime);
+      if (responseMime?.startsWith("image/") && !responseFormat) {
+        throw new Error("Remote image format is unsupported; use PNG or JPEG.");
+      }
+      format = responseFormat ?? urlFormat;
+      if (!format) {
+        throw new Error("Remote image must identify itself as PNG or JPEG.");
+      }
+
+      normalizedUri = cacheImageUri(label, format.extension);
+      await FileSystem.moveAsync({ from: downloaded.uri, to: normalizedUri });
+      temporaryUri = null;
+    } else if (sourceScheme === "file" && uri.startsWith("file:///")) {
+      format = imageFormatFromUri(uri);
+      if (!format) {
+        throw new Error("Local image URI must end in .png, .jpg, or .jpeg.");
+      }
+      normalizedUri = uri;
+    } else {
+      throw new Error(`Unsupported image URI scheme: ${sourceScheme}.`);
+    }
+
+    if (!format || !normalizedUri) {
+      throw new Error("Could not determine the exported image format.");
+    }
+    await verifyLocalImageUri(normalizedUri, format);
+    console.info("[image-export] normalized", {
+      sourceScheme,
+      intendedExtension: format.extension,
+      intendedMimeType: format.mimeType,
+      normalizedUri,
+    });
+    return { ...format, uri: normalizedUri, sourceScheme };
+  } catch (error) {
+    if (temporaryUri) {
+      try {
+        await FileSystem.deleteAsync(temporaryUri, { idempotent: true });
+      } catch {
+        // Keep the original export error; cleanup is best-effort.
+      }
+    }
+    console.error("[image-export] normalization failed", {
+      sourceScheme,
+      intendedExtension: format?.extension ?? null,
+      intendedMimeType: format?.mimeType ?? null,
+      normalizedUri,
+      exceptionMessage: safeImageExportError(error),
+    });
+    throw error;
+  }
+}
+
 function mimeFromDataUri(uri: string): { mimeType: string; ext: string } {
   if (uri.startsWith("data:")) {
     const m = uri.match(/^data:([^;,]+)/);
@@ -74,6 +239,8 @@ function mimeFromDataUri(uri: string): { mimeType: string; ext: string } {
 }
 
 async function saveImageUtil(uri: string, label = "blouse") {
+  let permissionResult: { status: string; granted: boolean; canAskAgain?: boolean } | null = null;
+  let normalized: NormalizedImageFile | null = null;
   try {
     const isSvg = isSvgUri(uri);
     const { mimeType, ext } = mimeFromDataUri(uri);
@@ -89,11 +256,12 @@ async function saveImageUtil(uri: string, label = "blouse") {
 
     // On mobile: SVGs can't be stored in the photo library — share as file instead
     if (isSvg) {
-      const b64 = uri.split(",")[1];
-      // @ts-ignore – expo-file-system version mismatch; API still works at runtime
-      const path = `${(FileSystem as any).cacheDirectory}blousley-${label}-${Date.now()}.svg`;
-      // @ts-ignore
-      await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
+      if (!uri.startsWith("data:") || !uri.includes(";base64,")) {
+        throw new Error("Only base64 SVG data can be shared as an SVG file.");
+      }
+      const b64 = uri.slice(uri.indexOf(",") + 1);
+      const path = cacheImageUri(label, "svg");
+      await FileSystem.writeAsStringAsync(path, b64, { encoding: FileSystem.EncodingType.Base64 });
       const available = await Sharing.isAvailableAsync();
       if (available) {
         await Sharing.shareAsync(path, { mimeType, dialogTitle: "Save or share your Blousley design" });
@@ -103,42 +271,44 @@ async function saveImageUtil(uri: string, label = "blouse") {
       return;
     }
 
-    const { status } = await MediaLibrary.requestPermissionsAsync();
-    if (status !== "granted") {
+    const permission = await MediaLibrary.requestPermissionsAsync(true, ["photo"]);
+    permissionResult = {
+      status: permission.status,
+      granted: permission.granted,
+      canAskAgain: permission.canAskAgain,
+    };
+    console.info("[image-export] save permission", {
+      sourceScheme: getUriScheme(uri),
+      intendedExtension: imageFormatFromSource(uri)?.extension ?? null,
+      intendedMimeType: imageFormatFromSource(uri)?.mimeType ?? null,
+      normalizedUri: null,
+      permission: permissionResult,
+    });
+    if (!permission.granted && permission.status !== "granted") {
       Alert.alert("Permission needed", "Allow access to photos to save images.");
       return;
     }
-    let localUri = uri;
-    if (uri.startsWith("data:")) {
-      const b64 = uri.split(",")[1];
-      // @ts-ignore
-      const path = `${(FileSystem as any).cacheDirectory}blousley-${label}-${Date.now()}.${ext}`;
-      // @ts-ignore
-      await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
-      localUri = path;
-    } else if (uri.startsWith("http")) {
-      // @ts-ignore
-      const path = `${(FileSystem as any).cacheDirectory}blousley-${label}-${Date.now()}.${ext}`;
-      const { uri: downloaded } = await FileSystem.downloadAsync(uri, path);
-      localUri = downloaded;
-    }
-    await MediaLibrary.saveToLibraryAsync(localUri);
+    normalized = await normalizeNativeImageUri(uri, label);
+    await MediaLibrary.saveToLibraryAsync(normalized.uri);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     Alert.alert("Saved! ✓", "Image saved to your photo library.");
-  } catch (e) {
-    console.error("Save error:", e);
-    try {
-      const available = await Sharing.isAvailableAsync();
-      if (available) await Sharing.shareAsync(uri);
-    } catch {
-      Alert.alert("Error", "Could not save the image.");
-    }
+  } catch (error) {
+    console.error("[image-export] save failed", {
+      sourceScheme: getUriScheme(uri),
+      intendedExtension: normalized?.extension ?? null,
+      intendedMimeType: normalized?.mimeType ?? null,
+      normalizedUri: normalized?.uri ?? null,
+      permission: permissionResult,
+      exceptionMessage: safeImageExportError(error),
+    });
+    Alert.alert("Error", "Could not save the image.");
   }
 }
 
 async function shareImageUtil(uri: string) {
+  let normalized: NormalizedImageFile | null = null;
   try {
-    const { mimeType, ext } = mimeFromDataUri(uri);
+    const { mimeType } = mimeFromDataUri(uri);
 
     if (Platform.OS === "web") {
       if (navigator.share) {
@@ -148,14 +318,35 @@ async function shareImageUtil(uri: string) {
       }
       return;
     }
-    const b64 = uri.split(",")[1];
-    // @ts-ignore
-    const path = `${(FileSystem as any).cacheDirectory}blousley-share-${Date.now()}.${ext}`;
-    // @ts-ignore
-    await FileSystem.writeAsStringAsync(path, b64, { encoding: (FileSystem as any).EncodingType.Base64 });
+
+    let localUri: string;
+    if (isSvgUri(uri)) {
+      if (!uri.startsWith("data:") || !uri.includes(";base64,")) {
+        throw new Error("Only base64 SVG data can be shared as an SVG file.");
+      }
+      const b64 = uri.slice(uri.indexOf(",") + 1);
+      localUri = cacheImageUri("share", "svg");
+      await FileSystem.writeAsStringAsync(localUri, b64, { encoding: FileSystem.EncodingType.Base64 });
+    } else {
+      normalized = await normalizeNativeImageUri(uri, "share");
+      localUri = normalized.uri;
+    }
+
     const available = await Sharing.isAvailableAsync();
-    if (available) await Sharing.shareAsync(path, { mimeType, dialogTitle: "Share my Blousley design" });
-  } catch {
+    if (available) {
+      await Sharing.shareAsync(localUri, {
+        mimeType: normalized?.mimeType ?? mimeType,
+        dialogTitle: "Share my Blousley design",
+      });
+    }
+  } catch (error) {
+    console.error("[image-export] share failed", {
+      sourceScheme: getUriScheme(uri),
+      intendedExtension: normalized?.extension ?? null,
+      intendedMimeType: normalized?.mimeType ?? null,
+      normalizedUri: normalized?.uri ?? null,
+      exceptionMessage: safeImageExportError(error),
+    });
     Alert.alert("Error", "Could not share the image.");
   }
 }

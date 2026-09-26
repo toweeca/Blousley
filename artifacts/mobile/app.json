@@ -44,7 +44,13 @@
           "cameraPermission": "Allow Saree Blouse Fitter to access your camera to analyze your body shape for perfect blouse fitting."
         }
       ],
-      "expo-sharing"
+      "expo-sharing",
+      [
+        "expo-media-library",
+        {
+          "granularPermissions": ["photo"]
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
