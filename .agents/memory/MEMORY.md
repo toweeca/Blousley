@@ -8,4 +8,4 @@
 - [Expo 57 media library](expo-57-media-library.md) — existing permission/save calls must use the legacy export; the package root loads the new native module and breaks web.
 - [EAS pnpm v11 config](eas-pnpm-v11-config.md) — keep overrides and dependency build approvals in pnpm-workspace.yaml; pnpm 11 ignores the legacy package.json settings.
 - [Fit thumbnail URLs](fit-thumbnail-urls.md) — persist stable private-image route paths, then make host-specific thumbnail URLs only in API responses.
-- [GitHub connector repository bootstrap](github-connector-repository-bootstrap.md) — empty repos require a Contents API bootstrap before Git Database uploads; throttle blob writes below connector RPS limits.
+- [GitHub connector repository bootstrap](github-connector-repository-bootstrap.md) — use the authenticated Git Database API for atomic commits when direct Git credentials are unavailable; bootstrap empty repos and throttle blobs.
