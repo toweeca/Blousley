@@ -1,0 +1,81 @@
+We’ve confirmed from the EAS logs that pnpm 11 cannot run in the Android build environment because it uses Node.js 18.18.0, while pnpm 11 requires Node 22+.
+
+We need a permanent, compatible pnpm 10 setup so EAS Android preview builds can install dependencies and use our catalog: workspace without errors.
+
+Scope: root package manager + EAS config only. Do not touch application code.
+
+1. From a clean checkout that matches GitHub main, read:
+   - root package.json
+   - root eas.json
+   - root pnpm-lock.yaml
+
+2. Change the package manager pin in root package.json from pnpm 11 to pnpm 10:
+   - Update:
+     "packageManager": "pnpm@11.1.0+..."
+   - To:
+     "packageManager": "pnpm@10.0.0"
+     (or a specific pnpm 10.x version you can confirm supports Node 18 according to pnpm’s installation docs.)
+
+   Preserve the existing Corepack integrity format if needed; just change the pnpm major/minor version so the project targets pnpm 10 instead of 11.
+
+3. In root eas.json, update build.preview:
+   - Currently:
+     "build": {
+       "preview": {
+         "distribution": "internal",
+         "corepack": true,
+         "pnpm": "11.1.0",
+         "env": {
+           "EAS_NO_FROZEN_LOCKFILE": "1"
+         }
+       },
+       ...
+     }
+   - Change only:
+     "pnpm": "11.1.0"
+   - To:
+     "pnpm": "10.0.0"
+     (or the same pnpm 10.x version used in package.json.)
+
+   Keep:
+   - "distribution": "internal"
+   - "corepack": true
+   - env.EAS_NO_FROZEN_LOCKFILE = "1"
+   - All other profiles and keys unchanged.
+
+4. Using pnpm 10.x:
+   - Run from the repository root:
+     pnpm install --frozen-lockfile
+   - Run the mobile TypeScript typecheck.
+
+   Confirm both commands succeed.
+
+5. If pnpm-lock.yaml is already compatible with pnpm 10 and catalog:, regenerating it may produce no diff. That’s fine:
+   - If it changes, include pnpm-lock.yaml in the commit.
+   - If it does not change, keep the commit limited to package.json and eas.json.
+
+6. Review the Git diff:
+   - Confirm the only tracked changed files are:
+     - package.json
+     - eas.json
+     - optionally pnpm-lock.yaml if it truly changed
+
+7. Commit and push these changes to GitHub repository toweeca/Blousley branch main, based on current main.
+
+8. Do NOT:
+   - Modify application source files
+   - Modify app.json
+   - Modify Blousley-landing
+   - Start or retry any EAS build
+   - Publish an Expo update
+   - Submit to any store
+   - Change credentials
+
+Report:
+- Exact pnpm 10.x version chosen
+- The new packageManager value in package.json
+- The new build.preview object from eas.json
+- Whether pnpm install --frozen-lockfile passed under pnpm 10
+- Typecheck result
+- Which files changed
+- The new commit SHA on GitHub main
