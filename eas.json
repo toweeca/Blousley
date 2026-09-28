@@ -9,7 +9,9 @@
       "distribution": "internal"
     },
     "preview": {
-      "distribution": "internal"
+      "distribution": "internal",
+      "corepack": true,
+      "pnpm": "11.1.0"
     },
     "production": {
       "autoIncrement": true
