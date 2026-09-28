@@ -11,7 +11,7 @@
     "preview": {
       "distribution": "internal",
       "corepack": true,
-      "pnpm": "11.1.0",
+      "pnpm": "10.26.1",
       "env": {
         "EAS_NO_FROZEN_LOCKFILE": "1"
       }
