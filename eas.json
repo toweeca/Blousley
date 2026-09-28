@@ -11,7 +11,10 @@
     "preview": {
       "distribution": "internal",
       "corepack": true,
-      "pnpm": "11.1.0"
+      "pnpm": "11.1.0",
+      "env": {
+        "EAS_NO_FROZEN_LOCKFILE": "1"
+      }
     },
     "production": {
       "autoIncrement": true
