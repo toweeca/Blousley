@@ -288,7 +288,7 @@ importers:
         specifier: ^1.0.2
         version: 1.0.2
       '@tanstack/react-query':
-        specifier: 'catalog:'
+        specifier: ^5.90.21
         version: 5.90.21(react@19.2.3)
       '@types/react':
         specifier: ~19.2.14
@@ -360,10 +360,10 @@ importers:
         specifier: ~57.0.3
         version: 57.0.3(expo@57.0.23)(react-native@0.86.3(@babel/core@7.29.7)(@react-native/metro-config@0.86.3(@babel/core@7.29.7))(@types/react@19.2.14)(react@19.2.3))
       react:
-        specifier: 'catalog:'
+        specifier: 19.2.3
         version: 19.2.3
       react-dom:
-        specifier: 'catalog:'
+        specifier: 19.2.3
         version: 19.2.3(react@19.2.3)
       react-native:
         specifier: 0.86.3
@@ -396,7 +396,7 @@ importers:
         specifier: ~6.0.3
         version: 6.0.3
       zod:
-        specifier: 'catalog:'
+        specifier: ^3.25.76
         version: 3.25.76
       zod-validation-error:
         specifier: ^3.4.0
