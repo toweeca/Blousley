@@ -11,7 +11,12 @@
     "preview": {
       "distribution": "internal",
       "corepack": true,
-      "pnpm": "10.26.1"
+      "pnpm": "10.26.1",
+      "node": "20.19.4",
+      "android": {
+        "image": "sdk-57",
+        "buildType": "apk"
+      }
     },
     "production": {
       "autoIncrement": true
