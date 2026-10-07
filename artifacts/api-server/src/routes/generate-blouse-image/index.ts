@@ -103,7 +103,7 @@ function respondWithImage(
   payloadMissingRequiredFields = false,
 ): void {
   res.status(200);
-  recordGenerationDiagnostic(200, 200, null, payloadMissingRequiredFields);
+  recordGenerationDiagnostic(200, null, null, payloadMissingRequiredFields);
   res.json(image);
 }
 
