@@ -1,24 +1,175 @@
 // Copyright © 2026 Blousley. All rights reserved.
-import { Router, type IRouter } from "express";
+import { Router, type IRouter, type Response } from "express";
 import { generateImage as generateGeminiImage } from "@workspace/integrations-gemini-ai/image";
 
 const router: IRouter = Router();
 
+type MobileImagePayload = { b64_json: string; mimeType: string };
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
+function recordGenerationDiagnostic(
+  endpointStatusCode: number,
+  providerResponseStatus: number | null,
+  providerErrorMessage: string | null,
+  payloadMissingRequiredFields: boolean,
+): void {
+  process.stderr.write(`${JSON.stringify({
+    endpointStatusCode,
+    providerResponseStatus,
+    providerErrorMessage,
+    serverApiKeyPresent: Boolean(process.env.AI_INTEGRATIONS_GEMINI_API_KEY),
+    payloadMissingRequiredFields,
+  })}\n`);
+}
+
+function getProviderFailure(error: unknown, redactions: string[] = []): {
+  status: number | null;
+  message: string;
+} {
+  const value = isRecord(error) ? error : {};
+  const response = isRecord(value.response) ? value.response : {};
+  const rawStatus = value.status ?? value.statusCode ?? response.status;
+  const status = typeof rawStatus === "number" && Number.isInteger(rawStatus) ? rawStatus : null;
+  let message = error instanceof Error
+    ? error.message
+    : typeof value.message === "string"
+      ? value.message
+      : "Unknown image provider error";
+
+  for (const sensitiveValue of [
+    process.env.AI_INTEGRATIONS_GEMINI_API_KEY,
+    ...redactions,
+  ]) {
+    if (sensitiveValue) message = message.split(sensitiveValue).join("[redacted]");
+  }
+
+  message = message
+    .replace(/\bAIza[0-9A-Za-z_-]{20,}\b/g, "[redacted]")
+    .replace(/\bBearer\s+\S+/gi, "Bearer [redacted]")
+    .replace(/([?&]key=)[^&\s]+/gi, "$1[redacted]")
+    .replace(/((?:api[_-]?key)\s*[:=]\s*)[^\s,;]+/gi, "$1[redacted]")
+    .slice(0, 500);
+
+  return { status, message };
+}
+
+function respondWithPayloadError(
+  res: Response,
+  category: string,
+  message: string,
+  payloadMissingRequiredFields: boolean,
+): void {
+  res.status(400);
+  recordGenerationDiagnostic(res.statusCode, null, null, payloadMissingRequiredFields);
+  res.json({ error: category, message });
+}
+
+function respondWithProviderError(
+  res: Response,
+  error: unknown,
+  payloadMissingRequiredFields: boolean,
+  redactions: string[] = [],
+): void {
+  const keyPresent = Boolean(process.env.AI_INTEGRATIONS_GEMINI_API_KEY);
+  const provider = getProviderFailure(error, redactions);
+  const category = !keyPresent
+    ? "provider_not_configured"
+    : provider.status === 401 || provider.status === 403
+      ? "provider_authentication_failed"
+      : provider.status === 429
+        ? "provider_rate_limited"
+        : provider.status === 400 || provider.status === 422
+          ? "provider_request_rejected"
+          : "provider_error";
+  const endpointStatusCode = !keyPresent || provider.status === 429 ? 503 : 502;
+  const message = keyPresent ? provider.message : "Server-side image generation is not configured.";
+
+  res.status(endpointStatusCode);
+  recordGenerationDiagnostic(
+    res.statusCode,
+    provider.status,
+    message,
+    payloadMissingRequiredFields,
+  );
+  res.json({ error: category, message, providerStatus: provider.status });
+}
+
+function respondWithImage(
+  res: Response,
+  image: MobileImagePayload,
+  payloadMissingRequiredFields = false,
+): void {
+  res.status(200);
+  recordGenerationDiagnostic(200, 200, null, payloadMissingRequiredFields);
+  res.json(image);
+}
+
+async function normalizeProviderImage(result: unknown): Promise<MobileImagePayload> {
+  const value = isRecord(result) ? result : {};
+  const inlineData = isRecord(value.inlineData)
+    ? value.inlineData
+    : isRecord(value.inline_data)
+      ? value.inline_data
+      : {};
+  const rawMimeType = value.mimeType ?? value.mime_type ?? inlineData.mimeType ?? inlineData.mime_type;
+  let mimeType = typeof rawMimeType === "string" && rawMimeType.startsWith("image/")
+    ? rawMimeType
+    : "image/png";
+  const rawData = value.b64_json ?? value.base64 ?? value.data ?? inlineData.data;
+
+  if (typeof rawData === "string" && rawData.length > 0) {
+    let b64_json = rawData;
+    const dataUri = /^data:(image\/[^;,]+);base64,([\s\S]+)$/i.exec(rawData);
+    if (dataUri) {
+      mimeType = dataUri[1];
+      b64_json = dataUri[2].replace(/\s/g, "");
+    }
+    return { b64_json, mimeType };
+  }
+
+  const rawUrl = value.url ?? value.imageUrl ?? value.image_url ?? value.uri;
+  if (typeof rawUrl === "string") {
+    const imageUrl = new URL(rawUrl);
+    if (imageUrl.protocol !== "https:") {
+      throw new Error("Provider returned an unsupported image URL");
+    }
+    const response = await fetch(imageUrl);
+    if (!response.ok) {
+      throw Object.assign(
+        new Error(`Provider image download failed with status ${response.status}`),
+        { status: response.status },
+      );
+    }
+    const responseMimeType = response.headers.get("content-type")?.split(";")[0];
+    if (responseMimeType?.startsWith("image/")) mimeType = responseMimeType;
+    const b64_json = Buffer.from(await response.arrayBuffer()).toString("base64");
+    if (!b64_json) throw new Error("Provider image URL returned empty image data");
+    return { b64_json, mimeType };
+  }
+
+  throw new Error("Provider response did not contain image data or an image URL");
+}
+
 router.post("/text", async (req, res) => {
-  const { description } = req.body as { description?: string };
-  if (!description?.trim() || description.length > 1_000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(description)) {
-    res.status(400).json({ error: "description is required" });
+  const { description } = (req.body ?? {}) as { description?: unknown };
+  if (typeof description !== "string" || !description.trim()) {
+    respondWithPayloadError(res, "missing_required_fields", "description is required", true);
+    return;
+  }
+  if (description.length > 1_000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(description)) {
+    respondWithPayloadError(res, "invalid_request", "description is invalid", false);
     return;
   }
 
+  const prompt = `Create a fashion design concept image of a saree blouse based on this customer description: ${description.trim()}. Show one front-facing blouse on a clean, neutral studio background with clear neckline, sleeves, fabric, and embellishment details. Do not include text or a person.`;
   try {
-    const result = await generateGeminiImage(
-      `Create a fashion design concept image of a saree blouse based on this customer description: ${description.trim()}. Show one front-facing blouse on a clean, neutral studio background with clear neckline, sleeves, fabric, and embellishment details. Do not include text or a person.`,
-    );
-    res.json(result);
+    const result = await generateBlousePhoto(prompt);
+    respondWithImage(res, result);
   } catch (error) {
-    console.error("Text-to-image generation error:", error);
-    res.status(500).json({ error: "Failed to generate design image" });
+    respondWithProviderError(res, error, false, [prompt, description]);
   }
 });
 
