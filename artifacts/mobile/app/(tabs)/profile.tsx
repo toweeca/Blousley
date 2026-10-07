@@ -768,6 +768,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       const bp = borderPattern !== "None" && borderPattern !== "custom" ? borderPattern : undefined;
       const res = await fetch(`${domain}/api/generate-blouse-image/style`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ neck, sleeve, back, fabric, color: fabricColor, borderPattern: bp, view: "front" }),
       });
@@ -1271,11 +1272,13 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
       const [frontRes, backRes] = await Promise.all([
         fetch(`${domain}/api/generate-blouse-image/sketch`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, view: "front" }),
         }),
         fetch(`${domain}/api/generate-blouse-image/sketch`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...payload, view: "back" }),
         }),
@@ -1301,6 +1304,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     try {
       const res = await fetch(`${domain}/api/generate-blouse-image/text`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ description: textDescription.trim() }),
       });
@@ -2724,11 +2728,13 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
         }),
         fetch(`${API_BASE}/api/generate-blouse-image/style`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...stylePayload, view: "front" }),
         }),
         fetch(`${API_BASE}/api/generate-blouse-image/style`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ ...stylePayload, view: "back" }),
         }),
