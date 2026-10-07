@@ -641,8 +641,8 @@ function generateBlouseSVG(opts: {
 async function generateBlousePhoto(
   prompt: string,
   _seed?: number,
-): Promise<{ b64_json: string; mimeType: string }> {
-  return generateGeminiImage(prompt);
+): Promise<MobileImagePayload> {
+  return normalizeProviderImage(await generateGeminiImage(prompt));
 }
 
 // Maps UI option names → vivid descriptive phrases the AI model can render faithfully
@@ -731,75 +731,72 @@ function buildBlousePrompt(opts: {
 // ─── Routes ──────────────────────────────────────────────────────────────────
 
 router.post("/style", async (req, res) => {
+  const { neck, sleeve, back, fabric, color, view, borderPattern } = (req.body ?? {}) as {
+    neck?: string;
+    sleeve?: string;
+    back?: string;
+    fabric?: string;
+    color?: string;
+    view?: "front" | "back";
+    borderPattern?: string;
+  };
+
+  const hasSelections = [neck, sleeve, back, fabric].some(
+    (selection) => typeof selection === "string" && Boolean(selection.trim()),
+  );
+  if (!hasSelections) {
+    respondWithPayloadError(
+      res,
+      "missing_required_fields",
+      "Please select at least one style option",
+      true,
+    );
+    return;
+  }
+
+  // Stable seed per selection combo; front/back get distinct seeds
+  const seedBase = [neck, sleeve, back, fabric, color].filter(Boolean).join("-");
+  let seed = 0;
+  for (let i = 0; i < seedBase.length; i++) seed = (seed * 31 + seedBase.charCodeAt(i)) & 0x7fffffff;
+  if (view === "back") seed = (seed + 99991) & 0x7fffffff;
+
+  const prompt = buildBlousePrompt({ neck, sleeve, back, fabric, color, borderPattern, view: view ?? "front" });
   try {
-    const { neck, sleeve, back, fabric, color, view, borderPattern } = req.body as {
-      neck?: string;
-      sleeve?: string;
-      back?: string;
-      fabric?: string;
-      color?: string;
-      view?: "front" | "back";
-      borderPattern?: string;
-    };
-
-    const hasSelections = neck || sleeve || back || fabric;
-    if (!hasSelections) {
-      res.status(400).json({ error: "Please select at least one style option" });
-      return;
-    }
-
-    // Stable seed per selection combo; front/back get distinct seeds
-    const seedBase = [neck, sleeve, back, fabric, color].filter(Boolean).join("-");
-    let seed = 0;
-    for (let i = 0; i < seedBase.length; i++) seed = (seed * 31 + seedBase.charCodeAt(i)) & 0x7fffffff;
-    if (view === "back") seed = (seed + 99991) & 0x7fffffff;
-
-    const prompt = buildBlousePrompt({ neck, sleeve, back, fabric, color, borderPattern, view: view ?? "front" });
-
-    try {
-      const result = await generateBlousePhoto(prompt, seed);
-      res.json(result);
-    } catch (aiErr) {
-      console.error("[generate-blouse-image/style] AI generation failed, falling back to SVG:", aiErr);
-      const svg = generateBlouseSVG({ neck, sleeve, back, fabric, color, view, borderPattern });
-      const b64 = Buffer.from(svg).toString("base64");
-      res.json({ b64_json: b64, mimeType: "image/svg+xml" });
-    }
-  } catch (err) {
-    console.error("POST /generate-blouse-image/style error:", err);
-    res.status(500).json({ error: "Image generation failed" });
+    const result = await generateBlousePhoto(prompt, seed);
+    respondWithImage(res, result);
+  } catch (error) {
+    respondWithProviderError(res, error, false, [prompt, neck ?? "", sleeve ?? "", back ?? "", fabric ?? "", color ?? ""]);
   }
 });
 
 router.post("/sketch", async (req, res) => {
+  const { description, colors, view } = (req.body ?? {}) as {
+    description?: unknown;
+    colors?: unknown;
+    view?: "front" | "back";
+  };
+  if (typeof description !== "string" || !description.trim()) {
+    respondWithPayloadError(res, "missing_required_fields", "description is required", true);
+    return;
+  }
+
+  const colorList = Array.isArray(colors)
+    ? colors.filter((color): color is string => typeof color === "string")
+    : [];
+  const isBack = view === "back";
+  const colorDesc = colorList[0] ? `in ${colorList[0]}` : "in rich maroon";
+  const styleDesc = description.trim();
+
+  const garmentCore = `traditional Indian saree blouse choli, short cropped bodice ending at the waist, structured fitted silhouette, standalone garment piece, no model or body`;
+  const prompt = isBack
+    ? `professional studio product photo of a ${garmentCore}, back view, ${styleDesc}, ${colorDesc} fabric, delicate gold zari border trim, garment displayed upright on invisible form or ghost mannequin, pure white background, soft even studio lighting, ultra sharp detail, photorealistic, high-end fashion e-commerce style`
+    : `professional studio product photo of a ${garmentCore}, front view, ${styleDesc}, ${colorDesc} fabric, delicate gold zari border trim, garment displayed upright on invisible form or ghost mannequin, pure white background, soft even studio lighting, ultra sharp detail, photorealistic, high-end fashion e-commerce style`;
+
   try {
-    const { description, colors, view } = req.body as {
-      description?: string;
-      colors?: string[];
-      view?: "front" | "back";
-    };
-
-    const isBack = view === "back";
-    const colorDesc = colors?.[0] ? `in ${colors[0]}` : "in rich maroon";
-    const styleDesc = description ?? "traditional style";
-
-    const garmentCore = `traditional Indian saree blouse choli, short cropped bodice ending at the waist, structured fitted silhouette, standalone garment piece, no model or body`;
-    const prompt = isBack
-      ? `professional studio product photo of a ${garmentCore}, back view, ${styleDesc}, ${colorDesc} fabric, delicate gold zari border trim, garment displayed upright on invisible form or ghost mannequin, pure white background, soft even studio lighting, ultra sharp detail, photorealistic, high-end fashion e-commerce style`
-      : `professional studio product photo of a ${garmentCore}, front view, ${styleDesc}, ${colorDesc} fabric, delicate gold zari border trim, garment displayed upright on invisible form or ghost mannequin, pure white background, soft even studio lighting, ultra sharp detail, photorealistic, high-end fashion e-commerce style`;
-
-    try {
-      const result = await generateBlousePhoto(prompt);
-      res.json(result);
-    } catch {
-      const { borderPattern: bp } = req.body as { borderPattern?: string };
-      const svg = generateBlouseSVG({ sketchColors: colors, description, view, borderPattern: bp });
-      const b64 = Buffer.from(svg).toString("base64");
-      res.json({ b64_json: b64, mimeType: "image/svg+xml" });
-    }
-  } catch (err) {
-    console.error("POST /generate-blouse-image/sketch error:", err);
-    res.status(500).json({ error: "Image generation failed" });
+    const result = await generateBlousePhoto(prompt);
+    respondWithImage(res, result);
+  } catch (error) {
+    respondWithProviderError(res, error, false, [prompt, description, ...colorList]);
   }
 });
 
