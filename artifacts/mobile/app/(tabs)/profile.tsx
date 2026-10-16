@@ -18,6 +18,7 @@ import {
   Platform,
   TextInput,
   Alert,
+  Linking,
   Image,
   PanResponder,
   Dimensions,
@@ -1218,6 +1219,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [textDescription, setTextDescription] = useState("");
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
+  const [requestPrice, setRequestPrice] = useState("");
   const [sketchPaths, setSketchPaths] = useState<SketchPath[]>([]);
   const [drawColor, setDrawColor] = useState(Colors.brand.primary);
   const [strokeWidth, setStrokeWidth] = useState(3);
@@ -1337,6 +1339,23 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     }
   };
 
+  const startCheckout = async (ideaId: number) => {
+    try {
+      const response = await fetch(`${domain}/api/ideas/${ideaId}/checkout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      const result = await response.json();
+      if (!response.ok || typeof result.url !== "string") {
+        throw new Error(result.error ?? "Could not start Checkout");
+      }
+      await Linking.openURL(result.url);
+    } catch (error) {
+      Alert.alert("Checkout unavailable", error instanceof Error ? error.message : "Please try again.");
+    }
+  };
+
   const pickImage = async (fromCamera: boolean, forSketch = false) => {
     const fn = fromCamera ? ImagePicker.launchCameraAsync : ImagePicker.launchImageLibraryAsync;
     const result = await fn({ mediaTypes: ["images"], allowsEditing: true, quality: 0.8, base64: true });
@@ -1352,6 +1371,13 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      if (!/^\d{1,3}(?:\.\d{1,2})?$/.test(requestPrice.trim())) {
+        throw new Error("Enter a CAD amount with up to two decimal places.");
+      }
+      const requestPriceCents = Math.round(Number(requestPrice) * 100);
+      if (!Number.isInteger(requestPriceCents) || requestPriceCents < 4000 || requestPriceCents > 10000) {
+        throw new Error("Request price must be between CAD $40.00 and $100.00.");
+      }
       const sketchData = sketchPaths.length > 0
         ? { paths: sketchPaths, width: CANVAS_W, height: CANVAS_H }
         : undefined;
@@ -1364,33 +1390,21 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           sketchCanvas: sketchData,
           notes: notes || null,
           title: title || null,
-          sharedWithTailors: shared,
+          requestPriceCents,
         }),
       });
       if (!r.ok) throw new Error("Failed");
       return r.json();
     },
-    onSuccess: () => {
+    onSuccess: (idea) => {
       qc.invalidateQueries({ queryKey: ["ideas", user.id] });
-       setTitle(""); setNotes(""); setTextDescription(""); setImageUri(null); setShared(false);
+      if (shared) void startCheckout(idea.id);
+      setTitle(""); setNotes(""); setTextDescription(""); setImageUri(null); setShared(false); setRequestPrice("");
       setSketchPaths([]); setSketchBackground(null);
       setMode("list");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
-    onError: () => Alert.alert("Error", "Could not save idea."),
-  });
-
-  const toggleShareMutation = useMutation({
-    mutationFn: async ({ id, val }: { id: number; val: boolean }) => {
-      const r = await fetch(`${domain}/api/ideas/${id}/share`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user.id, sharedWithTailors: val }),
-      });
-      if (!r.ok) throw new Error("Failed");
-      return r.json();
-    },
-    onSuccess: () => { qc.invalidateQueries({ queryKey: ["ideas", user.id] }); Haptics.selectionAsync(); },
+    onError: (error) => Alert.alert("Error", error instanceof Error ? error.message : "Could not save idea."),
   });
 
   const deleteMutation = useMutation({
@@ -1720,6 +1734,19 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           />
         </View>
 
+        <View style={[styles.formField, { gap: 6 }]}>
+          <Text style={[styles.groupLabel, { color: theme.text }]}>Request price (CAD)</Text>
+          <TextInput
+            style={[styles.notesInput, { minHeight: 48, backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
+            value={requestPrice}
+            onChangeText={setRequestPrice}
+            keyboardType="decimal-pad"
+            placeholder="40.00–100.00"
+            placeholderTextColor={theme.textMuted}
+          />
+          <Text style={{ color: theme.textMuted, fontSize: 12 }}>Enter $40.00–$100.00 CAD. This is the amount charged at Checkout.</Text>
+        </View>
+
         <TouchableOpacity
           style={[styles.shareToggle, { backgroundColor: shared ? Colors.brand.primary + "15" : theme.card, borderColor: shared ? Colors.brand.primary : theme.border }]}
           onPress={() => { setShared(!shared); Haptics.selectionAsync(); }}
@@ -1727,10 +1754,10 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           <Feather name={shared ? "users" : "user"} size={18} color={shared ? Colors.brand.primary : theme.textSecondary} />
           <View style={{ flex: 1 }}>
             <Text style={[styles.shareToggleTitle, { color: shared ? Colors.brand.primary : theme.text }]}>
-              {shared ? "Shared with Tailors ✓" : "Share with Tailors"}
+              {shared ? "Pay and share with tailors" : "Share with Tailors"}
             </Text>
             <Text style={[styles.shareToggleSub, { color: theme.textMuted }]}>
-              Tailors can view this idea when enabled
+              The request is shared only after successful payment
             </Text>
           </View>
           <View style={[styles.toggleDot, { backgroundColor: shared ? Colors.brand.primary : theme.border }]} />
@@ -1744,7 +1771,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           {saveMutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : (
             <>
               <Feather name="check" size={18} color="#fff" />
-              <Text style={styles.primaryBtnText}>Save Idea</Text>
+              <Text style={styles.primaryBtnText}>{shared ? "Save & Pay" : "Save Idea"}</Text>
             </>
           )}
         </TouchableOpacity>
@@ -1814,6 +1841,12 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 <Text style={[styles.ideaDate, { color: theme.textMuted }]}>
                   {new Date(idea.createdAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
                 </Text>
+                <Text style={[styles.ideaDate, { color: theme.textSecondary, fontWeight: "600" }]}>
+                  {Number.isInteger(idea.requestPriceCents) ? `Request price: CAD $${(idea.requestPriceCents / 100).toFixed(2)}` : "Request price not set"}
+                </Text>
+                <Text style={[styles.ideaDate, { color: theme.textMuted }]}>
+                  {idea.paymentStatus === "paid_open" ? "Paid · Open to tailors" : idea.paymentStatus === "accepted" ? "Accepted by a tailor" : idea.paymentStatus === "completed" ? "Completed" : "Unpaid"}
+                </Text>
               </View>
             </View>
             <View style={[styles.ideaCardActions, { borderTopColor: theme.border, flexWrap: "wrap" }]}>
@@ -1851,16 +1884,23 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 </TouchableOpacity>
               )}
 
-              {/* Share with tailor */}
-              <TouchableOpacity
-                style={[styles.ideaActionBtn, { backgroundColor: idea.sharedWithTailors ? Colors.brand.primary + "15" : theme.background }]}
-                onPress={() => toggleShareMutation.mutate({ id: idea.id, val: !idea.sharedWithTailors })}
-              >
-                <Feather name="users" size={14} color={idea.sharedWithTailors ? Colors.brand.primary : theme.textSecondary} />
-                <Text style={[styles.ideaActionText, { color: idea.sharedWithTailors ? Colors.brand.primary : theme.textSecondary }]}>
-                  {idea.sharedWithTailors ? "Shared" : "Share"}
-                </Text>
-              </TouchableOpacity>
+              {idea.paymentStatus === "unpaid" ? (
+                <TouchableOpacity
+                  style={[styles.ideaActionBtn, { backgroundColor: Colors.brand.primary + "15" }]}
+                  onPress={() => startCheckout(idea.id)}
+                  disabled={!idea.requestPriceCents}
+                >
+                  <Feather name="credit-card" size={14} color={Colors.brand.primary} />
+                  <Text style={[styles.ideaActionText, { color: Colors.brand.primary }]}>
+                    {Number.isInteger(idea.requestPriceCents) ? `Pay CAD $${(idea.requestPriceCents / 100).toFixed(2)} & Share` : "Set price before Checkout"}
+                  </Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={[styles.ideaActionBtn, { backgroundColor: Colors.brand.primary + "15" }]}>
+                  <Feather name="users" size={14} color={Colors.brand.primary} />
+                  <Text style={[styles.ideaActionText, { color: Colors.brand.primary }]}>{idea.paymentStatus === "accepted" ? "Accepted" : idea.paymentStatus === "completed" ? "Completed" : "Shared"}</Text>
+                </View>
+              )}
               <TouchableOpacity
                 style={[styles.ideaActionBtn, { backgroundColor: "#FF4D4D10" }]}
                 onPress={() => Alert.alert("Delete Idea?", "This cannot be undone.", [

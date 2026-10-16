@@ -49,6 +49,8 @@ interface CustomerIdea {
   notes?: string | null;
   imageUrl?: string | null;
   sharedWithTailors: boolean;
+  requestPriceCents: number | null;
+  paymentStatus: string;
   createdAt: string;
 }
 
@@ -220,6 +222,9 @@ function IdeaRequestCard({
             </Text>
             <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>
               Customer #{idea.userId.slice(-6)} · {date}
+            </Text>
+            <Text style={[styles.ideaReqCustomer, { color: Colors.brand.primary, fontWeight: "700" }]}>
+              Customer price: CAD ${((idea.requestPriceCents ?? 0) / 100).toFixed(2)}
             </Text>
             {idea.notes ? (
               <Text style={[styles.ideaReqNotes, { color: theme.textMuted }]} numberOfLines={2}>
@@ -650,6 +655,15 @@ export default function TailorScreen() {
     if (!user?.id || !selectedIdea || !offerText.trim()) return;
     setOfferSending(true);
     try {
+      const acceptRes = await fetch(`${apiBase}/api/ideas/${selectedIdea.id}/accept`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+      });
+      if (!acceptRes.ok) {
+        const error = await acceptRes.json().catch(() => ({}));
+        throw new Error(error.error ?? "Request is no longer available");
+      }
       const convoRes = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -670,12 +684,13 @@ export default function TailorScreen() {
       });
       if (!msgRes.ok) throw new Error("Failed to send offer message");
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      qc.invalidateQueries({ queryKey: ["tailor-design-requests"] });
       setOfferModalVisible(false);
       setChatConvoId(convo.id);
       setChatPartnerName(`Customer #${selectedIdea.userId.slice(-6)}`);
       setChatVisible(true);
-    } catch {
-      Alert.alert("Error", "Could not send offer. Please try again.");
+    } catch (error) {
+      Alert.alert("Error", error instanceof Error ? error.message : "Could not send offer. Please try again.");
     } finally {
       setOfferSending(false);
     }

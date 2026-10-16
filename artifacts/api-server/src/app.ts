@@ -6,6 +6,7 @@ import fs from "fs";
 import path from "path";
 import router from "./routes";
 import { rateLimit, requireHttps, securityHeaders } from "./lib/security";
+import { processStripeWebhook } from "./webhookHandlers";
 
 const app: Express = express();
 
@@ -15,6 +16,25 @@ app.use(requireHttps);
 app.use(securityHeaders);
 app.use(cors({ origin: true, credentials: true }));
 app.use(cookieParser());
+app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async (req, res) => {
+  const signature = req.header("stripe-signature");
+  if (!signature || !Buffer.isBuffer(req.body)) {
+    res.status(400).send("Invalid webhook");
+    return;
+  }
+  try {
+    await processStripeWebhook(req.body, signature);
+    res.sendStatus(200);
+  } catch {
+    res.status(400).send("Webhook verification failed");
+  }
+});
+app.get("/api/ideas/checkout/success", (_req, res) => {
+  res.type("html").send("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Payment complete</title><p>Payment submitted. Return to Blousley and refresh your request.</p>");
+});
+app.get("/api/ideas/checkout/cancel", (_req, res) => {
+  res.type("html").send("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Checkout cancelled</title><p>Checkout was cancelled. Your request remains unpaid.</p>");
+});
 // 5 MB binary images expand to about 6.7 MB as base64.
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));

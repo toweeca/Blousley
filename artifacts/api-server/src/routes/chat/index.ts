@@ -162,6 +162,22 @@ router.post("/conversations", async (req, res) => {
     return res.status(403).json({ error: "Requester is not a conversation participant" });
 
   try {
+    if (ideaId) {
+      if (!Number.isSafeInteger(ideaId)) {
+        return res.status(400).json({ error: "Invalid design request" });
+      }
+      const [acceptedIdea] = await db
+        .select({ id: customerIdeasTable.id })
+        .from(customerIdeasTable)
+        .where(and(
+          eq(customerIdeasTable.id, ideaId),
+          eq(customerIdeasTable.userId, customerId),
+          eq(customerIdeasTable.paymentStatus, "accepted"),
+          eq(customerIdeasTable.assignedTailorId, tailorId),
+        ))
+        .limit(1);
+      if (!acceptedIdea) return res.status(403).json({ error: "Only the accepting tailor can open this request chat" });
+    }
     if (fitId && requesterId !== tailorId) {
       return res.status(403).json({ error: "Only the assigned tailor can open this fit chat" });
     }

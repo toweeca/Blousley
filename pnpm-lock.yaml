@@ -117,6 +117,13 @@ overrides:
 importers:
 
   .:
+    dependencies:
+      stripe:
+        specifier: ^23.0.0
+        version: 23.0.0(@types/node@25.3.5)
+      stripe-replit-sync:
+        specifier: ^1.0.0
+        version: 1.0.0(stripe@23.0.0(@types/node@25.3.5))
     devDependencies:
       prettier:
         specifier: ^3.8.1
@@ -534,7 +541,7 @@ importers:
     devDependencies:
       orval:
         specifier: ^8.21.0
-        version: 8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(prettier@3.8.1)(typescript@6.0.3)(zod@3.25.76)
+        version: 8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(prettier@3.8.1)(typescript@5.9.3)(zod@3.25.76)
 
   lib/api-zod:
     dependencies:
@@ -4449,6 +4456,11 @@ packages:
     resolution: {integrity: sha512-WCtabS6t3c8SkpDBUlb1kjOs7l66xsGdKpIPZsg4wR+B3+u9UAum2odSsF9tnvxg80h4ZxLWMy4pRjOsFIqQpw==}
     engines: {node: '>=4.0.0'}
 
+  pg-node-migrations@0.0.8:
+    resolution: {integrity: sha512-44cMl9umOmCv0hzZyEcvjEq8Bm8u7mrzggZ06qXTJVSsMMB4j2OsjG+rSp+uzeKWyP2Vu0K9Ye2wKtjFUJwrdw==}
+    engines: {node: '>10.17.0'}
+    hasBin: true
+
   pg-pool@3.13.0:
     resolution: {integrity: sha512-gB+R+Xud1gLFuRD/QgOIgGOBE2KCQPaPwkzBBGC9oG69pHTkhQeIuejVIk3/cnDyX39av2AxomQiyPT13WKHQA==}
     peerDependencies:
@@ -5012,6 +5024,10 @@ packages:
     resolution: {integrity: sha512-UcjcJOWknrNkF6PLX83qcHM6KHgVKNkV62Y8a5uYDVv9ydGQVwAHMKqHdJje1VTWpljG0WYpCDhrCdAOYH4TWg==}
     engines: {node: '>= 10.x'}
 
+  sql-template-strings@2.2.2:
+    resolution: {integrity: sha512-UXhXR2869FQaD+GMly8jAMCRZ94nU5KcrFetZfWEMd+LVVG6y0ExgHAhatEcKZ/wk8YcKPdi+hiD2wm75lq3/Q==}
+    engines: {node: '>=4.0.0'}
+
   stackframe@1.3.4:
     resolution: {integrity: sha512-oeVtt7eWQS+Na6F//S4kJ2K2VbRlS9D43mAlMyVpVWovy9o+jfgH8O9agzANzaiLjclA0oYzUXEM4PurhSUChw==}
 
@@ -5061,6 +5077,20 @@ packages:
   strip-final-newline@4.0.0:
     resolution: {integrity: sha512-aulFJcD6YK8V1G7iRB5tigAP4TsHBZZrOV8pjV++zdUwmeV8uzbY7yn6h9MswN62adStNZFuCIx4haBnRuMDaw==}
     engines: {node: '>=18'}
+
+  stripe-replit-sync@1.0.0:
+    resolution: {integrity: sha512-Bkbih3k+IX/GugN8bKWNpwDiI2xkSLOAR+P34W7pjaR8fXyVay/QqztbrvbHZcU1JlfXncmBhuODY5TYY6DXlw==}
+    peerDependencies:
+      stripe: '> 11'
+
+  stripe@23.0.0:
+    resolution: {integrity: sha512-MDE2A5ZVVluYURORaZEVghSmnLJc3w6aHAlZSxDQMsOjOb3V0O6ro/CiaeFlJS4N7uIVmsg98ocRsPmUK6YfyA==}
+    engines: {node: '>=20'}
+    peerDependencies:
+      '@types/node': '>=20'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
 
   structured-headers@0.4.1:
     resolution: {integrity: sha512-0MP/Cxx5SzeeZ10p/bZI0S6MpgD+yxAhi1BOQ34jgnMXsCq3j1t6tQnZu+KdlL7dvJTLT3g9xN8tl10TqgFMcg==}
@@ -5433,6 +5463,9 @@ packages:
   yargs@17.7.2:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
     engines: {node: '>=12'}
+
+  yesql@7.0.0:
+    resolution: {integrity: sha512-sosfr7agy4ibLM7BvXBkM6BpBmKMGuBO8DUYQEuey+QqaqrgW+2bsSg6D050ocBYIz0PuHxUyehyzEztZTU4pw==}
 
   yocto-queue@1.2.2:
     resolution: {integrity: sha512-4LCcse/U2MHZ63HAJVE+v71o7yOdIe4cZ70Wpf8D/IyjDKYQLV5GD46B+hSTjJsvV5PztjvHoU580EftxjDZFQ==}
@@ -6562,23 +6595,23 @@ snapshots:
       '@nodelib/fs.scandir': 2.1.5
       fastq: 1.20.1
 
-  '@orval/angular@8.31.0(typescript@6.0.3)':
+  '@orval/angular@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/axios@8.31.0(typescript@6.0.3)':
+  '@orval/axios@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/core@8.31.0(typescript@6.0.3)':
+  '@orval/core@8.31.0(typescript@5.9.3)':
     dependencies:
       '@scalar/openapi-types': 0.9.4
       acorn: 8.16.0
@@ -6591,63 +6624,63 @@ snapshots:
       jsesc: 3.1.0
       remeda: 2.33.6
       tinyglobby: 0.2.17
-      typedoc: 0.28.20(typescript@6.0.3)
+      typedoc: 0.28.20(typescript@5.9.3)
     transitivePeerDependencies:
       - supports-color
       - typescript
 
-  '@orval/effect@8.31.0(typescript@6.0.3)':
+  '@orval/effect@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
       remeda: 2.33.6
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/fetch@8.31.0(typescript@6.0.3)':
+  '@orval/fetch@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/hono@8.31.0(typescript@6.0.3)(zod@3.25.76)':
+  '@orval/hono@8.31.0(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
-      '@orval/zod': 8.31.0(typescript@6.0.3)(zod@3.25.76)
+      '@orval/core': 8.31.0(typescript@5.9.3)
+      '@orval/zod': 8.31.0(typescript@5.9.3)(zod@3.25.76)
       fs-extra: 11.3.4
     optionalDependencies:
-      typescript: 6.0.3
+      typescript: 5.9.3
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - zod
 
-  '@orval/mcp@8.31.0(typescript@6.0.3)(zod@3.25.76)':
+  '@orval/mcp@8.31.0(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
-      '@orval/fetch': 8.31.0(typescript@6.0.3)
-      '@orval/zod': 8.31.0(typescript@6.0.3)(zod@3.25.76)
+      '@orval/core': 8.31.0(typescript@5.9.3)
+      '@orval/fetch': 8.31.0(typescript@5.9.3)
+      '@orval/zod': 8.31.0(typescript@5.9.3)(zod@3.25.76)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
       - zod
 
-  '@orval/mock@8.31.0(typescript@6.0.3)':
+  '@orval/mock@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
       remeda: 2.33.6
     transitivePeerDependencies:
       - supports-color
       - typescript
 
-  '@orval/query@8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(typescript@6.0.3)':
+  '@orval/query@8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
-      '@orval/fetch': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
+      '@orval/fetch': 8.31.0(typescript@5.9.3)
       remeda: 2.33.6
     optionalDependencies:
       '@tanstack/react-query': 5.90.21(react@19.2.3)
@@ -6656,26 +6689,26 @@ snapshots:
       - supports-color
       - typescript
 
-  '@orval/solid-start@8.31.0(typescript@6.0.3)':
+  '@orval/solid-start@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/swr@8.31.0(typescript@6.0.3)':
+  '@orval/swr@8.31.0(typescript@5.9.3)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
-      '@orval/fetch': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
+      '@orval/fetch': 8.31.0(typescript@5.9.3)
     transitivePeerDependencies:
       - '@faker-js/faker'
       - supports-color
       - typescript
 
-  '@orval/zod@8.31.0(typescript@6.0.3)(zod@3.25.76)':
+  '@orval/zod@8.31.0(typescript@5.9.3)(zod@3.25.76)':
     dependencies:
-      '@orval/core': 8.31.0(typescript@6.0.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
       jsesc: 3.1.0
       remeda: 2.33.6
     optionalDependencies:
@@ -9742,21 +9775,21 @@ snapshots:
       strip-ansi: 5.2.0
       wcwidth: 1.0.1
 
-  orval@8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(prettier@3.8.1)(typescript@6.0.3)(zod@3.25.76):
+  orval@8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(prettier@3.8.1)(typescript@5.9.3)(zod@3.25.76):
     dependencies:
       '@commander-js/extra-typings': 15.0.0(commander@15.0.0)
-      '@orval/angular': 8.31.0(typescript@6.0.3)
-      '@orval/axios': 8.31.0(typescript@6.0.3)
-      '@orval/core': 8.31.0(typescript@6.0.3)
-      '@orval/effect': 8.31.0(typescript@6.0.3)
-      '@orval/fetch': 8.31.0(typescript@6.0.3)
-      '@orval/hono': 8.31.0(typescript@6.0.3)(zod@3.25.76)
-      '@orval/mcp': 8.31.0(typescript@6.0.3)(zod@3.25.76)
-      '@orval/mock': 8.31.0(typescript@6.0.3)
-      '@orval/query': 8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(typescript@6.0.3)
-      '@orval/solid-start': 8.31.0(typescript@6.0.3)
-      '@orval/swr': 8.31.0(typescript@6.0.3)
-      '@orval/zod': 8.31.0(typescript@6.0.3)(zod@3.25.76)
+      '@orval/angular': 8.31.0(typescript@5.9.3)
+      '@orval/axios': 8.31.0(typescript@5.9.3)
+      '@orval/core': 8.31.0(typescript@5.9.3)
+      '@orval/effect': 8.31.0(typescript@5.9.3)
+      '@orval/fetch': 8.31.0(typescript@5.9.3)
+      '@orval/hono': 8.31.0(typescript@5.9.3)(zod@3.25.76)
+      '@orval/mcp': 8.31.0(typescript@5.9.3)(zod@3.25.76)
+      '@orval/mock': 8.31.0(typescript@5.9.3)
+      '@orval/query': 8.31.0(@tanstack/react-query@5.90.21(react@19.2.3))(typescript@5.9.3)
+      '@orval/solid-start': 8.31.0(typescript@5.9.3)
+      '@orval/swr': 8.31.0(typescript@5.9.3)
+      '@orval/zod': 8.31.0(typescript@5.9.3)(zod@3.25.76)
       '@scalar/json-magic': 0.12.20
       '@scalar/openapi-parser': 0.28.16
       '@scalar/openapi-types': 0.9.4
@@ -9770,9 +9803,9 @@ snapshots:
       js-yaml: 4.3.2
       remeda: 2.33.6
       string-argv: 0.3.2
-      typedoc: 0.28.20(typescript@6.0.3)
-      typedoc-plugin-coverage: 4.0.2(typedoc@0.28.20(typescript@6.0.3))
-      typedoc-plugin-markdown: 4.10.0(typedoc@0.28.20(typescript@6.0.3))
+      typedoc: 0.28.20(typescript@5.9.3)
+      typedoc-plugin-coverage: 4.0.2(typedoc@0.28.20(typescript@5.9.3))
+      typedoc-plugin-markdown: 4.10.0(typedoc@0.28.20(typescript@5.9.3))
     optionalDependencies:
       prettier: 3.8.1
     transitivePeerDependencies:
@@ -9842,6 +9875,13 @@ snapshots:
   pg-connection-string@2.12.0: {}
 
   pg-int8@1.0.1: {}
+
+  pg-node-migrations@0.0.8:
+    dependencies:
+      pg: 8.20.0
+      sql-template-strings: 2.2.2
+    transitivePeerDependencies:
+      - pg-native
 
   pg-pool@3.13.0(pg@8.20.0):
     dependencies:
@@ -10508,6 +10548,8 @@ snapshots:
 
   split2@4.2.0: {}
 
+  sql-template-strings@2.2.2: {}
+
   stackframe@1.3.4: {}
 
   stacktrace-parser@0.1.11:
@@ -10543,6 +10585,22 @@ snapshots:
       ansi-regex: 5.0.1
 
   strip-final-newline@4.0.0: {}
+
+  stripe-replit-sync@1.0.0(stripe@23.0.0(@types/node@25.3.5)):
+    dependencies:
+      pg: 8.20.0
+      pg-node-migrations: 0.0.8
+      stripe: 23.0.0(@types/node@25.3.5)
+      ws: 8.21.3
+      yesql: 7.0.0
+    transitivePeerDependencies:
+      - bufferutil
+      - pg-native
+      - utf-8-validate
+
+  stripe@23.0.0(@types/node@25.3.5):
+    optionalDependencies:
+      '@types/node': 25.3.5
 
   structured-headers@0.4.1: {}
 
@@ -10642,21 +10700,21 @@ snapshots:
       media-typer: 1.1.0
       mime-types: 3.0.2
 
-  typedoc-plugin-coverage@4.0.2(typedoc@0.28.20(typescript@6.0.3)):
+  typedoc-plugin-coverage@4.0.2(typedoc@0.28.20(typescript@5.9.3)):
     dependencies:
-      typedoc: 0.28.20(typescript@6.0.3)
+      typedoc: 0.28.20(typescript@5.9.3)
 
-  typedoc-plugin-markdown@4.10.0(typedoc@0.28.20(typescript@6.0.3)):
+  typedoc-plugin-markdown@4.10.0(typedoc@0.28.20(typescript@5.9.3)):
     dependencies:
-      typedoc: 0.28.20(typescript@6.0.3)
+      typedoc: 0.28.20(typescript@5.9.3)
 
-  typedoc@0.28.20(typescript@6.0.3):
+  typedoc@0.28.20(typescript@5.9.3):
     dependencies:
       '@gerrit0/mini-shiki': 3.23.0
       lunr: 2.3.9
       markdown-it: 14.3.2
       minimatch: 10.2.6
-      typescript: 6.0.3
+      typescript: 5.9.3
       yaml: 2.9.0
 
   typescript@5.9.3: {}
@@ -10840,6 +10898,8 @@ snapshots:
       string-width: 4.2.3
       y18n: 5.0.8
       yargs-parser: 21.1.1
+
+  yesql@7.0.0: {}
 
   yocto-queue@1.2.2: {}
 
