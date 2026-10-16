@@ -11,3 +11,4 @@
 - [Fit thumbnail URLs](fit-thumbnail-urls.md) — persist stable private-image route paths, then make host-specific thumbnail URLs only in API responses.
 - [GitHub connector repository bootstrap](github-connector-repository-bootstrap.md) — use the authenticated Git Database API for atomic commits when direct Git credentials are unavailable; bootstrap empty repos and throttle blobs.
 - [Blousley change scope](blousley-scope.md) — keep Blousley changes to the smallest possible set and prefer the lowest-credit approach.
+- [Stripe test Checkout](stripe-test-checkout.md) — backend test secret can differ from the connection; current Checkout API uses dynamic payment methods.

@@ -2,7 +2,7 @@
 import app from "./app";
 import { attachChatRealtime } from "./routes/chat";
 import { runMigrations } from "stripe-replit-sync";
-import { getStripeClient, getStripeSync, setManagedWebhookSecret } from "./stripeClient";
+import { getStripeClient, getStripeSync } from "./stripeClient";
 
 const rawPort = process.env["PORT"];
 
@@ -20,16 +20,23 @@ if (Number.isNaN(port) || port <= 0) {
 
 async function start() {
   if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required");
-  await runMigrations({ databaseUrl: process.env.DATABASE_URL });
-  await getStripeClient();
-  const sync = await getStripeSync();
-  const host = (process.env.REPLIT_DOMAINS ?? process.env.REPLIT_DEV_DOMAIN ?? "").split(",")[0];
-  if (!host) throw new Error("App domain is required to configure Stripe webhooks");
-  const webhook = await sync.findOrCreateManagedWebhook(`https://${host}/api/stripe/webhook`, {
-    enabled_events: ["checkout.session.completed"],
-    description: "Blousley test-mode customer design request payments",
-  });
-  if (webhook.secret) setManagedWebhookSecret(webhook.secret);
+  try {
+    await getStripeClient();
+    await runMigrations({ databaseUrl: process.env.DATABASE_URL });
+    const sync = await getStripeSync();
+    const host = (process.env.REPLIT_DOMAINS ?? process.env.REPLIT_DEV_DOMAIN ?? "").split(",")[0];
+    if (!host) throw new Error("App domain is required");
+    const events = ["checkout.session.completed", "checkout.session.async_payment_succeeded"] as const;
+    const webhook = await sync.findOrCreateManagedWebhook(`https://${host}/api/stripe/webhook`, {
+      enabled_events: [...events],
+      description: "Blousley test-mode customer design request payments",
+    });
+    const stripe = await getStripeClient();
+    await stripe.webhookEndpoints.update(webhook.id, { enabled_events: [...events] });
+    console.log("Stripe test-mode payments initialized");
+  } catch {
+    console.error("Stripe test-mode payment setup unavailable. Check the backend test key and Stripe webhook configuration.");
+  }
 
   const server = app.listen(port, () => {
     console.log(`Server listening on port ${port}`);

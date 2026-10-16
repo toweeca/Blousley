@@ -1220,6 +1220,10 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [shared, setShared] = useState(false);
   const [requestPrice, setRequestPrice] = useState("");
+  const [requestSaveError, setRequestSaveError] = useState("");
+  const [legacyRequestPrices, setLegacyRequestPrices] = useState<Record<number, string>>({});
+  const requestPriceValid = /^\d{1,3}(?:\.\d{1,2})?$/.test(requestPrice.trim()) &&
+    Number(requestPrice) >= 40 && Number(requestPrice) <= 100;
   const [sketchPaths, setSketchPaths] = useState<SketchPath[]>([]);
   const [drawColor, setDrawColor] = useState(Colors.brand.primary);
   const [strokeWidth, setStrokeWidth] = useState(3);
@@ -1339,20 +1343,32 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     }
   };
 
-  const startCheckout = async (ideaId: number) => {
+  const startCheckout = async (ideaId: number, priceInput?: string) => {
+    setRequestSaveError("");
     try {
+      let requestPriceCents: number | undefined;
+      if (priceInput !== undefined) {
+        requestPriceCents = Math.round(Number(priceInput) * 100);
+        if (!/^\d{1,3}(?:\.\d{1,2})?$/.test(priceInput.trim()) || requestPriceCents < 4000 || requestPriceCents > 10000) {
+          throw new Error("Enter CAD $40.00–$100.00 with at most two decimal places.");
+        }
+      }
       const response = await fetch(`${domain}/api/ideas/${ideaId}/checkout`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ requestPriceCents }),
       });
       const result = await response.json();
       if (!response.ok || typeof result.url !== "string") {
         throw new Error(result.error ?? "Could not start Checkout");
       }
       await Linking.openURL(result.url);
+      qc.invalidateQueries({ queryKey: ["ideas", user.id] });
     } catch (error) {
-      Alert.alert("Checkout unavailable", error instanceof Error ? error.message : "Please try again.");
+      const message = error instanceof Error ? error.message : "Please try again.";
+      setRequestSaveError(message);
+      if (Platform.OS !== "web") Alert.alert("Checkout unavailable", message);
     }
   };
 
@@ -1393,9 +1409,13 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           requestPriceCents,
         }),
       });
-      if (!r.ok) throw new Error("Failed");
+      if (!r.ok) {
+        const error = await r.json().catch(() => ({}));
+        throw new Error(error.error ?? "Could not save idea.");
+      }
       return r.json();
     },
+    onMutate: () => setRequestSaveError(""),
     onSuccess: (idea) => {
       qc.invalidateQueries({ queryKey: ["ideas", user.id] });
       if (shared) void startCheckout(idea.id);
@@ -1404,7 +1424,11 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
       setMode("list");
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
     },
-    onError: (error) => Alert.alert("Error", error instanceof Error ? error.message : "Could not save idea."),
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Could not save idea.";
+      setRequestSaveError(message);
+      if (Platform.OS !== "web") Alert.alert("Error", message);
+    },
   });
 
   const deleteMutation = useMutation({
@@ -1745,6 +1769,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
             placeholderTextColor={theme.textMuted}
           />
           <Text style={{ color: theme.textMuted, fontSize: 12 }}>Enter $40.00–$100.00 CAD. This is the amount charged at Checkout.</Text>
+          {!!requestPrice && !requestPriceValid && <Text style={{ color: "#CC3333", fontSize: 12 }}>Enter CAD $40.00–$100.00 with at most two decimal places.</Text>}
         </View>
 
         <TouchableOpacity
@@ -1763,10 +1788,11 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
           <View style={[styles.toggleDot, { backgroundColor: shared ? Colors.brand.primary : theme.border }]} />
         </TouchableOpacity>
 
+        {!!requestSaveError && <Text style={{ color: "#CC3333" }}>{requestSaveError}</Text>}
         <TouchableOpacity
-          style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary, opacity: saveMutation.isPending ? 0.7 : 1 }]}
+          style={[styles.primaryBtn, { backgroundColor: Colors.brand.primary, opacity: saveMutation.isPending || !requestPriceValid ? 0.5 : 1 }]}
           onPress={() => saveMutation.mutate()}
-          disabled={saveMutation.isPending}
+          disabled={saveMutation.isPending || !requestPriceValid}
         >
           {saveMutation.isPending ? <ActivityIndicator color="#fff" size="small" /> : (
             <>
@@ -1807,6 +1833,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
         </TouchableOpacity>
       </View>
       {ideasRefreshError ? <Text style={styles.ideaRefreshError}>Failed to refresh</Text> : null}
+      {!!requestSaveError && <Text style={{ color: "#CC3333" }}>{requestSaveError}</Text>}
 
       {isLoading ? (
         <View style={styles.centerLoader}><ActivityIndicator color={Colors.brand.primary} /></View>
@@ -1849,6 +1876,17 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                 </Text>
               </View>
             </View>
+            {idea.paymentStatus === "unpaid" && idea.requestPriceCents == null && (
+              <TextInput
+                accessibilityLabel="Request price in CAD"
+                keyboardType="decimal-pad"
+                placeholder="Request price CAD $40.00–$100.00"
+                placeholderTextColor={theme.textMuted}
+                value={legacyRequestPrices[idea.id] ?? ""}
+                onChangeText={(value) => setLegacyRequestPrices((previous) => ({ ...previous, [idea.id]: value }))}
+                style={[styles.notesInput, { minHeight: 48, color: theme.text, borderColor: theme.border }]}
+              />
+            )}
             <View style={[styles.ideaCardActions, { borderTopColor: theme.border, flexWrap: "wrap" }]}>
               {/* Add to Fits — shown if idea has an image */}
               {idea.imageUrl && (
@@ -1887,12 +1925,11 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
               {idea.paymentStatus === "unpaid" ? (
                 <TouchableOpacity
                   style={[styles.ideaActionBtn, { backgroundColor: Colors.brand.primary + "15" }]}
-                  onPress={() => startCheckout(idea.id)}
-                  disabled={!idea.requestPriceCents}
+                  onPress={() => startCheckout(idea.id, idea.requestPriceCents == null ? legacyRequestPrices[idea.id] ?? "" : undefined)}
                 >
                   <Feather name="credit-card" size={14} color={Colors.brand.primary} />
                   <Text style={[styles.ideaActionText, { color: Colors.brand.primary }]}>
-                    {Number.isInteger(idea.requestPriceCents) ? `Pay CAD $${(idea.requestPriceCents / 100).toFixed(2)} & Share` : "Set price before Checkout"}
+                    {Number.isInteger(idea.requestPriceCents) ? `Pay CAD $${(idea.requestPriceCents / 100).toFixed(2)} & Share` : "Set price & Pay"}
                   </Text>
                 </TouchableOpacity>
               ) : (
@@ -1901,7 +1938,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
                   <Text style={[styles.ideaActionText, { color: Colors.brand.primary }]}>{idea.paymentStatus === "accepted" ? "Accepted" : idea.paymentStatus === "completed" ? "Completed" : "Shared"}</Text>
                 </View>
               )}
-              <TouchableOpacity
+              {idea.paymentStatus === "unpaid" && !idea.stripeCheckoutSessionId && <TouchableOpacity
                 style={[styles.ideaActionBtn, { backgroundColor: "#FF4D4D10" }]}
                 onPress={() => Alert.alert("Delete Idea?", "This cannot be undone.", [
                   { text: "Cancel", style: "cancel" },
@@ -1910,7 +1947,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
               >
                 <Feather name="trash-2" size={14} color="#FF4D4D" />
                 <Text style={[styles.ideaActionText, { color: "#FF4D4D" }]}>Delete</Text>
-              </TouchableOpacity>
+              </TouchableOpacity>}
             </View>
           </Animated.View>
         ))

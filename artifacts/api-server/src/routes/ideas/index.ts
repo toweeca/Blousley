@@ -78,13 +78,13 @@ router.post("/", async (req, res) => {
   try {
     const { userId, imageUrl, sketchCanvas, notes, title, requestPriceCents } = req.body as {
       userId: string;
-      imageUrl?: string;
+      imageUrl?: string | null;
       sketchCanvas?: unknown;
       notes?: string;
       title?: string;
       requestPriceCents?: number;
     };
-    if (!isValidUserId(userId) || req.userId !== userId || !Number.isInteger(requestPriceCents) || requestPriceCents! < MIN_REQUEST_PRICE_CENTS || requestPriceCents! > MAX_REQUEST_PRICE_CENTS || !isSafeText(title, 160) || !isSafeText(notes, 4_000) || (imageUrl !== undefined && (typeof imageUrl !== "string" || imageUrl.length > 7_000_000))) {
+    if (!isValidUserId(userId) || req.userId !== userId || !Number.isInteger(requestPriceCents) || requestPriceCents! < MIN_REQUEST_PRICE_CENTS || requestPriceCents! > MAX_REQUEST_PRICE_CENTS || !isSafeText(title, 160) || !isSafeText(notes, 4_000) || (imageUrl != null && (typeof imageUrl !== "string" || imageUrl.length > 7_000_000))) {
       res.status(400).json({ error: "A request price from CAD $40.00 to $100.00 is required" });
       return;
     }
@@ -96,9 +96,9 @@ router.post("/", async (req, res) => {
         sketchCanvas: sketchCanvas as any,
         notes,
         title,
-         sharedWithTailors: false,
-         requestPriceCents,
-         paymentStatus: "unpaid",
+        sharedWithTailors: false,
+        requestPriceCents,
+        paymentStatus: "unpaid",
       })
       .returning();
     res.status(201).json(inserted[0]);
@@ -115,7 +115,7 @@ router.post("/:id/checkout", async (req, res) => {
       res.status(400).json({ error: "A valid request is required" });
       return;
     }
-    const [idea] = await db.select().from(customerIdeasTable)
+    let [idea] = await db.select().from(customerIdeasTable)
       .where(and(eq(customerIdeasTable.id, id), eq(customerIdeasTable.userId, req.userId)))
       .limit(1);
     if (!idea) {
@@ -125,6 +125,27 @@ router.post("/:id/checkout", async (req, res) => {
     if (idea.paymentStatus !== "unpaid") {
       res.status(409).json({ error: "Only unpaid requests can be paid" });
       return;
+    }
+    if (idea.requestPriceCents === null) {
+      const enteredAmount = req.body?.requestPriceCents;
+      if (!Number.isInteger(enteredAmount) || enteredAmount < MIN_REQUEST_PRICE_CENTS || enteredAmount > MAX_REQUEST_PRICE_CENTS) {
+        res.status(400).json({ error: "Enter a request price from CAD $40.00 to $100.00" });
+        return;
+      }
+      const [pricedIdea] = await db.update(customerIdeasTable)
+        .set({ requestPriceCents: enteredAmount, updatedAt: new Date() })
+        .where(and(
+          eq(customerIdeasTable.id, idea.id),
+          eq(customerIdeasTable.userId, req.userId),
+          eq(customerIdeasTable.paymentStatus, "unpaid"),
+          isNull(customerIdeasTable.requestPriceCents),
+          isNull(customerIdeasTable.stripeCheckoutSessionId),
+        )).returning();
+      if (!pricedIdea) {
+        res.status(409).json({ error: "Request changed; refresh before starting Checkout" });
+        return;
+      }
+      idea = pricedIdea;
     }
     const amount = idea.requestPriceCents;
     if (!Number.isInteger(amount) || amount! < MIN_REQUEST_PRICE_CENTS || amount! > MAX_REQUEST_PRICE_CENTS) {
@@ -153,6 +174,7 @@ router.post("/:id/checkout", async (req, res) => {
     if (!host) throw new Error("App domain is not configured for Checkout");
     const session = await stripe.checkout.sessions.create({
       mode: "payment",
+      adaptive_pricing: { enabled: false },
       line_items: [{ price: price.id, quantity: 1 }],
       success_url: `https://${host}/api/ideas/checkout/success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `https://${host}/api/ideas/checkout/cancel`,
@@ -176,7 +198,7 @@ router.post("/:id/checkout", async (req, res) => {
     }
     res.json({ url: session.url });
   } catch (err) {
-    console.error("POST /ideas/:id/checkout error:", err);
+    console.error("POST /ideas/:id/checkout failed");
     res.status(500).json({ error: "Could not start Checkout" });
   }
 });
@@ -204,6 +226,15 @@ router.post("/:id/accept", async (req, res) => {
       ))
       .returning();
     if (!accepted) {
+      const [alreadyAccepted] = await db.select().from(customerIdeasTable).where(and(
+        eq(customerIdeasTable.id, id),
+        eq(customerIdeasTable.paymentStatus, "accepted"),
+        eq(customerIdeasTable.assignedTailorId, tailorId),
+      )).limit(1);
+      if (alreadyAccepted) {
+        res.json(alreadyAccepted);
+        return;
+      }
       res.status(409).json({ error: "Request is unpaid or already accepted" });
       return;
     }
@@ -252,10 +283,15 @@ router.delete("/:id", async (req, res) => {
     }
     const deleted = await db
       .delete(customerIdeasTable)
-      .where(and(eq(customerIdeasTable.id, Number(id)), eq(customerIdeasTable.userId, userId)))
+      .where(and(
+        eq(customerIdeasTable.id, Number(id)),
+        eq(customerIdeasTable.userId, userId),
+        eq(customerIdeasTable.paymentStatus, "unpaid"),
+        isNull(customerIdeasTable.stripeCheckoutSessionId),
+      ))
       .returning({ id: customerIdeasTable.id });
     if (!deleted.length) {
-      res.status(404).json({ error: "Idea not found" });
+      res.status(409).json({ error: "Only unpaid requests without a Checkout session can be deleted" });
       return;
     }
     res.json({ success: true });

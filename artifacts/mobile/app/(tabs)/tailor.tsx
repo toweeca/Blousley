@@ -239,7 +239,7 @@ function IdeaRequestCard({
           activeOpacity={0.8}
         >
           <Feather name="scissors" size={15} color="#fff" />
-          <Text style={styles.makeOfferBtnText}>I Can Make This — Send Offer</Text>
+          <Text style={styles.makeOfferBtnText}>Accept Request & Send Offer</Text>
         </TouchableOpacity>
       </View>
     </Animated.View>
