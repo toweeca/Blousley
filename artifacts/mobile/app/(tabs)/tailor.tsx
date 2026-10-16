@@ -54,6 +54,10 @@ interface CustomerIdea {
   createdAt: string;
 }
 
+function formatRequestPriceCents(cents: number | null): string {
+  return cents === null ? "CAD price unavailable" : `CAD $${(cents / 100).toFixed(2)}`;
+}
+
 function CustomerCard({
   fit,
   onAddNote,
@@ -224,7 +228,7 @@ function IdeaRequestCard({
               Customer #{idea.userId.slice(-6)} · {date}
             </Text>
             <Text style={[styles.ideaReqCustomer, { color: Colors.brand.primary, fontWeight: "700" }]}>
-              Customer price: CAD ${((idea.requestPriceCents ?? 0) / 100).toFixed(2)}
+              Customer price: {formatRequestPriceCents(idea.requestPriceCents)}
             </Text>
             {idea.notes ? (
               <Text style={[styles.ideaReqNotes, { color: theme.textMuted }]} numberOfLines={2}>
@@ -647,7 +651,7 @@ export default function TailorScreen() {
 
   const handleOpenOffer = (idea: CustomerIdea) => {
     setSelectedIdea(idea);
-    setOfferText(`Hi! I can make your "${idea.title ?? "blouse design"}".\n\nHere are my details:\n• Price: ₹\n• Turnaround: days\n• Fabric: \n\nLet me know if you'd like to proceed!`);
+    setOfferText(`Hi! I can make your "${idea.title ?? "blouse design"}".\n\nCustomer request price: ${formatRequestPriceCents(idea.requestPriceCents)}\n\nYour offer details:\n• Price: CAD $\n• Turnaround: days\n• Fabric: \n\nLet me know if you'd like to proceed!`);
     setOfferModalVisible(true);
   };
 
@@ -662,7 +666,7 @@ export default function TailorScreen() {
       });
       if (!acceptRes.ok) {
         const error = await acceptRes.json().catch(() => ({}));
-        throw new Error(error.error ?? "Request is no longer available");
+        throw new Error(error.error ?? `Could not accept request (HTTP ${acceptRes.status})`);
       }
       const convoRes = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",

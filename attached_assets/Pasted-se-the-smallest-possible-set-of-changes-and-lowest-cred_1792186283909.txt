@@ -1,0 +1,43 @@
+se the smallest possible set of changes and lowest-credit approach.
+
+Fix two bugs in the existing Blousley Stripe test-mode design-request flow. Do not redesign or refactor unrelated code.
+
+Bug 1: Currency display
+- In the tailor menu, when a tailor opens a paid design request and prepares to send an offer, the request price is displaying in rupees.
+- It must display as Canadian dollars, for example: CAD $55.00.
+- Find every place in the tailor request/offer UI where request_price_cents is formatted.
+- Format it explicitly as CAD using request_price_cents / 100.
+- Do not rely on the device locale for the currency symbol.
+- Do not convert the amount. The stored integer cents value is already CAD.
+- Ensure the offer screen, request details screen, tailor dashboard, and any confirmation text all show CAD consistently.
+
+Bug 2: “Request is no longer available”
+- When a tailor taps Send Offer on a paid_open request, the app returns an error saying the request is no longer available.
+- Investigate the accept/offer API endpoint and the mobile request payload.
+- The request should be acceptable only when:
+  - payment_status = paid_open
+  - assigned_tailor_id is null
+  - accepted_at is null
+- If those conditions are true, the tailor must be able to accept it.
+- Check whether the API is incorrectly requiring a different status, checking an outdated field, or comparing the wrong request ID.
+- Check whether the mobile screen is sending stale data from an old list item instead of the current request record.
+- Preserve the existing protection against two tailors accepting the same request.
+- If acceptance succeeds, set assigned_tailor_id and accepted_at atomically and return success.
+- Return a clear, specific error only when the request is genuinely already accepted, cancelled, unpaid, or missing.
+
+Do not:
+- Change Stripe Checkout pricing, currency conversion, taxes, payouts, Connect, refunds, or boost.
+- Change the customer payment flow.
+- Add new database fields.
+- Refactor unrelated code.
+- Fix unrelated API typecheck errors.
+- Run an EAS build.
+- Commit or push.
+
+After the fix, verify in Stripe test mode that:
+1. A paid_open request displays as CAD in the tailor offer screen.
+2. A tailor can successfully send an offer/accept it.
+3. A second tailor still cannot accept the same request.
+4. An unpaid request still cannot be accepted.
+
+Report the exact files changed, the exact cause of each bug, and the verification results.

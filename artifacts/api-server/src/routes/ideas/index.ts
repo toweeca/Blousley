@@ -223,19 +223,41 @@ router.post("/:id/accept", async (req, res) => {
         eq(customerIdeasTable.id, id),
         eq(customerIdeasTable.paymentStatus, "paid_open"),
         isNull(customerIdeasTable.assignedTailorId),
+        isNull(customerIdeasTable.acceptedAt),
       ))
       .returning();
     if (!accepted) {
-      const [alreadyAccepted] = await db.select().from(customerIdeasTable).where(and(
-        eq(customerIdeasTable.id, id),
-        eq(customerIdeasTable.paymentStatus, "accepted"),
-        eq(customerIdeasTable.assignedTailorId, tailorId),
-      )).limit(1);
-      if (alreadyAccepted) {
-        res.json(alreadyAccepted);
+      const [current] = await db.select().from(customerIdeasTable)
+        .where(eq(customerIdeasTable.id, id)).limit(1);
+      if (!current) {
+        res.status(404).json({ error: "Design request not found" });
         return;
       }
-      res.status(409).json({ error: "Request is unpaid or already accepted" });
+      if (current.paymentStatus === "unpaid") {
+        res.status(409).json({ error: "Design request is unpaid and cannot be accepted" });
+        return;
+      }
+      if (current.paymentStatus === "cancelled") {
+        res.status(409).json({ error: "Design request is cancelled" });
+        return;
+      }
+      if (current.paymentStatus === "completed") {
+        res.status(409).json({ error: "Design request is already completed" });
+        return;
+      }
+      if (
+        current.paymentStatus === "accepted" &&
+        current.assignedTailorId === tailorId &&
+        current.acceptedAt !== null
+      ) {
+        res.json(current);
+        return;
+      }
+      if (current.paymentStatus === "accepted" || current.assignedTailorId !== null || current.acceptedAt !== null) {
+        res.status(409).json({ error: "Design request has already been accepted" });
+        return;
+      }
+      res.status(409).json({ error: "Design request is not open for acceptance" });
       return;
     }
     res.json(accepted);
