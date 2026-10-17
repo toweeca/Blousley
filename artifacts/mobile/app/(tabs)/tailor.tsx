@@ -554,7 +554,7 @@ export default function TailorScreen() {
     return d.startsWith("http") ? d : `https://${d}`;
   })();
 
-  const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
+  const { data: fits, isLoading, isFetching: fitsFetching, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["tailor-customers", user?.id],
     queryFn: async () => {
       const endpoint =
@@ -567,7 +567,7 @@ export default function TailorScreen() {
     },
   });
 
-  const { data: designRequests = [], isLoading: ideasLoading, refetch: refetchIdeas } = useQuery<CustomerIdea[]>({
+  const { data: designRequests = [], isLoading: ideasLoading, isFetching: ideasFetching, refetch: refetchIdeas } = useQuery<CustomerIdea[]>({
     queryKey: tailorDesignRequestsQueryKey(user?.id, requestSort, requestFilter),
     queryFn: async () => {
       const params = new URLSearchParams({
@@ -597,12 +597,14 @@ export default function TailorScreen() {
     refetchInterval: 30000,
   });
 
-  const refreshDesignRequests = async () => {
+  const refreshTailorScreen = async () => {
     setRequestRefreshing(true);
     setRequestRefreshError(false);
     try {
-      const result = await refetchIdeas();
-      if (result.error) setRequestRefreshError(true);
+      const [fitsResult, requestsResult] = await Promise.all([refetch(), refetchIdeas()]);
+      if (fitsResult.error || requestsResult.error) setRequestRefreshError(true);
+    } catch {
+      setRequestRefreshError(true);
     } finally {
       setRequestRefreshing(false);
     }
@@ -748,12 +750,34 @@ export default function TailorScreen() {
               {fits?.length ?? 0} fit{fits?.length === 1 ? "" : "s"} · {designRequests.length} design request{designRequests.length === 1 ? "" : "s"}
             </Text>
           </View>
-          <View style={[styles.tailorBadge, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
-            <MaterialCommunityIcons name="scissors-cutting" size={18} color="#fff" />
-            <Text style={styles.tailorBadgeText}>Tailor</Text>
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+            <TouchableOpacity
+              onPress={refreshTailorScreen}
+              disabled={requestRefreshing || fitsFetching || ideasFetching}
+              accessibilityRole="button"
+              accessibilityLabel="Refresh"
+              style={[
+                styles.requestRefreshButton,
+                {
+                  borderColor: "rgba(255,255,255,0.7)",
+                  backgroundColor: "rgba(255,255,255,0.12)",
+                  opacity: requestRefreshing || fitsFetching || ideasFetching ? 0.7 : 1,
+                },
+              ]}
+            >
+              {requestRefreshing ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="refresh-cw" size={14} color="#fff" />}
+              <Text style={[styles.requestControlText, { color: "#fff" }]}>{requestRefreshing ? "Refreshing…" : "Refresh"}</Text>
+            </TouchableOpacity>
+            <View style={[styles.tailorBadge, { backgroundColor: "rgba(255,255,255,0.2)" }]}>
+              <MaterialCommunityIcons name="scissors-cutting" size={18} color="#fff" />
+              <Text style={styles.tailorBadgeText}>Tailor</Text>
+            </View>
           </View>
         </View>
       </LinearGradient>
+      {requestRefreshError ? (
+        <Text style={[styles.requestRefreshError, { marginHorizontal: 20, marginTop: 10 }]}>Failed to refresh</Text>
+      ) : null}
 
       <FlatList
         data={fits ?? []}
@@ -777,18 +801,6 @@ export default function TailorScreen() {
             />
             {/* ── Design Requests section ── */}
             <View style={[styles.requestControls, { backgroundColor: theme.card, borderColor: theme.border }]}>
-              <View style={styles.requestRefreshRow}>
-                <Text style={[styles.requestControlLabel, { color: theme.textMuted, flex: 1, width: undefined }]}>Requests</Text>
-                <TouchableOpacity
-                  onPress={refreshDesignRequests}
-                  disabled={requestRefreshing}
-                  style={[styles.requestRefreshButton, { borderColor: theme.border, opacity: requestRefreshing ? 0.7 : 1 }]}
-                >
-                  {requestRefreshing ? <ActivityIndicator size="small" color={Colors.brand.primary} /> : <Feather name="refresh-cw" size={14} color={Colors.brand.primary} />}
-                  <Text style={[styles.requestControlText, { color: theme.text }]}>Refresh</Text>
-                </TouchableOpacity>
-              </View>
-              {requestRefreshError ? <Text style={styles.requestRefreshError}>Failed to refresh</Text> : null}
               <View style={styles.requestControlRow}>
                 <Text style={[styles.requestControlLabel, { color: theme.textMuted }]}>Sort</Text>
                 {(["newest", "oldest"] as const).map((value) => (
@@ -1067,10 +1079,6 @@ const styles = StyleSheet.create({
     borderRadius: 14,
     padding: 10,
     gap: 8,
-  },
-  requestRefreshRow: {
-    flexDirection: "row",
-    alignItems: "center",
   },
   requestRefreshButton: {
     flexDirection: "row",

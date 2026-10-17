@@ -3,11 +3,12 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { CopyrightNotice } from "@/components/LegalLinks";
 import { LinearGradient } from "expo-linear-gradient";
 import { router } from "expo-router";
-import React, { useCallback } from "react";
+import React, { useCallback, useState } from "react";
 import {
   View,
   Text,
   StyleSheet,
+  ActivityIndicator,
   TouchableOpacity,
   FlatList,
   useColorScheme,
@@ -232,8 +233,9 @@ export default function HistoryScreen() {
   const bottomPad = isWeb ? 34 : 0;
   const { user } = useApp();
   const qc = useQueryClient();
+  const [manualRefreshing, setManualRefreshing] = useState(false);
 
-  const { data: fits, isLoading, refetch } = useQuery<BlouseFit[]>({
+  const { data: fits, isLoading, isFetching, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["blouse-fits", user?.id],
     queryFn: async () => {
       const _d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
@@ -244,6 +246,18 @@ export default function HistoryScreen() {
     },
     enabled: true,
   });
+  const refreshFits = async () => {
+    if (manualRefreshing) return;
+    setManualRefreshing(true);
+    try {
+      const result = await refetch();
+      if (result.error) Alert.alert("Error", "Could not refresh My Fits. Please try again.");
+    } catch {
+      Alert.alert("Error", "Could not refresh My Fits. Please try again.");
+    } finally {
+      setManualRefreshing(false);
+    }
+  };
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
@@ -294,8 +308,23 @@ export default function HistoryScreen() {
         colors={[Colors.brand.primaryDark, Colors.brand.primary]}
         style={[styles.header, { paddingTop: topPad + 16 }]}
       >
-        <Text style={styles.headerTitle}>My Fits</Text>
-        <Text style={styles.headerSubtitle}>Your personalized blouse history</Text>
+        <View style={styles.headerTopRow}>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.headerTitle}>My Fits</Text>
+            <Text style={styles.headerSubtitle}>Your personalized blouse history</Text>
+          </View>
+          <TouchableOpacity
+            style={[styles.refreshButton, { opacity: manualRefreshing || isFetching ? 0.7 : 1 }]}
+            onPress={refreshFits}
+            disabled={manualRefreshing || isFetching}
+            accessibilityRole="button"
+            accessibilityLabel="Refresh"
+            testID="my-fits-refresh"
+          >
+            {manualRefreshing ? <ActivityIndicator size="small" color="#fff" /> : <Feather name="refresh-cw" size={14} color="#fff" />}
+            <Text style={styles.refreshButtonText}>{manualRefreshing ? "Refreshing…" : "Refresh"}</Text>
+          </TouchableOpacity>
+        </View>
       </LinearGradient>
 
       <FlatList
@@ -350,6 +379,28 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
     gap: 4,
+  },
+  headerTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: 12,
+  },
+  refreshButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.7)",
+    backgroundColor: "rgba(255,255,255,0.12)",
+    borderRadius: 10,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  refreshButtonText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 13,
+    color: "#fff",
   },
   headerTitle: {
     fontFamily: "Inter_700Bold",
