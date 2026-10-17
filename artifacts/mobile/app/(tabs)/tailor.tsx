@@ -51,6 +51,8 @@ interface CustomerIdea {
   sharedWithTailors: boolean;
   requestPriceCents: number | null;
   paymentStatus: string;
+  assignedTailorId?: string | null;
+  acceptedAt?: string | null;
   createdAt: string;
 }
 
@@ -561,7 +563,7 @@ export default function TailorScreen() {
   });
 
   const { data: designRequests = [], isLoading: ideasLoading, refetch: refetchIdeas } = useQuery<CustomerIdea[]>({
-    queryKey: ["tailor-design-requests", requestSort, requestFilter],
+    queryKey: ["tailor-design-requests", user?.id, requestSort, requestFilter],
     queryFn: async () => {
       const params = new URLSearchParams({
         userId: user?.id ?? "guest",
@@ -583,7 +585,8 @@ export default function TailorScreen() {
         }
       }
       const res = await fetch(`${apiBase}/api/ideas?${params.toString()}`);
-      return res.ok ? res.json() : [];
+      if (!res.ok) throw new Error("Failed to fetch design requests");
+      return res.json();
     },
     enabled: user?.role === "tailor",
     refetchInterval: 30000,
@@ -656,10 +659,26 @@ export default function TailorScreen() {
   };
 
   const handleSendOffer = async () => {
-    if (!user?.id || !selectedIdea || !offerText.trim()) return;
+    const idea = selectedIdea;
+    const tailorId = user?.id;
+    const message = offerText.trim();
+    if (!tailorId || !idea || !message) return;
     setOfferSending(true);
     try {
-      const acceptRes = await fetch(`${apiBase}/api/ideas/${selectedIdea.id}/accept`, {
+      const latestRequests = await refetchIdeas();
+      if (latestRequests.error) throw new Error("Could not refresh design requests. Please try again.");
+      const currentIdea = latestRequests.data?.find((request) =>
+        request.id === idea.id &&
+        request.paymentStatus === "paid_open" &&
+        request.assignedTailorId == null &&
+        request.acceptedAt == null
+      );
+      if (!currentIdea) {
+        setOfferModalVisible(false);
+        throw new Error("This request is no longer open. Refresh the request list.");
+      }
+
+      const acceptRes = await fetch(`${apiBase}/api/ideas/${currentIdea.id}/accept`, {
         method: "POST",
         credentials: "include",
         headers: { "Content-Type": "application/json" },
@@ -668,33 +687,45 @@ export default function TailorScreen() {
         const error = await acceptRes.json().catch(() => ({}));
         throw new Error(error.error ?? `Could not accept request (HTTP ${acceptRes.status})`);
       }
+
+      qc.invalidateQueries({ queryKey: ["tailor-design-requests"] });
+      setOfferModalVisible(false);
+    } catch (error) {
+      Alert.alert("Could not accept request", error instanceof Error ? error.message : "Please refresh and try again.");
+      setOfferSending(false);
+      return;
+    }
+
+    try {
       const convoRes = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          customerId: selectedIdea.userId,
-          tailorId: user.id,
-          requesterId: user.id,
-          title: `Design: ${selectedIdea.title ?? "Blouse Request"}`,
-          ideaId: selectedIdea.id,
+          customerId: idea.userId,
+          tailorId,
+          requesterId: tailorId,
+          title: `Design: ${idea.title ?? "Blouse Request"}`,
+          ideaId: idea.id,
         }),
       });
       if (!convoRes.ok) throw new Error("Failed to create conversation");
       const convo = await convoRes.json();
+      setChatConvoId(convo.id);
+      setChatPartnerName(`Customer #${idea.userId.slice(-6)}`);
+      setChatVisible(true);
+
       const msgRes = await fetch(`${apiBase}/api/chat/messages`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ conversationId: convo.id, senderId: user.id, content: offerText.trim() }),
+        body: JSON.stringify({ conversationId: convo.id, senderId: tailorId, content: message }),
       });
       if (!msgRes.ok) throw new Error("Failed to send offer message");
       qc.invalidateQueries({ queryKey: ["chat-conversations"] });
-      qc.invalidateQueries({ queryKey: ["tailor-design-requests"] });
-      setOfferModalVisible(false);
-      setChatConvoId(convo.id);
-      setChatPartnerName(`Customer #${selectedIdea.userId.slice(-6)}`);
-      setChatVisible(true);
     } catch (error) {
-      Alert.alert("Error", error instanceof Error ? error.message : "Could not send offer. Please try again.");
+      Alert.alert(
+        "Request accepted",
+        `The request was accepted, but the chat or offer message could not be sent. ${error instanceof Error ? error.message : "Please open the chat to continue."}`
+      );
     } finally {
       setOfferSending(false);
     }

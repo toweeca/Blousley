@@ -245,14 +245,6 @@ router.post("/:id/accept", async (req, res) => {
         res.status(409).json({ error: "Design request is already completed" });
         return;
       }
-      if (
-        current.paymentStatus === "accepted" &&
-        current.assignedTailorId === tailorId &&
-        current.acceptedAt !== null
-      ) {
-        res.json(current);
-        return;
-      }
       if (current.paymentStatus === "accepted" || current.assignedTailorId !== null || current.acceptedAt !== null) {
         res.status(409).json({ error: "Design request has already been accepted" });
         return;
