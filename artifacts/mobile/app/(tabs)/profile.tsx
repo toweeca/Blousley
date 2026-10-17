@@ -840,6 +840,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
     try {
       const res = await fetch(`${domain}/api/blouse/fits`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
