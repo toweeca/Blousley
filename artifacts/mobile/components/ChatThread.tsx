@@ -14,12 +14,14 @@ import {
   Animated,
   Alert,
   Image,
+  Linking,
 } from "react-native";
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
+import { useApp } from "@/context/AppContext";
 
 interface Message {
   id: number;
@@ -32,9 +34,12 @@ interface Message {
 
 interface IdeaSummary {
   id: number;
+  userId: string;
   title: string | null;
   notes: string | null;
   imageUrl: string | null;
+  requestPriceCents: number | null;
+  paymentStatus: string;
 }
 
 interface ChatThreadProps {
@@ -71,10 +76,13 @@ export default function ChatThread({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
+  const { user } = useApp();
   const insets = useSafeAreaInsets();
   const qc = useQueryClient();
   const flatListRef = useRef<FlatList>(null);
   const [draft, setDraft] = useState("");
+  const [checkoutPending, setCheckoutPending] = useState(false);
+  const [checkoutError, setCheckoutError] = useState("");
   const sendBtnScale = useRef(new Animated.Value(1)).current;
 
   const { data: msgs = [], isLoading } = useQuery<Message[]>({
@@ -98,7 +106,43 @@ export default function ChatThread({
       return r.json();
     },
     enabled: visible && conversationId > 0,
+    refetchInterval: (query) =>
+      query.state.data?.paymentStatus === "unpaid" &&
+      query.state.data.userId === currentUserId
+        ? 5000
+        : false,
   });
+
+  const isRequestOwner = user?.role === "customer" && idea?.userId === currentUserId;
+  const hasStoredPrice = Number.isInteger(idea?.requestPriceCents);
+  const canPayForRequest = isRequestOwner && idea?.paymentStatus === "unpaid" && hasStoredPrice;
+
+  const startRequestCheckout = async () => {
+    if (!idea || !canPayForRequest || checkoutPending) return;
+    setCheckoutPending(true);
+    setCheckoutError("");
+    try {
+      const response = await fetch(`${apiBase}/api/ideas/${idea.id}/checkout`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({}),
+      });
+      const result = await response.json();
+      if (!response.ok || typeof result.url !== "string") {
+        throw new Error(result.error ?? "Could not start Checkout");
+      }
+      await Linking.openURL(result.url);
+      await qc.invalidateQueries({ queryKey: ["chat-idea", conversationId] });
+      await qc.invalidateQueries({ queryKey: ["ideas", currentUserId] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Please try again.";
+      setCheckoutError(message);
+      Alert.alert("Checkout unavailable", message);
+    } finally {
+      setCheckoutPending(false);
+    }
+  };
 
   useEffect(() => {
     if (!visible || conversationId <= 0 || !currentUserId) return;
@@ -271,7 +315,7 @@ export default function ChatThread({
                 <Feather name="scissors" size={16} color={Colors.brand.primary} />
               </View>
             )}
-            <View style={{ flex: 1 }}>
+            <View style={styles.ideaContent}>
               <Text style={[styles.ideaLabel, { color: theme.textMuted }]}>About this design</Text>
               <Text style={[styles.ideaTitle, { color: theme.text }]} numberOfLines={1}>
                 {idea.title ?? "Blouse design request"}
@@ -280,6 +324,39 @@ export default function ChatThread({
                 <Text style={[styles.ideaNotes, { color: theme.textMuted }]} numberOfLines={1}>
                   {idea.notes}
                 </Text>
+              ) : null}
+              <View style={styles.ideaMetaRow}>
+                <Text style={[styles.ideaPrice, { color: theme.text }]}>
+                  {Number.isInteger(idea.requestPriceCents)
+                    ? `CAD $${((idea.requestPriceCents as number) / 100).toFixed(2)}`
+                    : "Price not set"}
+                </Text>
+                <Text style={[styles.ideaStatus, { color: theme.textMuted }]}>
+                  {idea.paymentStatus === "paid_open"
+                    ? "Paid · Open to tailors"
+                    : idea.paymentStatus === "accepted"
+                      ? "Accepted"
+                      : idea.paymentStatus === "unpaid"
+                        ? "Unpaid"
+                        : idea.paymentStatus}
+                </Text>
+              </View>
+              {canPayForRequest ? (
+                <TouchableOpacity
+                  accessibilityRole="button"
+                  style={[styles.payNowButton, { opacity: checkoutPending ? 0.65 : 1 }]}
+                  onPress={startRequestCheckout}
+                  disabled={checkoutPending}
+                >
+                  {checkoutPending ? (
+                    <ActivityIndicator color="#fff" size="small" />
+                  ) : (
+                    <Text style={styles.payNowText}>Pay Now</Text>
+                  )}
+                </TouchableOpacity>
+              ) : null}
+              {checkoutError ? (
+                <Text style={[styles.checkoutError, { color: theme.textMuted }]}>{checkoutError}</Text>
               ) : null}
             </View>
           </View>
@@ -431,6 +508,20 @@ const styles = StyleSheet.create({
   ideaLabel: { fontFamily: "Inter_500Medium", fontSize: 10, textTransform: "uppercase", letterSpacing: 0.5 },
   ideaTitle: { fontFamily: "Inter_700Bold", fontSize: 14, marginTop: 1 },
   ideaNotes: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 },
+  ideaContent: { flex: 1 },
+  ideaMetaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 },
+  ideaPrice: { fontFamily: "Inter_700Bold", fontSize: 13 },
+  ideaStatus: { fontFamily: "Inter_500Medium", fontSize: 11 },
+  payNowButton: {
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 38,
+    marginTop: 8,
+    borderRadius: 10,
+    backgroundColor: Colors.brand.primary,
+  },
+  payNowText: { color: "#fff", fontFamily: "Inter_700Bold", fontSize: 13 },
+  checkoutError: { fontFamily: "Inter_400Regular", fontSize: 11, marginTop: 5 },
   loadingBox: { flex: 1, alignItems: "center", justifyContent: "center" },
   emptyBox: { flex: 1, alignItems: "center", justifyContent: "center", gap: 10, padding: 40 },
   emptyTitle: { fontFamily: "Inter_700Bold", fontSize: 18 },

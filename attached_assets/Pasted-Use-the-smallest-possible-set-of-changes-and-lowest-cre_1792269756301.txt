@@ -1,0 +1,44 @@
+Use the smallest possible set of changes and lowest-credit approach.
+
+Improve the Blousley tailor-customer conversation so the design-request price and payment action are visible inside the chat.
+
+Current facts:
+- Customer design requests are customer_ideas records.
+- request_price_cents stores the CAD amount in integer cents.
+- payment_status can be unpaid or paid_open.
+- Stripe Checkout already exists and uses CAD.
+- The customer currently pays from the customer request flow.
+- The tailor-customer conversation is created after a tailor accepts a request.
+- Do not change the existing acceptance guard or payment webhook logic.
+
+Requirements:
+1. In the conversation between a tailor and customer, display the related design request’s price as CAD.
+   - Format request_price_cents / 100 explicitly as “CAD $55.00”.
+   - Do not rely on device locale for the currency symbol.
+   - Do not convert the amount.
+2. Add a compact request-summary card at the top of the conversation showing:
+   - Blouse request title or short description
+   - Request price in CAD
+   - Current payment status
+3. If the signed-in user is the customer and payment_status is unpaid, show a prominent “Pay Now” button.
+4. Pay Now must reuse the existing Stripe Checkout creation flow and create a Checkout session for the exact stored request_price_cents in CAD.
+5. After successful payment, refresh the conversation/request state so the button disappears and the status becomes paid_open.
+6. If payment_status is paid_open, show “Paid · Open to tailors” and do not show Pay Now.
+7. If the request is accepted, show “Accepted” and do not show Pay Now.
+8. Only the customer who owns the request can see and use Pay Now.
+9. Tailors must never see a Pay Now button.
+
+Do not:
+- Allow tailors to set, change, discount, or request a different price in chat.
+- Add Stripe Connect, payouts, tips, taxes, discounts, subscriptions, refunds, or boost.
+- Change the acceptance endpoint or database acceptance guard.
+- Store card details in the database.
+- Expose Stripe secret keys to the mobile app.
+- Refactor unrelated code.
+- Fix unrelated API typecheck errors.
+- Run an EAS build.
+- Commit or push.
+
+Use Stripe test mode only.
+Run mobile typecheck.
+Report exact files changed, the exact conversation UI changes, and how Pay Now reuses the existing Checkout flow.
