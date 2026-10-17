@@ -589,7 +589,9 @@ export default function TailorScreen() {
           params.set("from", from.toISOString());
         }
       }
-      const res = await fetch(`${apiBase}/api/ideas?${params.toString()}`);
+      const res = await fetch(`${apiBase}/api/ideas?${params.toString()}`, {
+        credentials: "include",
+      });
       if (!res.ok) throw new Error("Failed to fetch design requests");
       return res.json();
     },
@@ -671,6 +673,54 @@ export default function TailorScreen() {
     const message = offerText.trim();
     if (!tailorId || !idea || !message) return;
     setOfferSending(true);
+    let acceptedConversationId: number | null = null;
+    const createConversation = async () => {
+      const convoRes = await fetch(`${apiBase}/api/chat/conversations`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerId: idea.userId,
+          tailorId,
+          requesterId: tailorId,
+          title: `Design: ${idea.title ?? "Blouse Request"}`,
+          ideaId: idea.id,
+        }),
+      });
+      if (!convoRes.ok) throw new Error("Failed to create conversation");
+      return convoRes.json();
+    };
+    const sendOfferMessage = async (conversationId: number, content: string) => {
+      const msgRes = await fetch(`${apiBase}/api/chat/messages`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ conversationId, senderId: tailorId, content }),
+      });
+      if (!msgRes.ok) throw new Error("Failed to send offer message");
+    };
+    const retryAcceptedOfferMessage = async (): Promise<void> => {
+      try {
+        let conversationId = acceptedConversationId;
+        if (conversationId === null) {
+          const convo = await createConversation();
+          conversationId = convo.id;
+          acceptedConversationId = conversationId;
+          setChatConvoId(conversationId);
+          setChatPartnerName(`Customer #${idea.userId.slice(-6)}`);
+          setChatVisible(true);
+        }
+        if (conversationId === null) throw new Error("Conversation is unavailable");
+        await sendOfferMessage(conversationId, message);
+        qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+        Alert.alert("Offer sent", "Your offer message was sent.");
+      } catch {
+        Alert.alert("Request accepted", "The offer message could not be sent.", [
+          { text: "Retry offer message", onPress: () => void retryAcceptedOfferMessage() },
+          { text: "OK", style: "cancel" },
+        ]);
+      }
+    };
     try {
       const result = await runTailorOfferFlow({
         requestId: idea.id,
@@ -687,34 +737,14 @@ export default function TailorScreen() {
             throw new Error(error.error ?? `Could not accept request (HTTP ${acceptRes.status})`);
           }
         },
-        createConversation: async () => {
-          const convoRes = await fetch(`${apiBase}/api/chat/conversations`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              customerId: idea.userId,
-              tailorId,
-              requesterId: tailorId,
-              title: `Design: ${idea.title ?? "Blouse Request"}`,
-              ideaId: idea.id,
-            }),
-          });
-          if (!convoRes.ok) throw new Error("Failed to create conversation");
-          return convoRes.json();
-        },
-        sendMessage: async (conversationId, content) => {
-          const msgRes = await fetch(`${apiBase}/api/chat/messages`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ conversationId, senderId: tailorId, content }),
-          });
-          if (!msgRes.ok) throw new Error("Failed to send offer message");
-        },
+        createConversation,
+        sendMessage: sendOfferMessage,
         onAccepted: () => {
           qc.invalidateQueries({ queryKey: ["tailor-design-requests", tailorId] });
           setOfferModalVisible(false);
         },
         onConversationCreated: (convo) => {
+          acceptedConversationId = convo.id;
           setChatConvoId(convo.id);
           setChatPartnerName(`Customer #${idea.userId.slice(-6)}`);
           setChatVisible(true);
@@ -725,7 +755,14 @@ export default function TailorScreen() {
       });
       if (result.status === "stale") setOfferModalVisible(false);
       const alert = getTailorOfferAlert(result);
-      if (alert) Alert.alert(alert.title, alert.message);
+      if (alert?.title === "Request accepted") {
+        Alert.alert(alert.title, alert.message, [
+          { text: "Retry offer message", onPress: () => void retryAcceptedOfferMessage() },
+          { text: "OK", style: "cancel" },
+        ]);
+      } else if (alert) {
+        Alert.alert(alert.title, alert.message);
+      }
     } catch (error) {
       Alert.alert("Could not accept request", error instanceof Error ? error.message : "Please refresh and try again.");
     } finally {
