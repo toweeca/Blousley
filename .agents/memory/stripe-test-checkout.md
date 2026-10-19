@@ -14,3 +14,9 @@ Do not add `payment_method_types` to Checkout Session creation for the current S
 **Why:** Stripe rejected that parameter as no longer supported. Only handling immediate completion would leave delayed successful payments unopened.
 
 **How to apply:** verify payment status, CAD currency, stored cents, customer metadata, and stored Checkout Session before opening a request.
+
+For My Fits quote payments, verify Checkout session creation in test mode against the stored CAD quote and conversation/customer/tailor metadata. The signed Stripe webhook is the only path that marks the fit quote paid; don't simulate payment by writing `fit_paid_at` directly.
+
+**Why:** the app opens hosted Checkout outside the mobile view, and the webhook is the authoritative payment confirmation.
+
+**How to apply:** keep a foreground refresh for the fit-payment query when the customer returns to the app; use an actual test-mode Checkout/webhook cycle to verify the paid state.

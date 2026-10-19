@@ -9,6 +9,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  AppState,
   useColorScheme,
   ActivityIndicator,
   Animated,
@@ -142,6 +143,16 @@ export default function ChatThread({
   const isFitConversation = fitPayment?.fitId != null;
   const isFitTailor = isFitConversation && user?.role === "tailor" && fitPayment?.tailorId === currentUserId;
   const isFitCustomer = isFitConversation && user?.role === "customer" && fitPayment?.customerId === currentUserId;
+  useEffect(() => {
+    if (!visible || !isFitConversation) return;
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") {
+        void qc.invalidateQueries({ queryKey: ["fit-payment", conversationId] });
+      }
+    });
+    return () => subscription.remove();
+  }, [visible, isFitConversation, conversationId, qc]);
+
   const quoteInputIsValid = /^\d{1,7}(?:\.\d{1,2})?$/.test(quoteAmount.trim()) &&
     Number.isSafeInteger(Math.round(Number(quoteAmount) * 100)) &&
     Math.round(Number(quoteAmount) * 100) >= 50 &&
