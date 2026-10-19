@@ -33,9 +33,14 @@ router.get("/customers", async (req, res) => {
     const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
     const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const rows = await db
-      .select({ fit: blouseFitsTable, assignedTailorId: conversations.tailorId })
+      .select({
+        fit: blouseFitsTable,
+        assignedTailorId: conversations.tailorId,
+        customerName: usersTable.name,
+      })
       .from(blouseFitsTable)
       .leftJoin(conversations, eq(conversations.fitId, blouseFitsTable.id))
+      .leftJoin(usersTable, eq(usersTable.id, blouseFitsTable.userId))
       .where(or(
         and(
           eq(blouseFitsTable.findMyTailor, true),
@@ -45,9 +50,9 @@ router.get("/customers", async (req, res) => {
         eq(conversations.tailorId, tailorId),
       ))
       .orderBy(desc(blouseFitsTable.createdAt));
-    const securedRows = await Promise.all(rows.map(async ({ fit, assignedTailorId }) => {
+    const securedRows = await Promise.all(rows.map(async ({ fit, assignedTailorId, customerName }) => {
       if (assignedTailorId !== tailorId) {
-        return { ...fit, imageUrl: null, thumbnailUrl: null, assignedTailorId };
+        return { ...fit, customerName, imageUrl: null, thumbnailUrl: null, assignedTailorId };
       }
       const image = await withRlsUser(tailorId, async (tx) => {
         const [row] = await tx
@@ -58,7 +63,7 @@ router.get("/customers", async (req, res) => {
         return row;
       });
       const imageUrl = image ? privateImageUrl(req, fit.id, tailorId) : null;
-      return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null, assignedTailorId };
+      return { ...fit, customerName, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null, assignedTailorId };
     }));
     res.json(securedRows);
   } catch (error) {

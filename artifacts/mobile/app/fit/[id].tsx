@@ -25,6 +25,7 @@ import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import ChatThread from "@/components/ChatThread";
 import PrivateFitImage from "@/components/PrivateFitImage";
+import { formatPersonName } from "@/lib/person-name";
 
 interface BlouseFit {
   id: number;
@@ -44,6 +45,7 @@ interface BlouseFit {
 interface FitConversation {
   id: number;
   tailorId: string | null;
+  tailorName?: string | null;
 }
 
 function DetailRow({ label, value, icon }: { label: string; value?: string | number | null; icon: string }) {
@@ -336,7 +338,7 @@ export default function FitDetailScreen() {
           visible={chatVisible}
           onClose={() => setChatVisible(false)}
           conversationId={fitConversation.id}
-          partnerName={`Tailor #${fitConversation.tailorId.slice(-6)}`}
+          partnerName={formatPersonName(fitConversation.tailorName, "Tailor", fitConversation.tailorId)}
           currentUserId={fitUserId}
           apiBase={apiBase}
         />

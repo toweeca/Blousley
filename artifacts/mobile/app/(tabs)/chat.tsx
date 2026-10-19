@@ -20,12 +20,15 @@ import { useQuery } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import ChatThread from "@/components/ChatThread";
+import { formatPersonName, getPersonInitials } from "@/lib/person-name";
 
 interface Conversation {
   id: number;
   title: string;
   customerId: string | null;
   tailorId: string | null;
+  customerName: string | null;
+  tailorName: string | null;
   lastMessageAt: string | null;
   createdAt: string;
   unreadCount: number;
@@ -65,8 +68,11 @@ function ConvoCard({
 
   const partnerId =
     convo.customerId === currentUserId ? convo.tailorId : convo.customerId;
-  const partnerLabel = convo.customerId === currentUserId ? "Tailor" : "Customer";
-  const initials = (partnerId ?? "?").slice(0, 2).toUpperCase();
+  const partnerName = convo.customerId === currentUserId
+    ? formatPersonName(convo.tailorName, "Tailor", partnerId)
+    : formatPersonName(convo.customerName, "Customer", partnerId);
+  const partnerInitials = convo.customerId === currentUserId ? convo.tailorName : convo.customerName;
+  const initials = getPersonInitials(partnerInitials, partnerId);
   const hasUnread = convo.unreadCount > 0;
   const preview = convo.lastMessage?.content ?? "No messages yet";
 
@@ -85,7 +91,7 @@ function ConvoCard({
         <View style={styles.convoBody}>
           <View style={styles.convoTopRow}>
             <Text style={[styles.convoName, { color: theme.text }]} numberOfLines={1}>
-              {partnerLabel} #{(partnerId ?? "?").slice(-6)}
+              {partnerName}
             </Text>
             <Text style={[styles.convoTime, { color: theme.textMuted }]}>
               {timeAgo(convo.lastMessageAt ?? convo.createdAt)}
@@ -155,8 +161,8 @@ export default function ChatScreen() {
 
   const partnerName = openConvo
     ? openConvo.customerId === user?.id
-      ? `Tailor #${(openConvo.tailorId ?? "?").slice(-6)}`
-      : `Customer #${(openConvo.customerId ?? "?").slice(-6)}`
+      ? formatPersonName(openConvo.tailorName, "Tailor", openConvo.tailorId)
+      : formatPersonName(openConvo.customerName, "Customer", openConvo.customerId)
     : "";
 
   return (

@@ -28,6 +28,7 @@ import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import ChatThread from "@/components/ChatThread";
 import PrivateFitImage from "@/components/PrivateFitImage";
+import { formatPersonName, getPersonInitials } from "@/lib/person-name";
 import {
   getTailorOfferAlert,
   runTailorOfferFlow,
@@ -38,6 +39,7 @@ import {
 interface BlouseFit {
   id: number;
   userId: string;
+  customerName?: string | null;
   imageUrl?: string | null;
   bodyShape?: string | null;
   measurements?: { bust?: number; waist?: number; shoulder?: number; hip?: number } | null;
@@ -51,6 +53,7 @@ interface BlouseFit {
 interface CustomerIdea {
   id: number;
   userId: string;
+  customerName?: string | null;
   title?: string | null;
   notes?: string | null;
   imageUrl?: string | null;
@@ -103,12 +106,12 @@ function CustomerCard({
         <View style={styles.cardTopRow}>
           <View style={[styles.customerAvatar, { backgroundColor: Colors.brand.primary + "20" }]}>
             <Text style={[styles.customerAvatarText, { color: Colors.brand.primary }]}>
-              {fit.userId.slice(0, 2).toUpperCase()}
+              {getPersonInitials(fit.customerName, fit.userId)}
             </Text>
           </View>
           <View style={styles.cardTopInfo}>
             <Text style={[styles.customerId, { color: theme.text }]}>
-              Customer #{fit.userId.slice(-6)}
+              {formatPersonName(fit.customerName, "Customer", fit.userId)}
             </Text>
             <Text style={[styles.customerDate, { color: theme.textMuted }]}>{date}</Text>
           </View>
@@ -233,7 +236,7 @@ function IdeaRequestCard({
               {idea.title ?? "Untitled Design"}
             </Text>
             <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>
-              Customer #{idea.userId.slice(-6)} · {date}
+              {formatPersonName(idea.customerName, "Customer", idea.userId)} · {date}
             </Text>
             <Text style={[styles.ideaReqCustomer, { color: Colors.brand.primary, fontWeight: "700" }]}>
               Customer price: {formatRequestPriceCents(idea.requestPriceCents)}
@@ -627,14 +630,14 @@ export default function TailorScreen() {
           tailorId: user.id,
           requesterId: user.id,
           fitId: fit.id,
-          title: `Customer #${fit.userId.slice(-6)}`,
+          title: formatPersonName(fit.customerName, "Customer", fit.userId),
         }),
       });
        if (!res.ok) throw new Error("Could not open chat");
        const convo = await res.json();
        qc.invalidateQueries({ queryKey: ["tailor-customers"] });
       setChatConvoId(convo.id);
-      setChatPartnerName(`Customer #${fit.userId.slice(-6)}`);
+      setChatPartnerName(formatPersonName(fit.customerName, "Customer", fit.userId));
       setChatVisible(true);
     } catch {
       Alert.alert("Error", "Could not open chat. Please try again.");
@@ -687,7 +690,7 @@ export default function TailorScreen() {
           conversationId = convo.id;
           acceptedConversationId = conversationId;
           setChatConvoId(conversationId);
-          setChatPartnerName(`Customer #${idea.userId.slice(-6)}`);
+          setChatPartnerName(formatPersonName(idea.customerName, "Customer", idea.userId));
           setChatVisible(true);
         }
         if (conversationId === null) throw new Error("Conversation is unavailable");
@@ -726,7 +729,7 @@ export default function TailorScreen() {
         onConversationCreated: (convo) => {
           acceptedConversationId = convo.id;
           setChatConvoId(convo.id);
-          setChatPartnerName(`Customer #${idea.userId.slice(-6)}`);
+          setChatPartnerName(formatPersonName(idea.customerName, "Customer", idea.userId));
           setChatVisible(true);
         },
         onMessageSent: () => {
@@ -952,7 +955,7 @@ export default function TailorScreen() {
               <View style={{ flex: 1, gap: 2 }}>
                 <Text style={[styles.modalTitle, { color: theme.text }]}>Send Offer to Customer</Text>
                 <Text style={[styles.modalSubtitle, { color: theme.textSecondary }]}>
-                  Customer #{selectedIdea?.userId.slice(-6)} · "{selectedIdea?.title ?? "Design Request"}"
+                  {formatPersonName(selectedIdea?.customerName, "Customer", selectedIdea?.userId)} · "{selectedIdea?.title ?? "Design Request"}"
                 </Text>
               </View>
               <TouchableOpacity onPress={() => setOfferModalVisible(false)}>

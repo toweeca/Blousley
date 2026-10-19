@@ -55,11 +55,12 @@ router.get("/", async (req, res) => {
           : []),
       ];
       const ideas = await db
-        .select()
+        .select({ idea: customerIdeasTable, customerName: usersTable.name })
         .from(customerIdeasTable)
+        .leftJoin(usersTable, eq(usersTable.id, customerIdeasTable.userId))
         .where(and(...dateFilters))
         .orderBy(sort === "oldest" ? asc(customerIdeasTable.createdAt) : desc(customerIdeasTable.createdAt));
-      res.json(ideas);
+      res.json(ideas.map(({ idea, customerName }) => ({ ...idea, customerName })));
     } else {
       const ideas = await db
         .select()

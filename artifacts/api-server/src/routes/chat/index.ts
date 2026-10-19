@@ -2,9 +2,9 @@
 import { Router } from "express";
 import type { Server } from "node:http";
 import Stripe from "stripe";
-import { db } from "@workspace/db";
+import { db, usersTable } from "@workspace/db";
 import { conversations, messages, customerIdeasTable, blouseFitsTable } from "@workspace/db/schema";
-import { eq, or, desc, and, ne, isNull, isNotNull } from "drizzle-orm";
+import { eq, or, desc, and, ne, isNull, isNotNull, inArray } from "drizzle-orm";
 import { WebSocket, WebSocketServer } from "ws";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { findSessionUser } from "../../lib/auth";
@@ -280,6 +280,17 @@ router.get("/conversations", async (req, res) => {
       .from(conversations)
       .where(filters)
       .orderBy(desc(conversations.lastMessageAt));
+    const participantIds = [...new Set(
+      convos.flatMap((conversation) => [conversation.customerId, conversation.tailorId])
+        .filter((id): id is string => Boolean(id)),
+    )];
+    const participantRows = participantIds.length > 0
+      ? await db
+          .select({ id: usersTable.id, name: usersTable.name })
+          .from(usersTable)
+          .where(inArray(usersTable.id, participantIds))
+      : [];
+    const participantNames = new Map(participantRows.map((participant) => [participant.id, participant.name]));
 
     const withUnread = await Promise.all(
       convos.map(async (c) => {
@@ -300,6 +311,8 @@ router.get("/conversations", async (req, res) => {
 
         return {
           ...c,
+          customerName: c.customerId ? participantNames.get(c.customerId) ?? null : null,
+          tailorName: c.tailorId ? participantNames.get(c.tailorId) ?? null : null,
           unreadCount: unread,
           lastMessage: lastMsgRows[0] ?? null,
         };
