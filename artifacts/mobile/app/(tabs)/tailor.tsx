@@ -620,6 +620,7 @@ export default function TailorScreen() {
     try {
       const res = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerId: fit.userId,

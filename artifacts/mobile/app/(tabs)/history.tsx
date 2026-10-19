@@ -276,6 +276,7 @@ export default function HistoryScreen() {
       const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
       const res = await fetch(`${domain}/api/blouse/fits/${id}/find-tailor`, {
         method: "PATCH",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user?.id }),
       });

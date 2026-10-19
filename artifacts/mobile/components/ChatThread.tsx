@@ -42,6 +42,16 @@ interface IdeaSummary {
   paymentStatus: string;
 }
 
+interface FitPaymentSummary {
+  id: number;
+  customerId: string | null;
+  tailorId: string | null;
+  fitId: number | null;
+  fitQuoteCents: number | null;
+  fitPaidAt: string | null;
+  quoteCheckoutStarted: boolean;
+}
+
 interface ChatThreadProps {
   visible: boolean;
   onClose: () => void;
@@ -83,6 +93,8 @@ export default function ChatThread({
   const [draft, setDraft] = useState("");
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
+  const [quoteAmount, setQuoteAmount] = useState("");
+  const [quoteError, setQuoteError] = useState("");
   const sendBtnScale = useRef(new Animated.Value(1)).current;
 
   const { data: msgs = [], isLoading } = useQuery<Message[]>({
@@ -113,6 +125,38 @@ export default function ChatThread({
         : false,
   });
 
+  const { data: fitPayment } = useQuery<FitPaymentSummary>({
+    queryKey: ["fit-payment", conversationId],
+    queryFn: async () => {
+      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/payment`, {
+        credentials: "include",
+      });
+      if (!r.ok) throw new Error("Could not load fit payment details");
+      return r.json();
+    },
+    enabled: visible && conversationId > 0,
+    refetchInterval: (query) =>
+      query.state.data?.fitId != null && query.state.data.fitPaidAt === null ? 5000 : false,
+  });
+
+  const isFitConversation = fitPayment?.fitId != null;
+  const isFitTailor = isFitConversation && user?.role === "tailor" && fitPayment?.tailorId === currentUserId;
+  const isFitCustomer = isFitConversation && user?.role === "customer" && fitPayment?.customerId === currentUserId;
+  const quoteInputIsValid = /^\d{1,7}(?:\.\d{1,2})?$/.test(quoteAmount.trim()) &&
+    Number.isSafeInteger(Math.round(Number(quoteAmount) * 100)) &&
+    Math.round(Number(quoteAmount) * 100) >= 50 &&
+    Math.round(Number(quoteAmount) * 100) <= 99_999_999;
+  const canPayForFit = isFitCustomer &&
+    Number.isSafeInteger(fitPayment?.fitQuoteCents) &&
+    (fitPayment?.fitQuoteCents ?? 0) >= 50 &&
+    !fitPayment?.fitPaidAt;
+
+  useEffect(() => {
+    setQuoteAmount(fitPayment?.fitQuoteCents != null ? (fitPayment.fitQuoteCents / 100).toFixed(2) : "");
+    setQuoteError("");
+    setCheckoutError("");
+  }, [conversationId, fitPayment?.fitQuoteCents]);
+
   const isRequestOwner = user?.role === "customer" && idea?.userId === currentUserId;
   const hasStoredPrice = Number.isInteger(idea?.requestPriceCents);
   const canPayForRequest = isRequestOwner && idea?.paymentStatus === "unpaid" && hasStoredPrice;
@@ -135,6 +179,56 @@ export default function ChatThread({
       await Linking.openURL(result.url);
       await qc.invalidateQueries({ queryKey: ["chat-idea", conversationId] });
       await qc.invalidateQueries({ queryKey: ["ideas", currentUserId] });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "Please try again.";
+      setCheckoutError(message);
+      Alert.alert("Checkout unavailable", message);
+    } finally {
+      setCheckoutPending(false);
+    }
+  };
+
+  const setFitQuoteMutation = useMutation({
+    mutationFn: async () => {
+      if (!quoteInputIsValid) throw new Error("Enter a CAD quote of at least $0.50.");
+      const amountCents = Math.round(Number(quoteAmount) * 100);
+      const response = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/quote`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ amountCents }),
+      });
+      const result = await response.json();
+      if (!response.ok) throw new Error(result.error ?? "Could not send quote");
+      return result;
+    },
+    onSuccess: async () => {
+      setQuoteError("");
+      await qc.invalidateQueries({ queryKey: ["fit-payment", conversationId] });
+      await qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
+      await qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+    },
+    onError: (error) => {
+      setQuoteError(error instanceof Error ? error.message : "Could not send quote");
+    },
+  });
+
+  const startFitCheckout = async () => {
+    if (!canPayForFit || checkoutPending) return;
+    setCheckoutPending(true);
+    setCheckoutError("");
+    try {
+      const response = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/fit-checkout`, {
+        method: "POST",
+        credentials: "include",
+      });
+      const result = await response.json();
+      if (!response.ok || typeof result.url !== "string") {
+        throw new Error(result.error ?? "Could not start Checkout");
+      }
+      await Linking.openURL(result.url);
+      await qc.invalidateQueries({ queryKey: ["fit-payment", conversationId] });
+      await qc.invalidateQueries({ queryKey: ["chat-conversations"] });
     } catch (error) {
       const message = error instanceof Error ? error.message : "Please try again.";
       setCheckoutError(message);
@@ -304,6 +398,81 @@ export default function ChatThread({
           </View>
           <View style={{ width: 40 }} />
         </View>
+
+        {isFitConversation ? (
+          <View style={[styles.fitQuoteCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <Text style={[styles.fitQuoteLabel, { color: theme.textMuted }]}>MY FITS · TAILOR QUOTE</Text>
+            {fitPayment?.fitQuoteCents != null ? (
+              <Text style={[styles.fitQuoteAmount, { color: theme.text }]}>
+                CAD ${(fitPayment.fitQuoteCents / 100).toFixed(2)}
+                {fitPayment.fitPaidAt ? " · Paid" : " · Awaiting payment"}
+              </Text>
+            ) : (
+              <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                {isFitTailor ? "Send a quote when you’re ready." : "Waiting for your tailor to send a quote."}
+              </Text>
+            )}
+
+            {isFitTailor && !fitPayment?.fitPaidAt && (
+              fitPayment?.quoteCheckoutStarted ? (
+                <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                  Checkout has started, so this quote is locked.
+                </Text>
+              ) : (
+                <>
+                  <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                    Set the amount the customer can pay securely here.
+                  </Text>
+                  <View style={styles.quoteInputRow}>
+                    <Text style={[styles.quoteCurrency, { color: theme.text }]}>CAD $</Text>
+                    <TextInput
+                      style={[styles.quoteInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                      value={quoteAmount}
+                      onChangeText={setQuoteAmount}
+                      keyboardType="decimal-pad"
+                      placeholder="125.00"
+                      placeholderTextColor={theme.textMuted}
+                      accessibilityLabel="Tailor quote in Canadian dollars"
+                    />
+                  </View>
+                  {!!quoteError && <Text style={[styles.checkoutError, { color: "#CC3333" }]}>{quoteError}</Text>}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    style={[styles.payNowButton, { opacity: setFitQuoteMutation.isPending || !quoteInputIsValid ? 0.6 : 1 }]}
+                    onPress={() => setFitQuoteMutation.mutate()}
+                    disabled={setFitQuoteMutation.isPending || !quoteInputIsValid}
+                  >
+                    {setFitQuoteMutation.isPending ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.payNowText}>
+                        {fitPayment?.fitQuoteCents != null ? "Update Quote" : "Send Quote"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )
+            )}
+
+            {canPayForFit ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                style={[styles.payNowButton, { opacity: checkoutPending ? 0.65 : 1 }]}
+                onPress={startFitCheckout}
+                disabled={checkoutPending}
+              >
+                {checkoutPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.payNowText}>
+                    Pay CAD ${((fitPayment?.fitQuoteCents ?? 0) / 100).toFixed(2)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
+            {checkoutError ? <Text style={[styles.checkoutError, { color: "#CC3333" }]}>{checkoutError}</Text> : null}
+          </View>
+        ) : null}
 
         {/* Design context banner */}
         {idea ? (
@@ -509,6 +678,27 @@ const styles = StyleSheet.create({
   ideaTitle: { fontFamily: "Inter_700Bold", fontSize: 14, marginTop: 1 },
   ideaNotes: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 1 },
   ideaContent: { flex: 1 },
+  fitQuoteCard: {
+    marginHorizontal: 16,
+    marginTop: 10,
+    padding: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+  },
+  fitQuoteLabel: { fontFamily: "Inter_500Medium", fontSize: 10, letterSpacing: 0.5 },
+  fitQuoteAmount: { fontFamily: "Inter_700Bold", fontSize: 16, marginTop: 5 },
+  fitQuoteStatus: { fontFamily: "Inter_400Regular", fontSize: 12, marginTop: 6 },
+  quoteInputRow: { flexDirection: "row", alignItems: "center", gap: 8, marginTop: 10 },
+  quoteCurrency: { fontFamily: "Inter_600SemiBold", fontSize: 14 },
+  quoteInput: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    fontFamily: "Inter_400Regular",
+    fontSize: 14,
+  },
   ideaMetaRow: { flexDirection: "row", flexWrap: "wrap", alignItems: "center", gap: 8, marginTop: 6 },
   ideaPrice: { fontFamily: "Inter_700Bold", fontSize: 13 },
   ideaStatus: { fontFamily: "Inter_500Medium", fontSize: 11 },

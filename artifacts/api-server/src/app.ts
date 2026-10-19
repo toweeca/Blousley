@@ -30,10 +30,10 @@ app.post("/api/stripe/webhook", express.raw({ type: "application/json" }), async
   }
 });
 app.get("/api/ideas/checkout/success", (_req, res) => {
-  res.type("html").send("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Payment complete</title><p>Payment submitted. Return to Blousley and refresh your request.</p>");
+  res.type("html").send("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Payment submitted</title><p>Payment submitted. Return to Blousley; your request or conversation will update when payment is confirmed.</p>");
 });
 app.get("/api/ideas/checkout/cancel", (_req, res) => {
-  res.type("html").send("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Checkout cancelled</title><p>Checkout was cancelled. Your request remains unpaid.</p>");
+  res.type("html").send("<!doctype html><meta name=\"viewport\" content=\"width=device-width\"><title>Checkout cancelled</title><p>Checkout was cancelled. Return to Blousley and try again when you are ready.</p>");
 });
 // 5 MB binary images expand to about 6.7 MB as base64.
 app.use(express.json({ limit: "8mb" }));
