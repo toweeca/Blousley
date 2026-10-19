@@ -32,6 +32,7 @@ import {
   getTailorOfferAlert,
   runTailorOfferFlow,
   tailorDesignRequestsQueryKey,
+  tailorDesignRequestsQueryOptions,
 } from "@/lib/tailor-offer-flow";
 
 interface BlouseFit {
@@ -567,37 +568,15 @@ export default function TailorScreen() {
     },
   });
 
-  const { data: designRequests = [], isLoading: ideasLoading, isFetching: ideasFetching, refetch: refetchIdeas } = useQuery<CustomerIdea[]>({
-    queryKey: tailorDesignRequestsQueryKey(user?.id, requestSort, requestFilter),
-    queryFn: async () => {
-      const params = new URLSearchParams({
-        userId: user?.id ?? "guest",
-        tailorView: "true",
-        sort: requestSort,
-      });
-      if (requestFilter !== "all") {
-        const now = new Date();
-        const from = new Date(now);
-        if (requestFilter === "today") {
-          from.setHours(0, 0, 0, 0);
-          const to = new Date(from);
-          to.setDate(to.getDate() + 1);
-          params.set("from", from.toISOString());
-          params.set("to", to.toISOString());
-        } else {
-          from.setDate(from.getDate() - Number(requestFilter.replace("d", "")));
-          params.set("from", from.toISOString());
-        }
-      }
-      const res = await fetch(`${apiBase}/api/ideas?${params.toString()}`, {
-        credentials: "include",
-      });
-      if (!res.ok) throw new Error("Failed to fetch design requests");
-      return res.json();
-    },
-    enabled: user?.role === "tailor",
-    refetchInterval: 30000,
-  });
+  const { data: designRequests = [], isLoading: ideasLoading, isFetching: ideasFetching, refetch: refetchIdeas } = useQuery<CustomerIdea[]>(
+    tailorDesignRequestsQueryOptions<CustomerIdea>({
+      userId: user?.id,
+      role: user?.role,
+      sort: requestSort,
+      filter: requestFilter,
+      apiBase,
+    }),
+  );
 
   const refreshTailorScreen = async () => {
     setRequestRefreshing(true);

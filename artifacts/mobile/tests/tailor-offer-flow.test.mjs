@@ -1,10 +1,12 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { QueryClient, QueryObserver } from "@tanstack/react-query";
 
 import {
   getTailorOfferAlert,
   runTailorOfferFlow,
   tailorDesignRequestsQueryKey,
+  tailorDesignRequestsQueryOptions,
 } from "../lib/tailor-offer-flow.ts";
 
 const openRequest = {
@@ -139,4 +141,77 @@ test("keeps request results in a distinct cache entry for each tailor account", 
 
   assert.notDeepEqual(firstAccountKey, secondAccountKey);
   assert.deepEqual(firstAccountKey, ["tailor-design-requests", "tailor-1", "newest", "all"]);
+});
+
+test("switching tailor accounts never displays the previous account's cached requests", async () => {
+  const queryClient = new QueryClient({
+    defaultOptions: { queries: { retry: false, gcTime: 0 } },
+  });
+  const fetchedUrls = [];
+  const fetchedCredentials = [];
+  let releaseSecondAccount;
+  const fetcher = async (input, init) => {
+    const url = new URL(input);
+    fetchedUrls.push(url);
+    fetchedCredentials.push(init?.credentials);
+    const userId = url.searchParams.get("userId");
+    const requests = [{ id: userId === "tailor-1" ? 101 : 202, userId, title: `${userId} request` }];
+    const response = new Response(JSON.stringify(requests), {
+      status: 200,
+      headers: { "Content-Type": "application/json" },
+    });
+
+    if (userId === "tailor-2" && url.searchParams.get("sort") === "newest") {
+      return new Promise((resolve) => {
+        releaseSecondAccount = () => resolve(response);
+      });
+    }
+    return response;
+  };
+  const optionsFor = (userId, sort = "newest", filter = "all") =>
+    tailorDesignRequestsQueryOptions({
+      userId,
+      role: "tailor",
+      sort,
+      filter,
+      apiBase: "https://api.example.test",
+      fetcher,
+      now: () => new Date("2026-10-17T12:00:00.000Z"),
+    });
+
+  const firstOptions = optionsFor("tailor-1");
+  const observer = new QueryObserver(queryClient, firstOptions);
+  const unsubscribe = observer.subscribe(() => {});
+  try {
+    await queryClient.fetchQuery(firstOptions);
+    assert.equal(observer.getCurrentResult().data[0].userId, "tailor-1");
+
+    const secondOptions = optionsFor("tailor-2");
+    observer.setOptions(secondOptions);
+    assert.equal(observer.getCurrentResult().data, undefined);
+    releaseSecondAccount();
+    await queryClient.fetchQuery(secondOptions);
+    assert.equal(observer.getCurrentResult().data[0].userId, "tailor-2");
+    assert.equal(observer.getCurrentResult().data[0].title, "tailor-2 request");
+
+    const filteredOptions = optionsFor("tailor-2", "oldest", "7d");
+    observer.setOptions(filteredOptions);
+    await queryClient.fetchQuery(filteredOptions);
+    assert.equal(observer.getCurrentResult().data[0].userId, "tailor-2");
+
+    await observer.refetch();
+    assert.equal(observer.getCurrentResult().data[0].userId, "tailor-2");
+
+    const filteredUrls = fetchedUrls.filter((url) => url.searchParams.has("from"));
+    assert.equal(filteredUrls.length, 2);
+    assert.ok(fetchedCredentials.every((credentials) => credentials === "include"));
+    for (const url of filteredUrls) {
+      assert.equal(url.searchParams.get("userId"), "tailor-2");
+      assert.equal(url.searchParams.get("sort"), "oldest");
+      assert.equal(url.searchParams.has("to"), false);
+    }
+  } finally {
+    unsubscribe();
+    queryClient.clear();
+  }
 });

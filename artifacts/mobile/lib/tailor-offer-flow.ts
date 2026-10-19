@@ -16,12 +16,64 @@ export type TailorOfferResult =
   | { status: "accept_failed"; error: unknown }
   | { status: "accepted_chat_failed"; error: unknown };
 
+export type TailorDesignRequestSort = "newest" | "oldest";
+export type TailorDesignRequestFilter = "all" | "today" | "7d" | "30d";
+
 export function tailorDesignRequestsQueryKey(
   userId: string | undefined,
-  sort: "newest" | "oldest",
-  filter: "all" | "today" | "7d" | "30d",
+  sort: TailorDesignRequestSort,
+  filter: TailorDesignRequestFilter,
 ) {
   return ["tailor-design-requests", userId, sort, filter] as const;
+}
+
+export function tailorDesignRequestsQueryOptions<T>({
+  userId,
+  role,
+  sort,
+  filter,
+  apiBase,
+  fetcher = fetch,
+  now = () => new Date(),
+}: {
+  userId: string | undefined;
+  role: string | undefined;
+  sort: TailorDesignRequestSort;
+  filter: TailorDesignRequestFilter;
+  apiBase: string;
+  fetcher?: typeof fetch;
+  now?: () => Date;
+}) {
+  return {
+    queryKey: tailorDesignRequestsQueryKey(userId, sort, filter),
+    queryFn: async (): Promise<T[]> => {
+      const params = new URLSearchParams({
+        userId: userId ?? "guest",
+        tailorView: "true",
+        sort,
+      });
+      if (filter !== "all") {
+        const from = now();
+        if (filter === "today") {
+          from.setHours(0, 0, 0, 0);
+          const to = new Date(from);
+          to.setDate(to.getDate() + 1);
+          params.set("from", from.toISOString());
+          params.set("to", to.toISOString());
+        } else {
+          from.setDate(from.getDate() - Number(filter.replace("d", "")));
+          params.set("from", from.toISOString());
+        }
+      }
+      const res = await fetcher(`${apiBase}/api/ideas?${params.toString()}`, {
+        credentials: "include",
+      });
+      if (!res.ok) throw new Error("Failed to fetch design requests");
+      return res.json() as Promise<T[]>;
+    },
+    enabled: role === "tailor",
+    refetchInterval: 30000,
+  };
 }
 
 export function getTailorOfferAlert(
