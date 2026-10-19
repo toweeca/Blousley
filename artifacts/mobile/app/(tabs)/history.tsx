@@ -240,11 +240,11 @@ export default function HistoryScreen() {
     queryFn: async () => {
       const _d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
       const domain = _d.startsWith("http") ? _d : `https://${_d}`;
-      const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`);
+      const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch fits");
       return res.json();
     },
-    enabled: true,
+    enabled: !!user?.id,
   });
   const refreshFits = async () => {
     if (manualRefreshing) return;

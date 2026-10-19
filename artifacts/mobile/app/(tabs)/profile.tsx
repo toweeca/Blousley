@@ -851,6 +851,7 @@ function PreferencesTab({ theme, user }: { theme: typeof Colors.light; user: Non
       });
       if (!res.ok) throw new Error("Save failed");
       await qc.invalidateQueries({ queryKey: ["blouse-fits"] });
+      await qc.invalidateQueries({ queryKey: ["blouse-fits-count"] });
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       Alert.alert("Saved to My Fits!", "Your style selection has been saved.", [
         { text: "View My Fits", onPress: () => router.push("/(tabs)/history" as any) },
@@ -1243,6 +1244,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
     mutationFn: async ({ ideaId, imageUrl }: { ideaId: number; imageUrl: string }) => {
       const r = await fetch(`${API_BASE}/api/tailor/fits`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ userId: user.id, imageUrl, notes: "Saved from Ideas gallery" }),
       });
@@ -2715,6 +2717,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
     mutationFn: async (imageUrl: string) => {
       const r = await fetch(`${API_BASE}/api/tailor/fits`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
@@ -2744,7 +2747,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
   const { data: savedDesign } = useQuery({
     queryKey: ["blouse-design", user.id],
     queryFn: async () => {
-      const r = await fetch(`${API_BASE}/api/blouse/design?userId=${user.id}`);
+      const r = await fetch(`${API_BASE}/api/blouse/design?userId=${user.id}`, { credentials: "include" });
       return r.ok ? r.json() : null;
     },
   });
@@ -2791,6 +2794,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
       const [designResp, frontResp, backResp] = await Promise.all([
         fetch(`${API_BASE}/api/blouse/design`, {
           method: "POST",
+          credentials: "include",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             userId: user.id,
@@ -3077,7 +3081,7 @@ function BlouseDesignTab({ theme, user }: { theme: typeof Colors.light; user: No
                   </View>
                 ))}
 
-                {bust && underBust && blouseLen && (
+                {!!(bust && underBust && blouseLen) && (
                   <TouchableOpacity
                     style={[styles.logoutBtn, { borderColor: Colors.brand.primary + "50", flexDirection: "row", alignItems: "center", gap: 6, justifyContent: "center" }]}
                     onPress={() => { setMeasEditing(false); Haptics.selectionAsync(); }}
@@ -3436,7 +3440,7 @@ export default function ProfileScreen() {
     queryKey: ["blouse-fits-count", user?.id],
     queryFn: async () => {
       const domain = API_BASE;
-      const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`);
+      const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`, { credentials: "include" });
       return res.ok ? res.json() : [];
     },
     enabled: !!user,

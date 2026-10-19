@@ -76,9 +76,7 @@ function EdgeLabel({
       fontSize={size}
       fontFamily="sans-serif"
       fontWeight="600"
-      rotation={angle}
-      originX={x}
-      originY={y}
+      transform={`rotate(${angle} ${x} ${y})`}
     >
       {text}
     </SvgText>
@@ -92,7 +90,7 @@ function DimLine({
     <G>
       <Line x1={x1} y1={y1} x2={x2} y2={y2} stroke={color} strokeWidth={1} />
       <SvgText x={lx} y={ly} textAnchor="middle" fill={color} fontSize={9}
-        fontFamily="sans-serif" fontWeight="600" rotation={angle} originX={lx} originY={ly}>
+        fontFamily="sans-serif" fontWeight="600" transform={`rotate(${angle} ${lx} ${ly})`}>
         {label}
       </SvgText>
     </G>

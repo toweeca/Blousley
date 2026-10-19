@@ -46,9 +46,7 @@ function DimArrow({
         fontFamily="sans-serif"
         fontWeight="600"
         textAnchor="middle"
-        rotation={labelRotate}
-        originX={labelX}
-        originY={labelY}
+        transform={`rotate(${labelRotate ?? 0} ${labelX} ${labelY})`}
       >
         {label}
       </SvgText>
@@ -220,8 +218,8 @@ export default function BlousePatternDiagram({
         <SvgText
           x={F.foldX - 5} y={(F.topY + F.hemY) / 2 + 20}
           fontSize="9" fill={FOLD_C} fontFamily="sans-serif" fontWeight="bold"
-          textAnchor="middle" rotation={-90}
-          originX={F.foldX - 5} originY={(F.topY + F.hemY) / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 ${F.foldX - 5} ${(F.topY + F.hemY) / 2})`}
         >← FOLD</SvgText>
 
         {/* Bust arrow + label */}
@@ -298,8 +296,8 @@ export default function BlousePatternDiagram({
         <SvgText
           x={B.foldX - 5} y={(B.neckY + B.hemY) / 2 + 20}
           fontSize="9" fill={FOLD_C} fontFamily="sans-serif" fontWeight="bold"
-          textAnchor="middle" rotation={-90}
-          originX={B.foldX - 5} originY={(B.neckY + B.hemY) / 2}
+          textAnchor="middle"
+          transform={`rotate(-90 ${B.foldX - 5} ${(B.neckY + B.hemY) / 2})`}
         >← FOLD</SvgText>
 
         {/* Shoulder width arrow (top) */}
