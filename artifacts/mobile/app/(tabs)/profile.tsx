@@ -1330,7 +1330,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
   const { data: ideas = [], isLoading, refetch: refetchIdeas } = useQuery({
     queryKey: ["ideas", user.id],
     queryFn: async () => {
-      const r = await fetch(`${domain}/api/ideas?userId=${user.id}`);
+      const r = await fetch(`${domain}/api/ideas?userId=${encodeURIComponent(user.id)}`, { credentials: "include" });
       return r.ok ? r.json() : [];
     },
   });
@@ -1402,6 +1402,7 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
         : undefined;
       const r = await fetch(`${domain}/api/ideas`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           userId: user.id,
@@ -1436,7 +1437,10 @@ function IdeasTab({ theme, user }: { theme: typeof Colors.light; user: NonNullab
 
   const deleteMutation = useMutation({
     mutationFn: async (id: number) => {
-      const r = await fetch(`${domain}/api/ideas/${id}?userId=${encodeURIComponent(user.id)}`, { method: "DELETE" });
+      const r = await fetch(`${domain}/api/ideas/${id}?userId=${encodeURIComponent(user.id)}`, {
+        method: "DELETE",
+        credentials: "include",
+      });
       if (!r.ok) throw new Error("Failed");
     },
     onSuccess: () => { qc.invalidateQueries({ queryKey: ["ideas", user.id] }); Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning); },
@@ -3450,7 +3454,7 @@ export default function ProfileScreen() {
     queryKey: ["ideas-count", user?.id],
     queryFn: async () => {
       const domain = API_BASE;
-      const r = await fetch(`${domain}/api/ideas?userId=${user?.id}`);
+      const r = await fetch(`${domain}/api/ideas?userId=${encodeURIComponent(user!.id)}`, { credentials: "include" });
       return r.ok ? r.json() : [];
     },
     enabled: !!user,
