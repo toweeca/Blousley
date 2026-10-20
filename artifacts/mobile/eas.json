@@ -12,6 +12,13 @@
         "EAS_NO_FROZEN_LOCKFILE": "1"
       }
     },
+    "fit-checkout-diagnostics": {
+      "extends": "preview",
+      "env": {
+        "EXPO_PUBLIC_DOMAIN": "https://bd4fad89-2637-4126-8a52-0d6e18ee7e00-00-3txigvwmbd72c.spock.replit.dev",
+        "EXPO_PUBLIC_ENABLE_FIT_CHECKOUT_DIAGNOSTICS": "true"
+      }
+    },
     "production": {
       "autoIncrement": true
     }

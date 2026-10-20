@@ -245,23 +245,29 @@ export default function ChatThread({
     setCheckoutError("");
     const url = `${apiBase}/api/chat/conversations/${conversationId}/fit-checkout`;
     const options = { method: "POST", credentials: "include" as const };
-    if (__DEV__) {
-      // HttpOnly/native cookies cannot be inspected here; check API diagnostics.
-      console.info("fit_checkout_request", { url, credentials: options.credentials });
+    const diagnosticsEnabled = process.env.EXPO_PUBLIC_ENABLE_FIT_CHECKOUT_DIAGNOSTICS === "true";
+    const timestamp = new Date().toISOString();
+    let diagnosticOutput = "";
+    if (diagnosticsEnabled) {
+      // Cookie presence/authentication are recorded only by the workspace API.
+      console.info("fit_checkout_diagnostic", JSON.stringify({ timestamp, url }));
     }
     try {
       const response = await fetch(url, options);
-      if (__DEV__) {
-        console.info("fit_checkout_status", { url: response.url || url, status: response.status });
+      if (diagnosticsEnabled) {
+        diagnosticOutput = JSON.stringify({ timestamp, url, status: response.status });
+        console.info("fit_checkout_diagnostic", diagnosticOutput);
       }
       const result = await response.json();
-      if (__DEV__) {
-        console.info("fit_checkout_response", {
+      if (diagnosticsEnabled) {
+        diagnosticOutput = JSON.stringify({
+          timestamp, url,
           status: response.status,
           errorCode: typeof result.code === "string" ? result.code.slice(0, 256) : null,
           error: typeof result.error === "string" ? result.error.slice(0, 512) : null,
           message: typeof result.message === "string" ? result.message.slice(0, 512) : null,
         });
+        console.info("fit_checkout_diagnostic", diagnosticOutput);
       }
       if (!response.ok || typeof result.url !== "string") {
         throw new Error(result.error ?? "Could not start Checkout");
@@ -272,7 +278,9 @@ export default function ChatThread({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Please try again.";
       setCheckoutError(message);
-      Alert.alert("Checkout unavailable", message);
+      Alert.alert("Checkout unavailable", diagnosticsEnabled
+        ? `${message}\n\nFit Checkout diagnostic:\n${diagnosticOutput || JSON.stringify({ timestamp, url })}`
+        : message);
     } finally {
       setCheckoutPending(false);
     }

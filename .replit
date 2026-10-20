@@ -29,6 +29,9 @@ timeoutMs = 90000
 
 [userenv.shared]
 
+[userenv.development]
+ENABLE_FIT_CHECKOUT_DIAGNOSTICS = "true"
+
 [nix]
 channel = "stable-25_05"
 packages = ["eas-cli"]
