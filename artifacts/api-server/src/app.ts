@@ -52,6 +52,7 @@ if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "producti
       return;
     }
     if (production) productionCaptureAvailable = false;
+    const timestamp = new Date().toISOString();
     const url = `${req.protocol}://${req.get("host")}${req.path}`;
     const sessionCookiePresent = typeof req.cookies?.blousley_session === "string"
       && req.cookies.blousley_session.length > 0;
@@ -66,10 +67,10 @@ if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "producti
       return sendJson(body);
     };
     res.once("finish", () => {
-      console.info("fit_checkout_api_response", {
-        url, sessionCookiePresent, sessionAuthenticated: Boolean(req.userId),
+      console.info("fit_checkout_api_response", JSON.stringify({
+        timestamp, url, sessionCookiePresent, sessionAuthenticated: Boolean(req.userId),
         status: res.statusCode, errorCode, error, message,
-      });
+      }));
     });
     next();
   });
