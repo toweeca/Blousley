@@ -73,7 +73,7 @@ async function request(userId, path, { method = "GET", body } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
     headers: {
-      Cookie: sessionCookies.get(userId),
+      ...(userId ? { Cookie: sessionCookies.get(userId) } : {}),
       ...(body ? { "Content-Type": "application/json" } : {}),
     },
     ...(body ? { body: JSON.stringify(body) } : {}),
@@ -116,6 +116,78 @@ before(async () => {
   });
   const address = server.address();
   baseUrl = `http://127.0.0.1:${address.port}`;
+});
+
+test("session-derived fit save accepts no client userId", async () => {
+  for (const [path, expectedStatus] of [
+    ["/api/blouse/fits", 201],
+    ["/api/tailor/fits", 200],
+  ]) {
+    const response = await request(customerId, path, {
+      method: "POST",
+      body: { measurements: { bust: 86 }, notes: "Session-only save regression" },
+    });
+    if (response.body.id) fitIds.push(response.body.id);
+    assert.equal(response.status, expectedStatus, `${path} must save using only the authenticated session`);
+    assert.equal(response.body.userId, customerId);
+    const spoofed = await request(customerId, path, {
+      method: "POST",
+      body: { userId: nonParticipantId, measurements: { bust: 86 } },
+    });
+    assert.equal(spoofed.status, 403, `${path} must reject a different client-supplied userId`);
+  }
+});
+
+test("session-derived sharing only allows the saved fit owner", async () => {
+  const saved = await request(customerId, "/api/blouse/fits", {
+    method: "POST",
+    body: { measurements: { bust: 86 } },
+  });
+  if (saved.body.id) fitIds.push(saved.body.id);
+  assert.equal(saved.status, 201);
+  const path = `/api/blouse/fits/${saved.body.id}/find-tailor`;
+  assert.equal((await request(nonParticipantId, path, { method: "PATCH" })).status, 404);
+  assert.equal((await request(nonParticipantId, path, {
+    method: "PATCH",
+    body: { userId: customerId },
+  })).status, 403);
+  const shared = await request(customerId, path, { method: "PATCH" });
+  assert.equal(shared.status, 200);
+  assert.equal(shared.body.findMyTailor, true);
+  assert.equal(shared.body.userId, customerId);
+});
+
+test("session-derived fit actions reject signed-out requests with authentication errors", async () => {
+  for (const [method, path] of [
+    ["POST", "/api/blouse/fits"],
+    ["POST", "/api/tailor/fits"],
+    ["PATCH", `/api/blouse/fits/${sameTailorFitId}/find-tailor`],
+    ["POST", "/api/chat/conversations/1/fit-checkout"],
+  ]) {
+    const response = await request(null, path, { method });
+    assert.equal(response.status, 401, `${method} ${path} must require a session`);
+    assert.equal(response.body.error, "Authentication required");
+  }
+});
+
+test("session-derived Checkout rejects another customer and identity spoofing", async () => {
+  const fitId = await addSharedFit();
+  const opened = await openFit(tailorOneId, fitId);
+  assert.equal(opened.status, 201);
+  const conversationId = opened.body.id;
+  const quote = await request(tailorOneId, `/api/chat/conversations/${conversationId}/quote`, {
+    method: "POST",
+    body: { amountCents: 8750 },
+  });
+  assert.equal(quote.status, 200);
+  const path = `/api/chat/conversations/${conversationId}/fit-checkout`;
+  assert.equal((await request(nonParticipantId, path, { method: "POST" })).status, 403);
+  assert.equal((await request(nonParticipantId, path, {
+    method: "POST",
+    body: { userId: customerId },
+  })).status, 403);
+  const [stored] = await db.select().from(conversations).where(eq(conversations.id, conversationId));
+  assert.equal(stored.fitStripeCheckoutSessionId, null);
 });
 
 after(async () => {

@@ -332,6 +332,7 @@ export default function AnalyzeScreen() {
       const domain = _d.startsWith("http") ? _d : `https://${_d}`;
       const res = await fetch(`${domain}/api/blouse/analyze`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           imageBase64,
@@ -368,9 +369,9 @@ export default function AnalyzeScreen() {
       const domain = _d2.startsWith("http") ? _d2 : `https://${_d2}`;
       const res = await fetch(`${domain}/api/blouse/fits`, {
         method: "POST",
+        credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          userId: user?.id ?? "guest",
           imageBase64: imageBase64 ?? null,
           measurements: analysis.measurements,
           bodyShape: analysis.bodyShape,

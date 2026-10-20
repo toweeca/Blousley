@@ -88,7 +88,7 @@ export default function FitDetailScreen() {
   const { data: fit, isLoading } = useQuery<BlouseFit>({
      queryKey: ["blouse-fit", id, fitUserId],
     queryFn: async () => {
-       const res = await fetch(`${apiBase}/api/blouse/fits/${id}?userId=${encodeURIComponent(fitUserId)}`, { credentials: "include" });
+       const res = await fetch(`${apiBase}/api/blouse/fits/${id}`, { credentials: "include" });
       if (!res.ok) throw new Error("Not found");
       return res.json();
     },
@@ -98,7 +98,7 @@ export default function FitDetailScreen() {
   const { data: fitConversation } = useQuery<FitConversation | null>({
     queryKey: ["chat-conversation-fit", id, fitUserId],
     queryFn: async () => {
-      const res = await fetch(`${apiBase}/api/chat/conversations?userId=${encodeURIComponent(fitUserId)}&fitId=${id}`, { credentials: "include" });
+      const res = await fetch(`${apiBase}/api/chat/conversations?fitId=${id}`, { credentials: "include" });
       if (!res.ok) return null;
       const conversations = await res.json();
       return conversations[0] ?? null;
@@ -115,8 +115,6 @@ export default function FitDetailScreen() {
       const res = await fetch(`${apiBase}/api/blouse/fits/${id}/find-tailor`, {
         method: "PATCH",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: fitUserId }),
       });
       if (!res.ok) throw new Error("Could not add fit");
       return res.json();

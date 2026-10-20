@@ -87,8 +87,9 @@ router.get("/customers", async (req, res) => {
 
 router.post("/fits", async (req, res) => {
   try {
-    const { userId, imageUrl, imageBase64, measurements, stylePrefs, notes, aiAnalysis } = req.body;
-    if (!isValidUserId(userId)) return res.status(400).json({ error: "A valid userId is required" });
+    const userId = req.userId;
+    if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required" });
+    const { imageUrl, imageBase64, measurements, stylePrefs, notes, aiAnalysis } = req.body ?? {};
     const upload = imageBase64
       ? imageDataUriFromBase64(imageBase64)
       : imageUrl;

@@ -240,7 +240,7 @@ export default function HistoryScreen() {
     queryFn: async () => {
       const _d = process.env.EXPO_PUBLIC_DOMAIN ?? "";
       const domain = _d.startsWith("http") ? _d : `https://${_d}`;
-      const res = await fetch(`${domain}/api/blouse/fits?userId=${user?.id ?? "guest"}`, { credentials: "include" });
+      const res = await fetch(`${domain}/api/blouse/fits`, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch fits");
       return res.json();
     },
@@ -277,8 +277,6 @@ export default function HistoryScreen() {
       const res = await fetch(`${domain}/api/blouse/fits/${id}/find-tailor`, {
         method: "PATCH",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ userId: user?.id }),
       });
       if (!res.ok) throw new Error("Find tailor failed");
     },
