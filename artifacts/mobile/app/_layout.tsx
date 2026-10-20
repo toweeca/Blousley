@@ -46,6 +46,10 @@ function RootLayoutNav() {
         options={{ presentation: "card", headerShown: false }}
       />
       <Stack.Screen
+        name="tailor-summary"
+        options={{ presentation: "card", headerShown: false }}
+      />
+      <Stack.Screen
         name="sewing-guide"
         options={{ presentation: "card", headerShown: false }}
       />

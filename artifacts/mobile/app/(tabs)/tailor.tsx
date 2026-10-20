@@ -3,6 +3,7 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { CopyrightNotice } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
+import { router } from "expo-router";
 import React, { useState } from "react";
 import {
   View,
@@ -365,18 +366,34 @@ function TailorProfileCard({
         {/* ── Stat tiles ── */}
         <View style={styles.profileStats}>
           {[
-            { label: "Jobs Accepted", value: acceptedJobs, icon: "check-circle" as const, color: "#27AE60" },
-            { label: "Customers", value: customerCount, icon: "users" as const, color: Colors.brand.primary },
-            { label: "Skills", value: skills.length, icon: "star" as const, color: Colors.brand.goldDark },
+            { label: "Jobs Accepted", value: acceptedJobs, icon: "check-circle" as const, color: "#27AE60", section: "jobs" as const },
+            { label: "Customers", value: customerCount, icon: "users" as const, color: Colors.brand.primary, section: "customers" as const },
+            { label: "Skills", value: skills.length, icon: "star" as const, color: Colors.brand.goldDark, section: "skills" as const },
           ].map((stat) => (
-            <View
+            <TouchableOpacity
               key={stat.label}
-              style={[styles.profileStatTile, { backgroundColor: stat.color + "10", borderColor: stat.color + "30" }]}
+              onPress={() => router.push({ pathname: "/tailor-summary", params: { section: stat.section } })}
+              disabled={!user.id}
+              activeOpacity={0.72}
+              accessibilityRole="button"
+              accessibilityLabel={`${stat.label}: ${stat.value}. Open ${stat.label.toLowerCase()}`}
+              testID={`tailor-summary-${stat.section}`}
+              style={[
+                styles.profileStatTile,
+                {
+                  backgroundColor: stat.color + "10",
+                  borderColor: stat.color + "30",
+                  opacity: user.id ? 1 : 0.55,
+                },
+              ]}
             >
-              <Feather name={stat.icon} size={16} color={stat.color} />
+              <View style={styles.profileStatIconRow}>
+                <Feather name={stat.icon} size={16} color={stat.color} />
+                <Feather name="chevron-right" size={13} color={stat.color} />
+              </View>
               <Text style={[styles.profileStatNum, { color: stat.color }]}>{stat.value}</Text>
               <Text style={[styles.profileStatLabel, { color: theme.textSecondary }]}>{stat.label}</Text>
-            </View>
+            </TouchableOpacity>
           ))}
         </View>
 
@@ -1401,6 +1418,12 @@ const styles = StyleSheet.create({
     padding: 12,
     alignItems: "center",
     gap: 4,
+  },
+  profileStatIconRow: {
+    width: "100%",
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   profileStatNum: {
     fontFamily: "Inter_700Bold",
