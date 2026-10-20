@@ -1,0 +1,38 @@
+Use the smallest possible change and lowest-credit approach.
+
+Fix the “userId is required” error affecting:
+1. Pay in the fit-conversation Messages flow
+2. Share with Tailors / Find My Tailor from a saved customer fit
+
+Expected behavior:
+- A signed-in customer must be able to share/save a fit and use Find My Tailor without supplying userId manually.
+- A signed-in customer must be able to open Pay for a tailor’s CAD quote and create a Stripe test-mode Checkout session without supplying userId manually.
+- The server must identify the current user from the authenticated session cookie/token, not from a client-supplied userId.
+- If an endpoint currently requires userId in the request body, query, or params, change it to use the authenticated user from the request session.
+- Keep server-side authorization: the customer may only pay a quote in a conversation they participate in; the customer may only share their own fit.
+- Do not allow a client to impersonate another user by passing a different userId.
+- Preserve the existing Stripe test-mode Checkout, webhook matching, quote authorization, conversation creation, and Ideas payment flow.
+
+Investigate:
+1. The exact API route returning “userId is required” for Pay.
+2. The exact API route returning “userId is required” for Share with Tailors / Find My Tailor.
+3. The mobile API client calls for both actions.
+4. Whether the authenticated session cookie/token is being attached to those requests.
+5. Whether the server validation schema incorrectly requires userId from the client.
+
+Fix only the minimum code needed. Do not change database schema, Stripe keys, webhook logic, quote amounts, acceptance rules, or the Ideas flow.
+
+After fixing:
+- Run mobile typecheck.
+- Run the focused fit-payment and fit-sharing tests.
+- Verify a signed-in customer can share a fit and use Find My Tailor.
+- Verify a signed-in customer can tap Pay and create a Stripe test Checkout session for the exact quote.
+- Verify a signed-out user is rejected with an authentication error, not “userId is required.”
+- Verify a customer cannot pay another customer’s quote.
+
+Report:
+1. Exact files changed
+2. Exact endpoints fixed
+3. How the authenticated user is now resolved
+4. Why the error occurred
+5. Test results
