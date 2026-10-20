@@ -40,12 +40,18 @@ app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
 // Temporary diagnostics: fit Checkout only, before authentication can reject it.
-if (process.env.NODE_ENV === "development") {
+// Production: one matching request per process, with a fixed automatic expiry.
+const fitCheckoutDiagnosticsExpireAt = Date.parse("2026-10-21T18:48:31Z");
+if (process.env.NODE_ENV === "development" || process.env.NODE_ENV === "production") {
+  let productionCaptureAvailable = true;
   app.use((req, res, next) => {
-    if (req.method !== "POST" || !/^\/api\/chat\/conversations\/\d+\/fit-checkout\/?$/.test(req.path)) {
+    const production = process.env.NODE_ENV === "production";
+    if (req.method !== "POST" || !/^\/api\/chat\/conversations\/\d+\/fit-checkout\/?$/.test(req.path)
+      || (production && (!productionCaptureAvailable || Date.now() >= fitCheckoutDiagnosticsExpireAt))) {
       next();
       return;
     }
+    if (production) productionCaptureAvailable = false;
     const url = `${req.protocol}://${req.get("host")}${req.path}`;
     const sessionCookiePresent = typeof req.cookies?.blousley_session === "string"
       && req.cookies.blousley_session.length > 0;
