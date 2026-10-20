@@ -243,12 +243,26 @@ export default function ChatThread({
     if (!canPayForFit || checkoutPending) return;
     setCheckoutPending(true);
     setCheckoutError("");
+    const url = `${apiBase}/api/chat/conversations/${conversationId}/fit-checkout`;
+    const options = { method: "POST", credentials: "include" as const };
+    if (__DEV__) {
+      // HttpOnly/native cookies cannot be inspected here; check API diagnostics.
+      console.info("fit_checkout_request", { url, credentials: options.credentials });
+    }
     try {
-      const response = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/fit-checkout`, {
-        method: "POST",
-        credentials: "include",
-      });
+      const response = await fetch(url, options);
+      if (__DEV__) {
+        console.info("fit_checkout_status", { url: response.url || url, status: response.status });
+      }
       const result = await response.json();
+      if (__DEV__) {
+        console.info("fit_checkout_response", {
+          status: response.status,
+          errorCode: typeof result.code === "string" ? result.code.slice(0, 256) : null,
+          error: typeof result.error === "string" ? result.error.slice(0, 512) : null,
+          message: typeof result.message === "string" ? result.message.slice(0, 512) : null,
+        });
+      }
       if (!response.ok || typeof result.url !== "string") {
         throw new Error(result.error ?? "Could not start Checkout");
       }
