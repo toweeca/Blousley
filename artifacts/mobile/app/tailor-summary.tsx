@@ -20,24 +20,16 @@ import ChatThread from "@/components/ChatThread";
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import { formatPersonName } from "@/lib/person-name";
+import {
+  getTailorSummaryItems,
+  tailorSummaryConversationsQueryOptions,
+  type TailorConversation,
+} from "@/lib/tailor-summary-data";
 
 interface TailorFit {
   id: number;
   customerName?: string | null;
   userId: string;
-  createdAt: string;
-}
-
-interface TailorConversation {
-  id: number;
-  title: string;
-  customerId: string | null;
-  tailorId: string | null;
-  customerName: string | null;
-  tailorName: string | null;
-  fitId?: number | null;
-  ideaId?: number | null;
-  lastMessageAt: string | null;
   createdAt: string;
 }
 
@@ -83,18 +75,11 @@ export default function TailorSummaryScreen() {
     isLoading: conversationsLoading,
     isError: conversationsError,
     refetch: refetchConversations,
-  } = useQuery<TailorConversation[]>({
-    queryKey: ["chat-conversations", user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
-      const response = await fetch(`${apiBase}/api/chat/conversations?userId=${encodeURIComponent(user.id)}`, {
-        credentials: "include",
-      });
-      if (!response.ok) throw new Error("Could not load conversations");
-      return response.json();
-    },
-    enabled: user?.role === "tailor" && activeSection !== "skills",
-  });
+  } = useQuery(tailorSummaryConversationsQueryOptions(
+    user?.id,
+    apiBase,
+    user?.role === "tailor" && activeSection !== "skills",
+  ));
   const {
     data: profile,
     isLoading: profileLoading,
@@ -111,21 +96,7 @@ export default function TailorSummaryScreen() {
     enabled: user?.role === "tailor" && activeSection === "skills",
   });
 
-  const tailorConversations = conversations
-    .filter((conversation) => conversation.tailorId === user?.id)
-    .sort((a, b) =>
-      new Date(b.lastMessageAt ?? b.createdAt).getTime() - new Date(a.lastMessageAt ?? a.createdAt).getTime(),
-    );
-  const acceptedJobs = tailorConversations.filter(
-    (conversation) => conversation.fitId != null || conversation.ideaId != null,
-  );
-  const customersById = new Map<string, TailorConversation>();
-  tailorConversations.forEach((conversation) => {
-    if (conversation.customerId && !customersById.has(conversation.customerId)) {
-      customersById.set(conversation.customerId, conversation);
-    }
-  });
-  const customers = [...customersById.values()];
+  const { acceptedJobs, customers } = getTailorSummaryItems(conversations, user?.id ?? "");
 
   const pageTitle = activeSection === "jobs"
     ? "Jobs Accepted"

@@ -30,6 +30,7 @@ import { useApp } from "@/context/AppContext";
 import ChatThread from "@/components/ChatThread";
 import PrivateFitImage from "@/components/PrivateFitImage";
 import { formatPersonName, getPersonInitials } from "@/lib/person-name";
+import { getTailorSummaryItems, tailorSummaryConversationsQueryOptions } from "@/lib/tailor-summary-data";
 import {
   getTailorOfferAlert,
   runTailorOfferFlow,
@@ -271,11 +272,9 @@ const SUGGESTED_SKILLS = [
 function TailorProfileCard({
   user,
   apiBase,
-  customerCount,
 }: {
   user: NonNullable<ReturnType<typeof useApp>["user"]>;
   apiBase: string;
-  customerCount: number;
 }) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -288,13 +287,18 @@ function TailorProfileCard({
   const [newSkill, setNewSkill] = useState("");
   const [showSuggestions, setShowSuggestions] = useState(false);
 
-  const { data: profile, isLoading } = useQuery({
+  const { data: profile, isLoading: profileLoading } = useQuery({
     queryKey: ["tailor-profile", user.id],
     queryFn: async () => {
       const r = await fetch(`${apiBase}/api/tailor/profile?tailorId=${user.id}`);
       return r.ok ? r.json() : { skills: [], acceptedJobs: 0, bio: null };
     },
   });
+  const {
+    data: conversations,
+    isLoading: conversationsLoading,
+    isError: conversationsError,
+  } = useQuery(tailorSummaryConversationsQueryOptions(user.id, apiBase, user.role === "tailor"));
 
   const saveMutation = useMutation({
     mutationFn: async (payload: { bio?: string; skills?: string[] }) => {
@@ -310,7 +314,10 @@ function TailorProfileCard({
   });
 
   const skills: string[] = profile?.skills ?? [];
-  const acceptedJobs: number = profile?.acceptedJobs ?? 0;
+  const summaryItems = getTailorSummaryItems(conversations ?? [], user.id);
+  const countsUnavailable = conversationsLoading || conversationsError;
+  const acceptedJobs = countsUnavailable ? "—" : summaryItems.acceptedJobs.length;
+  const customerCount = countsUnavailable ? "—" : summaryItems.customers.length;
   const bio: string = profile?.bio ?? "";
 
   const handleSaveBio = () => {
@@ -339,7 +346,7 @@ function TailorProfileCard({
     (s) => !skills.includes(s) && s.toLowerCase().includes(newSkill.toLowerCase())
   );
 
-  if (isLoading) return null;
+  if (profileLoading) return null;
 
   return (
     <Animated.View entering={FadeInDown.delay(60).springify()}>
@@ -831,11 +838,7 @@ export default function TailorScreen() {
         ListHeaderComponent={user?.role === "tailor" ? (
           <View style={{ gap: 16 }}>
             {/* ── Tailor Profile Card ── */}
-            <TailorProfileCard
-              user={user}
-              apiBase={apiBase}
-              customerCount={fits?.length ?? 0}
-            />
+            <TailorProfileCard user={user} apiBase={apiBase} />
             {/* ── Design Requests section ── */}
             <View style={[styles.requestControls, { backgroundColor: theme.card, borderColor: theme.border }]}>
               <View style={styles.requestControlRow}>
