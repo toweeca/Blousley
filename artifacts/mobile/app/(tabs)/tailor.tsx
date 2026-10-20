@@ -3,8 +3,8 @@ import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { CopyrightNotice } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
-import { router } from "expo-router";
-import React, { useState } from "react";
+import { router, useFocusEffect } from "expo-router";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import {
   View,
   Text,
@@ -20,6 +20,7 @@ import {
   Alert,
   Modal,
   Image,
+  AppState,
 } from "react-native";
 import Animated, { FadeInDown } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -49,6 +50,10 @@ interface BlouseFit {
   aiAnalysis?: string | null;
   notes?: string | null;
   assignedTailorId?: string | null;
+  conversationId?: number | null;
+  lastActivityAt?: string;
+  fitQuoteCents?: number | null;
+  fitPaidAt?: string | null;
   createdAt: string;
 }
 
@@ -87,16 +92,25 @@ function CustomerCard({
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
   const theme = isDark ? Colors.dark : Colors.light;
-  const date = new Date(fit.createdAt).toLocaleDateString("en-IN", {
+  const date = new Date(fit.lastActivityAt ?? fit.createdAt).toLocaleString("en-CA", {
     day: "numeric",
     month: "short",
+    hour: "2-digit",
+    minute: "2-digit",
   });
   const assignedToThisTailor = fit.assignedTailorId === tailorId;
   const assignedToAnotherTailor = !!fit.assignedTailorId && !assignedToThisTailor;
 
   return (
     <Animated.View entering={FadeInDown.delay(delay).springify()}>
-      <View style={[styles.customerCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
+      <TouchableOpacity
+        onPress={() => onMessage(fit)}
+        disabled={assignedToAnotherTailor}
+        activeOpacity={0.8}
+        accessibilityRole="button"
+        accessibilityLabel={`Open fit request from ${formatPersonName(fit.customerName, "Customer", fit.userId)}`}
+        style={[styles.customerCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+      >
         {fit.imageUrl ? (
           <PrivateFitImage
             source={{ uri: fit.imageUrl }}
@@ -104,7 +118,14 @@ function CustomerCard({
             resizeMode="cover"
             fallbackColor={theme.card}
           />
-        ) : null}
+        ) : (
+          <View style={[styles.customerFitImage, { backgroundColor: theme.backgroundSecondary, alignItems: "center", justifyContent: "center" }]}>
+            <Feather name="image" size={28} color={theme.textMuted} />
+            <Text style={[styles.customerDate, { color: theme.textMuted }]}>
+              {fit.conversationId ? "Design image unavailable" : "Design preview available after accepting"}
+            </Text>
+          </View>
+        )}
         <View style={styles.cardTopRow}>
           <View style={[styles.customerAvatar, { backgroundColor: Colors.brand.primary + "20" }]}>
             <Text style={[styles.customerAvatarText, { color: Colors.brand.primary }]}>
@@ -115,13 +136,22 @@ function CustomerCard({
             <Text style={[styles.customerId, { color: theme.text }]}>
               {formatPersonName(fit.customerName, "Customer", fit.userId)}
             </Text>
-            <Text style={[styles.customerDate, { color: theme.textMuted }]}>{date}</Text>
+            <Text style={[styles.customerDate, { color: theme.textMuted }]}>Latest activity: {date}</Text>
           </View>
           <View style={[styles.shapeBadge, { backgroundColor: Colors.brand.gold + "20" }]}>
             <Text style={[styles.shapeText, { color: Colors.brand.goldDark }]}>
               {fit.bodyShape ?? "unknown"}
             </Text>
           </View>
+        </View>
+        <View style={{ gap: 4 }}>
+          <Text style={[styles.customerDate, { color: theme.textSecondary }]}>
+            Request: {fit.conversationId ? "Assigned to you" : "Available · Find My Tailor"}
+          </Text>
+          <Text style={[styles.customerDate, { color: theme.textSecondary }]}>
+            Quote: {fit.fitQuoteCents != null ? `Sent · CAD $${(fit.fitQuoteCents / 100).toFixed(2)}` : "Not sent"}
+            {" · "}{fit.fitPaidAt ? "Paid" : "Unpaid"}
+          </Text>
         </View>
 
         {fit.measurements && (
@@ -188,7 +218,7 @@ function CustomerCard({
             </Text>
           </TouchableOpacity>
         </View>
-      </View>
+      </TouchableOpacity>
     </Animated.View>
   );
 }
@@ -566,6 +596,8 @@ export default function TailorScreen() {
   const [chatConvoId, setChatConvoId] = useState<number | null>(null);
   const [chatPartnerName, setChatPartnerName] = useState("");
   const [chatVisible, setChatVisible] = useState(false);
+  const openingFit = useRef(false);
+  const [customerFitsFocused, setCustomerFitsFocused] = useState(false);
 
   // Design request offer modal
   const [offerModalVisible, setOfferModalVisible] = useState(false);
@@ -582,18 +614,41 @@ export default function TailorScreen() {
     return d.startsWith("http") ? d : `https://${d}`;
   })();
 
-  const { data: fits, isLoading, isFetching: fitsFetching, refetch } = useQuery<BlouseFit[]>({
+  const { data: fits, isLoading, isError: fitsError, isFetching: fitsFetching, refetch } = useQuery<BlouseFit[]>({
     queryKey: ["tailor-customers", user?.id],
     queryFn: async () => {
       const endpoint =
         user?.role === "tailor"
           ? `${apiBase}/api/tailor/customers?tailorId=${encodeURIComponent(user.id)}`
           : `${apiBase}/api/blouse/fits?userId=${user?.id ?? "guest"}`;
-      const res = await fetch(endpoint);
+      const res = await fetch(endpoint, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
       return res.json();
     },
+    refetchInterval: (query) =>
+      customerFitsFocused && AppState.currentState === "active" &&
+      query.state.data?.some((fit) => fit.fitQuoteCents != null && !fit.fitPaidAt)
+        ? 5000
+        : false,
   });
+
+  const refreshCustomerFits = useCallback(() => {
+    if (user?.role !== "tailor") return;
+    void qc.invalidateQueries({ queryKey: ["tailor-customers", user.id] });
+  }, [qc, user?.id, user?.role]);
+
+  useFocusEffect(useCallback(() => {
+    setCustomerFitsFocused(true);
+    refreshCustomerFits();
+    return () => setCustomerFitsFocused(false);
+  }, [refreshCustomerFits]));
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (state) => {
+      if (state === "active") refreshCustomerFits();
+    });
+    return () => subscription.remove();
+  }, [refreshCustomerFits]);
 
   const { data: designRequests = [], isLoading: ideasLoading, isFetching: ideasFetching, refetch: refetchIdeas } = useQuery<CustomerIdea[]>(
     tailorDesignRequestsQueryOptions<CustomerIdea>({
@@ -643,7 +698,14 @@ export default function TailorScreen() {
   };
 
   const handleMessage = async (fit: BlouseFit) => {
-    if (!user?.id) return;
+    if (!user?.id || user.role !== "tailor" || openingFit.current) return;
+    if (fit.conversationId && fit.assignedTailorId === user.id) {
+      setChatConvoId(fit.conversationId);
+      setChatPartnerName(formatPersonName(fit.customerName, "Customer", fit.userId));
+      setChatVisible(true);
+      return;
+    }
+    openingFit.current = true;
     try {
       const res = await fetch(`${apiBase}/api/chat/conversations`, {
         method: "POST",
@@ -665,6 +727,9 @@ export default function TailorScreen() {
       setChatVisible(true);
     } catch {
       Alert.alert("Error", "Could not open chat. Please try again.");
+      refreshCustomerFits();
+    } finally {
+      openingFit.current = false;
     }
   };
 
@@ -777,7 +842,7 @@ export default function TailorScreen() {
     }
   };
 
-  const isRefreshing = isLoading || ideasLoading;
+  const isRefreshing = requestRefreshing || isLoading || ideasLoading;
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
@@ -819,8 +884,10 @@ export default function TailorScreen() {
           </View>
         </View>
       </LinearGradient>
-      {requestRefreshError ? (
-        <Text style={[styles.requestRefreshError, { marginHorizontal: 20, marginTop: 10 }]}>Failed to refresh</Text>
+      {requestRefreshError || fitsError ? (
+        <Text style={[styles.requestRefreshError, { marginHorizontal: 20, marginTop: 10 }]}>
+          {fitsError ? "Could not load customer fits. Pull to refresh or tap Refresh to retry." : "Failed to refresh"}
+        </Text>
       ) : null}
 
       <FlatList
@@ -930,7 +997,7 @@ export default function TailorScreen() {
         refreshControl={
           <RefreshControl
             refreshing={isRefreshing}
-            onRefresh={() => { refetch(); refetchIdeas(); }}
+            onRefresh={refreshTailorScreen}
             tintColor={Colors.brand.primary}
           />
         }
@@ -954,7 +1021,7 @@ export default function TailorScreen() {
       {chatConvoId && user && (
         <ChatThread
           visible={chatVisible}
-          onClose={() => setChatVisible(false)}
+          onClose={() => { setChatVisible(false); refreshCustomerFits(); }}
           conversationId={chatConvoId}
           partnerName={chatPartnerName}
           currentUserId={user.id}

@@ -2,7 +2,7 @@
 import { Router, type IRouter } from "express";
 import { db, blouseFitsTable, privateImages, tailorsTable, usersTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
-import { desc, eq, count, and, gte, lt, or } from "drizzle-orm";
+import { desc, eq, count, and, isNull, or } from "drizzle-orm";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
 
@@ -21,6 +21,8 @@ router.get("/customers", async (req, res) => {
   try {
     const { tailorId } = req.query as { tailorId?: string };
     if (!tailorId) return res.status(400).json({ error: "tailorId required" });
+    if (!req.userId) return res.status(401).json({ error: "Authentication required" });
+    if (tailorId !== req.userId) return res.status(403).json({ error: "Tailor account mismatch" });
 
     const [tailor] = await db
       .select({ id: usersTable.id })
@@ -29,13 +31,14 @@ router.get("/customers", async (req, res) => {
       .limit(1);
     if (!tailor) return res.status(403).json({ error: "Tailor access required" });
 
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-    const startOfTomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const rows = await db
       .select({
         fit: blouseFitsTable,
         assignedTailorId: conversations.tailorId,
+        conversationId: conversations.id,
+        lastMessageAt: conversations.lastMessageAt,
+        fitQuoteCents: conversations.fitQuoteCents,
+        fitPaidAt: conversations.fitPaidAt,
         customerName: usersTable.name,
       })
       .from(blouseFitsTable)
@@ -44,15 +47,25 @@ router.get("/customers", async (req, res) => {
       .where(or(
         and(
           eq(blouseFitsTable.findMyTailor, true),
-          gte(blouseFitsTable.createdAt, startOfToday),
-          lt(blouseFitsTable.createdAt, startOfTomorrow),
+          isNull(conversations.id),
         ),
         eq(conversations.tailorId, tailorId),
       ))
       .orderBy(desc(blouseFitsTable.createdAt));
-    const securedRows = await Promise.all(rows.map(async ({ fit, assignedTailorId, customerName }) => {
+    const securedRows = await Promise.all(rows.map(async ({
+      fit, assignedTailorId, customerName, conversationId, lastMessageAt, fitQuoteCents, fitPaidAt,
+    }) => {
+      const request = {
+        ...fit, customerName, assignedTailorId, conversationId,
+        lastActivityAt: new Date(Math.max(
+          (lastMessageAt ?? fit.createdAt).getTime(),
+          fit.updatedAt.getTime(),
+          fitPaidAt?.getTime() ?? 0,
+        )),
+        fitQuoteCents, fitPaidAt,
+      };
       if (assignedTailorId !== tailorId) {
-        return { ...fit, customerName, imageUrl: null, thumbnailUrl: null, assignedTailorId };
+        return { ...request, imageUrl: null, thumbnailUrl: null };
       }
       const image = await withRlsUser(tailorId, async (tx) => {
         const [row] = await tx
@@ -63,9 +76,9 @@ router.get("/customers", async (req, res) => {
         return row;
       });
       const imageUrl = image ? privateImageUrl(req, fit.id, tailorId) : null;
-      return { ...fit, customerName, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null, assignedTailorId };
+      return { ...request, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null };
     }));
-    res.json(securedRows);
+    res.json(securedRows.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()));
   } catch (error) {
     console.error("Error fetching customer fits:", error);
     res.status(500).json({ error: "Failed to fetch customer fits" });

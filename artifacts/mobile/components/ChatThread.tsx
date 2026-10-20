@@ -23,6 +23,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
+import PrivateFitImage from "@/components/PrivateFitImage";
 
 interface Message {
   id: number;
@@ -51,6 +52,14 @@ interface FitPaymentSummary {
   fitQuoteCents: number | null;
   fitPaidAt: string | null;
   quoteCheckoutStarted: boolean;
+  fit?: {
+    id: number;
+    imageUrl: string | null;
+    bodyShape: string | null;
+    measurements: Record<string, number> | null;
+    stylePrefs: Record<string, string> | null;
+    notes: string | null;
+  } | null;
 }
 
 interface ChatThreadProps {
@@ -144,6 +153,11 @@ export default function ChatThread({
   const isFitTailor = isFitConversation && user?.role === "tailor" && fitPayment?.tailorId === currentUserId;
   const isFitCustomer = isFitConversation && user?.role === "customer" && fitPayment?.customerId === currentUserId;
   useEffect(() => {
+    if (fitPayment?.fitId != null) {
+      void qc.invalidateQueries({ queryKey: ["tailor-customers"] });
+    }
+  }, [fitPayment?.fitId, fitPayment?.fitPaidAt, fitPayment?.fitQuoteCents, qc]);
+  useEffect(() => {
     if (!visible || !isFitConversation) return;
     const subscription = AppState.addEventListener("change", (state) => {
       if (state === "active") {
@@ -218,6 +232,7 @@ export default function ChatThread({
       await qc.invalidateQueries({ queryKey: ["fit-payment", conversationId] });
       await qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
       await qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      await qc.invalidateQueries({ queryKey: ["tailor-customers"] });
     },
     onError: (error) => {
       setQuoteError(error instanceof Error ? error.message : "Could not send quote");
@@ -409,6 +424,36 @@ export default function ChatThread({
           </View>
           <View style={{ width: 40 }} />
         </View>
+
+        {isFitConversation && fitPayment?.fit ? (
+          <View style={[styles.ideaBanner, { backgroundColor: theme.card, borderColor: theme.border }]}>
+            <PrivateFitImage
+              source={{ uri: fitPayment.fit.imageUrl ?? undefined }}
+              style={[styles.ideaThumb, { width: 80, height: 100 }]}
+              resizeMode="cover"
+              fallbackColor={theme.background}
+            />
+            <View style={styles.ideaContent}>
+              <Text style={[styles.ideaTitle, { color: theme.text }]}>Saved blouse design · Fit #{fitPayment.fit.id}</Text>
+              <Text style={[styles.ideaNotes, { color: theme.textSecondary }]}>
+                {[
+                  fitPayment.fit.bodyShape,
+                  ...Object.values(fitPayment.fit.stylePrefs ?? {}).filter(Boolean),
+                ].filter(Boolean).join(" · ") || "No style preferences added."}
+              </Text>
+              {!!fitPayment.fit.measurements && (
+                <Text style={[styles.ideaNotes, { color: theme.textMuted }]}>
+                  {Object.entries(fitPayment.fit.measurements)
+                    .filter(([, value]) => value != null)
+                    .map(([key, value]) => `${key}: ${value} cm`).join(" · ")}
+                </Text>
+              )}
+              {!!fitPayment.fit.notes && (
+                <Text style={[styles.ideaNotes, { color: theme.textSecondary }]} numberOfLines={2}>{fitPayment.fit.notes}</Text>
+              )}
+            </View>
+          </View>
+        ) : null}
 
         {isFitConversation ? (
           <View style={[styles.fitQuoteCard, { backgroundColor: theme.card, borderColor: theme.border }]}>

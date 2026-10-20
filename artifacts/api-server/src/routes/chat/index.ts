@@ -3,7 +3,7 @@ import { Router } from "express";
 import type { Server } from "node:http";
 import Stripe from "stripe";
 import { db, usersTable } from "@workspace/db";
-import { conversations, messages, customerIdeasTable, blouseFitsTable } from "@workspace/db/schema";
+import { conversations, messages, customerIdeasTable, blouseFitsTable, privateImages } from "@workspace/db/schema";
 import { eq, or, desc, and, ne, isNull, isNotNull, inArray } from "drizzle-orm";
 import { WebSocket, WebSocketServer } from "ws";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
@@ -104,6 +104,31 @@ router.get("/conversations/:id/payment", async (req, res) => {
     const { convo, allowed } = await withRlsUser(userId, () => getConversationForParticipant(id, userId));
     if (!convo) return res.status(404).json({ error: "Conversation not found" });
     if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
+    const { fitId, customerId } = convo;
+    const [fit] = fitId !== null && customerId
+      ? await withRlsUser(userId, (tx) => tx.select({
+        design: {
+          id: blouseFitsTable.id,
+          bodyShape: blouseFitsTable.bodyShape,
+          measurements: blouseFitsTable.measurements,
+          stylePrefs: blouseFitsTable.stylePrefs,
+          notes: blouseFitsTable.notes,
+        },
+        imageId: privateImages.id,
+        }).from(blouseFitsTable)
+        .leftJoin(privateImages, eq(privateImages.fitId, blouseFitsTable.id))
+        .where(and(
+          eq(blouseFitsTable.id, fitId),
+          eq(blouseFitsTable.userId, customerId),
+        )).limit(1)) as { design: {
+          id: number;
+          bodyShape: string | null;
+          measurements: unknown;
+          stylePrefs: unknown;
+          notes: string | null;
+        }; imageId: number | null }[]
+      : [];
+    const protocol = (req.header("x-forwarded-proto") ?? req.protocol).split(",")[0];
     return res.json({
       id: convo.id,
       customerId: convo.customerId,
@@ -112,6 +137,10 @@ router.get("/conversations/:id/payment", async (req, res) => {
       fitQuoteCents: convo.fitQuoteCents,
       fitPaidAt: convo.fitPaidAt,
       quoteCheckoutStarted: Boolean(convo.fitStripeCheckoutSessionId),
+      fit: fit ? {
+        ...fit.design,
+        imageUrl: fit.imageId ? `${protocol}://${req.get("host")}/api/images/fits/${fit.design.id}` : null,
+      } : null,
     });
   } catch (e: any) {
     return res.status(500).json({ error: e.message });
@@ -382,27 +411,37 @@ router.post("/conversations", async (req, res) => {
       return res.status(403).json({ error: "Only the assigned tailor can open this fit chat" });
     }
     if (fitId) {
-      const [sharedFit] = await db
-        .select({ id: blouseFitsTable.id })
-        .from(blouseFitsTable)
-        .where(
-          and(
-            eq(blouseFitsTable.id, fitId),
-            eq(blouseFitsTable.userId, customerId),
-            eq(blouseFitsTable.findMyTailor, true),
-          ),
-        )
-        .limit(1);
-      if (!sharedFit) return res.status(403).json({ error: "This fit is not available for tailor contact" });
-
-      const [assignedConversation] = await db
-        .select()
-        .from(conversations)
-        .where(eq(conversations.fitId, fitId))
-        .limit(1);
-      if (assignedConversation && assignedConversation.tailorId !== tailorId) {
-        return res.status(409).json({ error: "This fit is already assigned to another tailor" });
+      if (!Number.isSafeInteger(fitId) || fitId <= 0) {
+        return res.status(400).json({ error: "Invalid fit request" });
       }
+      const [tailor] = await db.select({ id: usersTable.id }).from(usersTable)
+        .where(and(eq(usersTable.id, tailorId), eq(usersTable.role, "tailor"))).limit(1);
+      if (!tailor) return res.status(403).json({ error: "Tailor access required" });
+
+      // Serialize first contact on this fit so concurrent opens reuse one conversation.
+      const result = await db.transaction(async (tx) => {
+        const [fit] = await tx.select().from(blouseFitsTable)
+          .where(and(eq(blouseFitsTable.id, fitId), eq(blouseFitsTable.userId, customerId)))
+          .limit(1).for("update");
+        if (!fit) return { status: 403, body: { error: "This fit is not available for tailor contact" } };
+        const [existingFitConversation] = await tx.select().from(conversations)
+          .where(eq(conversations.fitId, fitId)).limit(1);
+        if (existingFitConversation) {
+          if (existingFitConversation.tailorId !== tailorId || existingFitConversation.customerId !== customerId) {
+            return { status: 409, body: { error: "This fit is already assigned to another tailor" } };
+          }
+          return { status: 200, body: existingFitConversation };
+        }
+        if (!fit.findMyTailor) {
+          return { status: 403, body: { error: "This fit is not available for tailor contact" } };
+        }
+        const [created] = await tx.insert(conversations).values({
+          title: title ?? `Chat with ${customerId.slice(0, 6)}`,
+          customerId, tailorId, fitId, ideaId: ideaId ?? null,
+        }).returning();
+        return { status: 201, body: created };
+      });
+      return res.status(result.status).json(result.body);
     }
 
     const existing = await db
