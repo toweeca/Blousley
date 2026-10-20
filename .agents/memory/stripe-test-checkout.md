@@ -20,3 +20,9 @@ For My Fits quote payments, verify Checkout session creation in test mode agains
 **Why:** the app opens hosted Checkout outside the mobile view, and the webhook is the authoritative payment confirmation.
 
 **How to apply:** keep a foreground refresh for the fit-payment query when the customer returns to the app; use an actual test-mode Checkout/webhook cycle to verify the paid state.
+
+The installed StripeSync webhook processor logs the received event and syncs the Checkout session, but does not automatically populate `stripe.events`.
+
+**Why:** requiring an event row there incorrectly fails verification even after a signed webhook has marked the matching quote paid.
+
+**How to apply:** verify the exact received event in API logs, the Stripe session status, and the application paid state; do not treat an empty `stripe.events` table as failed webhook delivery.
