@@ -358,6 +358,7 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
   await t.test("9. the assigned customer can create one test-mode CAD Checkout session", async () => {
     const response = await request(customerId, `/api/chat/conversations/${sameTailorConversationId}/fit-checkout`, {
       method: "POST",
+      body: { userId: customerId },
     });
     assert.equal(response.status, 200);
     assert.equal(new URL(response.body.url).hostname, "checkout.stripe.com");

@@ -244,7 +244,13 @@ export default function ChatThread({
     setCheckoutPending(true);
     setCheckoutError("");
     const url = `${apiBase}/api/chat/conversations/${conversationId}/fit-checkout`;
-    const options = { method: "POST", credentials: "include" as const };
+    const options = {
+      method: "POST",
+      credentials: "include" as const,
+      headers: { "Content-Type": "application/json" },
+      // Older deployed fit-checkout handlers require this; the API still verifies it against the session.
+      body: JSON.stringify({ userId: currentUserId }),
+    };
     const diagnosticsEnabled = process.env.EXPO_PUBLIC_ENABLE_FIT_CHECKOUT_DIAGNOSTICS === "true";
     const timestamp = new Date().toISOString();
     let diagnosticOutput = "";
