@@ -32,6 +32,7 @@ import ChatThread from "@/components/ChatThread";
 import PrivateFitImage from "@/components/PrivateFitImage";
 import { formatPersonName, getPersonInitials } from "@/lib/person-name";
 import { getTailorSummaryItems, tailorSummaryConversationsQueryOptions } from "@/lib/tailor-summary-data";
+import { getTailorFitSections } from "@/lib/tailor-fit-sections";
 import {
   getTailorOfferAlert,
   runTailorOfferFlow,
@@ -49,8 +50,10 @@ interface BlouseFit {
   stylePrefs?: { neckline?: string; sleeves?: string; back?: string; fabric?: string; fit?: string } | null;
   aiAnalysis?: string | null;
   notes?: string | null;
+  findMyTailor?: boolean;
   assignedTailorId?: string | null;
   conversationId?: number | null;
+  thumbnailUrl?: string | null;
   lastActivityAt?: string;
   fitQuoteCents?: number | null;
   fitPaidAt?: string | null;
@@ -288,6 +291,139 @@ function IdeaRequestCard({
           <Feather name="scissors" size={15} color="#fff" />
           <Text style={styles.makeOfferBtnText}>Accept Request & Send Offer</Text>
         </TouchableOpacity>
+      </View>
+    </Animated.View>
+  );
+}
+
+function FitDesignRequestCard({
+  fit,
+  onMessage,
+  onQuote,
+  delay,
+}: {
+  fit: BlouseFit;
+  onMessage: (fit: BlouseFit) => void;
+  onQuote: (fit: BlouseFit) => void;
+  delay: number;
+}) {
+  const colorScheme = useColorScheme();
+  const isDark = colorScheme === "dark";
+  const theme = isDark ? Colors.dark : Colors.light;
+  const [expanded, setExpanded] = useState(false);
+  const date = new Date(fit.createdAt).toLocaleString("en-CA", {
+    day: "numeric",
+    month: "short",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  });
+  const title = fit.bodyShape
+    ? `${fit.bodyShape.charAt(0).toUpperCase()}${fit.bodyShape.slice(1)} blouse fit`
+    : "Blouse fit request";
+
+  return (
+    <Animated.View entering={FadeInDown.delay(delay).springify()}>
+      <View style={[styles.ideaReqCard, { backgroundColor: theme.card, borderColor: Colors.brand.gold + "40" }]}>
+        <View style={styles.ideaReqTop}>
+          {fit.imageUrl ? (
+            <PrivateFitImage
+              source={{ uri: fit.imageUrl }}
+              style={styles.ideaReqThumb}
+              resizeMode="cover"
+              fallbackColor={theme.backgroundSecondary}
+            />
+          ) : (
+            <View style={[styles.ideaReqThumb, { backgroundColor: Colors.brand.primary + "10", alignItems: "center", justifyContent: "center" }]}>
+              <Feather name="image" size={22} color={Colors.brand.primary + "60"} />
+            </View>
+          )}
+          <View style={{ flex: 1, gap: 4 }}>
+            <View style={styles.ideaReqBadgeRow}>
+              <View style={[styles.ideaReqBadge, { backgroundColor: Colors.brand.gold + "20" }]}>
+                <Feather name="zap" size={11} color={Colors.brand.goldDark} />
+                <Text style={[styles.ideaReqBadgeText, { color: Colors.brand.goldDark }]}>Find My Tailor</Text>
+              </View>
+            </View>
+            <Text style={[styles.ideaReqTitle, { color: theme.text }]} numberOfLines={1}>{title}</Text>
+            <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>
+              {formatPersonName(fit.customerName, "Customer", fit.userId)} · {date}
+            </Text>
+            {fit.notes ? (
+              <Text style={[styles.ideaReqNotes, { color: theme.textMuted }]} numberOfLines={2}>{fit.notes}</Text>
+            ) : null}
+          </View>
+        </View>
+
+        {expanded ? (
+          <View style={{ gap: 10 }}>
+            {fit.imageUrl ? (
+              <PrivateFitImage
+                source={{ uri: fit.imageUrl }}
+                style={styles.fitRequestExpandedImage}
+                resizeMode="cover"
+                fallbackColor={theme.backgroundSecondary}
+              />
+            ) : null}
+            {fit.measurements ? (
+              <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>
+                Measurements: {Object.entries(fit.measurements)
+                  .filter(([, value]) => value != null)
+                  .map(([key, value]) => `${key}: ${value} cm`)
+                  .join(" · ") || "Not provided"}
+              </Text>
+            ) : null}
+            {fit.stylePrefs ? (
+              <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>
+                Style: {Object.entries(fit.stylePrefs)
+                  .filter(([, value]) => !!value)
+                  .map(([key, value]) => `${key}: ${value}`)
+                  .join(" · ") || "Not provided"}
+              </Text>
+            ) : null}
+            {fit.aiAnalysis ? (
+              <Text style={[styles.ideaReqCustomer, { color: theme.textSecondary }]}>{fit.aiAnalysis}</Text>
+            ) : null}
+            {!fit.notes && !fit.measurements && !fit.stylePrefs && !fit.aiAnalysis ? (
+              <Text style={[styles.ideaReqCustomer, { color: theme.textMuted }]}>No additional design details provided.</Text>
+            ) : null}
+          </View>
+        ) : null}
+
+        <View style={styles.fitRequestActions}>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`${expanded ? "Hide" : "View"} design for ${title}`}
+            testID={`view-fit-design-${fit.id}`}
+            style={[styles.fitRequestAction, { borderColor: Colors.brand.primary + "50" }]}
+            onPress={() => setExpanded((current) => !current)}
+          >
+            <Feather name={expanded ? "eye-off" : "eye"} size={13} color={Colors.brand.primary} />
+            <Text style={[styles.fitRequestActionText, { color: Colors.brand.primary }]}>
+              {expanded ? "Hide Design" : "View Design"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`Message ${formatPersonName(fit.customerName, "Customer", fit.userId)}`}
+            testID={`message-fit-customer-${fit.id}`}
+            style={[styles.fitRequestAction, { backgroundColor: Colors.brand.primary, borderColor: Colors.brand.primary }]}
+            onPress={() => onMessage(fit)}
+          >
+            <Feather name="message-circle" size={13} color="#fff" />
+            <Text style={[styles.fitRequestActionText, { color: "#fff" }]}>Message Customer</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            accessibilityRole="button"
+            accessibilityLabel={`Send quote for ${title}`}
+            testID={`quote-fit-request-${fit.id}`}
+            style={[styles.fitRequestAction, { backgroundColor: Colors.brand.goldDark, borderColor: Colors.brand.goldDark }]}
+            onPress={() => onQuote(fit)}
+          >
+            <Feather name="dollar-sign" size={13} color="#fff" />
+            <Text style={[styles.fitRequestActionText, { color: "#fff" }]}>Send Quote</Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </Animated.View>
   );
@@ -659,6 +795,10 @@ export default function TailorScreen() {
       apiBase,
     }),
   );
+  const { availableFitRequests, customerFits } = user?.role === "tailor"
+    ? getTailorFitSections(fits ?? [], user.id)
+    : { availableFitRequests: [], customerFits: fits ?? [] };
+  const totalDesignRequests = designRequests.length + availableFitRequests.length;
 
   const refreshTailorScreen = async () => {
     setRequestRefreshing(true);
@@ -857,7 +997,7 @@ export default function TailorScreen() {
               {user?.role === "tailor" ? "Tailor Hub" : "Tailor View"}
             </Text>
             <Text style={styles.headerSubtitle}>
-              {fits?.length ?? 0} fit{fits?.length === 1 ? "" : "s"} · {designRequests.length} design request{designRequests.length === 1 ? "" : "s"}
+                {customerFits.length} fit{customerFits.length === 1 ? "" : "s"} · {totalDesignRequests} design request{totalDesignRequests === 1 ? "" : "s"}
             </Text>
           </View>
           <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -892,7 +1032,7 @@ export default function TailorScreen() {
       ) : null}
 
       <FlatList
-        data={fits ?? []}
+        data={customerFits}
         keyExtractor={(item) => item.id.toString()}
         renderItem={({ item, index }) => (
           <CustomerCard
@@ -961,25 +1101,36 @@ export default function TailorScreen() {
               </View>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Design Requests</Text>
               <View style={[styles.sectionBadge, { backgroundColor: Colors.brand.gold + "25" }]}>
-                <Text style={[styles.sectionBadgeText, { color: Colors.brand.goldDark }]}>{designRequests.length}</Text>
+                <Text style={[styles.sectionBadgeText, { color: Colors.brand.goldDark }]}>{totalDesignRequests}</Text>
               </View>
             </View>
-            {designRequests.length === 0 ? (
+            {totalDesignRequests === 0 ? (
               <View style={[styles.sectionEmpty, { backgroundColor: theme.card, borderColor: theme.border }]}>
                 <Feather name="inbox" size={28} color={theme.textMuted} />
                 <Text style={[styles.sectionEmptyText, { color: theme.textMuted }]}>
-                  No design requests yet — customers share ideas from their Ideas tab
+                  No design requests yet — customers can share an idea or request a tailor from My Fits
                 </Text>
               </View>
             ) : (
-              designRequests.map((idea, i) => (
-                <IdeaRequestCard
-                  key={idea.id}
-                  idea={idea}
-                  onMakeOffer={handleOpenOffer}
-                  delay={i * 60}
-                />
-              ))
+              <>
+                {availableFitRequests.map((fit, i) => (
+                  <FitDesignRequestCard
+                    key={`fit-request-${fit.id}`}
+                    fit={fit}
+                    onMessage={handleMessage}
+                    onQuote={handleMessage}
+                    delay={i * 60}
+                  />
+                ))}
+                {designRequests.map((idea, i) => (
+                  <IdeaRequestCard
+                    key={idea.id}
+                    idea={idea}
+                    onMakeOffer={handleOpenOffer}
+                    delay={(availableFitRequests.length + i) * 60}
+                  />
+                ))}
+              </>
             )}
             {/* ── Customer Fits section header ── */}
             <View style={[styles.sectionHeader, { marginTop: 4 }]}>
@@ -988,7 +1139,7 @@ export default function TailorScreen() {
               </View>
               <Text style={[styles.sectionTitle, { color: theme.text }]}>Customer Fits</Text>
               <View style={[styles.sectionBadge, { backgroundColor: Colors.brand.primary + "15" }]}>
-                <Text style={[styles.sectionBadgeText, { color: Colors.brand.primary }]}>{fits?.length ?? 0}</Text>
+                <Text style={[styles.sectionBadgeText, { color: Colors.brand.primary }]}>{customerFits.length}</Text>
               </View>
             </View>
           </View>
@@ -1010,7 +1161,7 @@ export default function TailorScreen() {
               </View>
               <Text style={[styles.emptyTitle, { color: theme.text }]}>No customer fits</Text>
               <Text style={[styles.emptySubtitle, { color: theme.textSecondary }]}>
-                Customer fit profiles will appear here
+                Assigned customer fits and conversations will appear here
               </Text>
             </Animated.View>
           ) : null
@@ -1682,6 +1833,31 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: 12,
+  },
+  fitRequestExpandedImage: {
+    width: "100%",
+    height: 220,
+    borderRadius: 14,
+  },
+  fitRequestActions: {
+    flexDirection: "row",
+    gap: 6,
+  },
+  fitRequestAction: {
+    flex: 1,
+    minHeight: 42,
+    borderWidth: 1,
+    borderRadius: 11,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 3,
+  },
+  fitRequestActionText: {
+    fontFamily: "Inter_600SemiBold",
+    fontSize: 10,
+    textAlign: "center",
   },
   ideaReqBadgeRow: { flexDirection: "row" },
   ideaReqBadge: {

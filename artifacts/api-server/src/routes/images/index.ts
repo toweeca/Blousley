@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { blouseFitsTable, conversations, privateImages } from "@workspace/db/schema";
+import { blouseFitsTable, conversations, privateImages, usersTable } from "@workspace/db/schema";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { readPrivateImage } from "../../lib/privateImages";
 
@@ -17,7 +17,10 @@ router.get("/fits/:fitId", async (req, res) => {
 
   try {
     const [fit] = await db
-      .select({ userId: blouseFitsTable.userId })
+      .select({
+        userId: blouseFitsTable.userId,
+        findMyTailor: blouseFitsTable.findMyTailor,
+      })
       .from(blouseFitsTable)
       .where(eq(blouseFitsTable.id, fitId))
       .limit(1);
@@ -26,23 +29,35 @@ router.get("/fits/:fitId", async (req, res) => {
       return;
     }
     const isOwner = fit.userId === userId;
-    const [assignedConversation] = isOwner
+    const [fitConversation] = isOwner
       ? [undefined]
       : await db
-          .select({ id: conversations.id })
+          .select({ tailorId: conversations.tailorId })
           .from(conversations)
-          .where(and(eq(conversations.fitId, fitId), eq(conversations.tailorId, userId)))
+          .where(eq(conversations.fitId, fitId))
           .limit(1);
-    if (!isOwner && !assignedConversation) {
+    const assignedToCurrentTailor = fitConversation?.tailorId === userId;
+    const [tailor] = !isOwner && !fitConversation
+      ? await db
+          .select({ id: usersTable.id })
+          .from(usersTable)
+          .where(and(eq(usersTable.id, userId), eq(usersTable.role, "tailor")))
+          .limit(1)
+      : [undefined];
+    const availableToTailors = Boolean(tailor) && fit.findMyTailor && !fitConversation;
+    if (!isOwner && !assignedToCurrentTailor && !availableToTailors) {
       res.status(403).json({ error: "Not authorized to view this image" });
       return;
     }
 
-    const image = await withRlsUser(userId, async (tx) => {
+    const image = await withRlsUser(fit.userId, async (tx) => {
       const [privateImage] = await tx
         .select()
         .from(privateImages)
-        .where(eq(privateImages.fitId, fitId))
+        .where(and(
+          eq(privateImages.fitId, fitId),
+          eq(privateImages.ownerId, fit.userId),
+        ))
         .limit(1);
       return privateImage;
     });

@@ -65,6 +65,10 @@ router.get("/customers", async (req, res) => {
         fitQuoteCents, fitPaidAt,
       };
       if (assignedTailorId !== tailorId) {
+        if (!assignedTailorId && fit.findMyTailor) {
+          const imageUrl = fit.thumbnailUrl ? privateImageUrl(req, fit.id, tailorId) : null;
+          return { ...request, imageUrl, thumbnailUrl: imageUrl };
+        }
         return { ...request, imageUrl: null, thumbnailUrl: null };
       }
       const image = await withRlsUser(tailorId, async (tx) => {

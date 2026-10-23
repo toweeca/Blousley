@@ -14,3 +14,9 @@ Private fit URLs must be fetched with the authenticated app session before rende
 **Why:** Native image requests do not reliably forward the session cookie used by the app's authenticated API fetches, causing valid private URLs to return 401/403 and appear unavailable.
 
 **How to apply:** Use an authenticated fetch with credentials included, convert the response to a local data URI, and render that data URI while keeping the server image endpoint private.
+
+For a shared but unassigned fit request, allow image reads only for authenticated tailor accounts while `findMyTailor` is true and no conversation assignment exists. After assignment, only the assigned tailor may read it. Since image-metadata RLS is owner/participant-based, authorize the request first, then query the metadata under the fit owner's RLS context; do not broaden the policy or make the file public for this flow.
+
+**Why:** eligible tailors need to preview shared requests before a conversation exists, but the existing RLS policy intentionally excludes them until assignment.
+
+**How to apply:** keep the request gate and owner-context metadata query together in the private image endpoint, and test access before and after assignment.

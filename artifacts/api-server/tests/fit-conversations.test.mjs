@@ -1,9 +1,15 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
+import { unlink } from "node:fs/promises";
+import path from "node:path";
 import test, { after, before } from "node:test";
 import { and, eq, inArray, or } from "drizzle-orm";
+import sharp from "sharp";
 import { db, blouseFitsTable, conversations, messages, sessions, usersTable } from "@workspace/db";
+import { privateImages } from "@workspace/db/schema";
 import { createSessionToken } from "../src/lib/auth.ts";
+import { withRlsUser } from "../src/lib/rls.ts";
+import { savePrivateImage } from "../src/lib/privateImages.ts";
 import { getStripeClient } from "../src/stripeClient.ts";
 
 if (process.env.NODE_ENV === "production") {
@@ -21,6 +27,7 @@ const stripe = await getStripeClient();
 
 const userIds = [];
 const fitIds = [];
+const privateImageStorageKeys = [];
 const sessionCookies = new Map();
 let server;
 let baseUrl;
@@ -30,6 +37,7 @@ let tailorTwoId;
 let nonParticipantId;
 let sameTailorFitId;
 let crossTailorFitId;
+let unassignedImageFitId;
 let sameTailorConversationId;
 let crossTailorConversationId;
 let crossTailorWinnerId;
@@ -67,6 +75,28 @@ async function addSharedFit() {
   }).returning({ id: blouseFitsTable.id });
   fitIds.push(fit.id);
   return fit.id;
+}
+
+async function addSharedFitWithImage() {
+  const fitId = await addSharedFit();
+  const imageBuffer = await sharp({
+    create: { width: 2, height: 2, channels: 4, background: { r: 70, g: 120, b: 180, alpha: 1 } },
+  }).png().toBuffer();
+  const privateImage = await savePrivateImage(
+    `data:image/png;base64,${imageBuffer.toString("base64")}`,
+    customerId,
+  );
+  privateImageStorageKeys.push(privateImage.storageKey);
+  await withRlsUser(customerId, (tx) => tx.insert(privateImages).values({
+    fitId,
+    ownerId: customerId,
+    storageKey: privateImage.storageKey,
+    mimeType: privateImage.mimeType,
+  }));
+  await db.update(blouseFitsTable)
+    .set({ thumbnailUrl: `/api/images/fits/${fitId}`, updatedAt: new Date() })
+    .where(eq(blouseFitsTable.id, fitId));
+  return fitId;
 }
 
 async function request(userId, path, { method = "GET", body } = {}) {
@@ -110,6 +140,7 @@ before(async () => {
   nonParticipantId = await addUser("Fit test non-participant", "customer");
   sameTailorFitId = await addSharedFit();
   crossTailorFitId = await addSharedFit();
+  unassignedImageFitId = await addSharedFitWithImage();
 
   await new Promise((resolve, reject) => {
     server = app.listen(0, "127.0.0.1", (error) => error ? reject(error) : resolve());
@@ -137,6 +168,73 @@ test("session-derived fit save accepts no client userId", async () => {
     });
     assert.equal(spoofed.status, 403, `${path} must reject a different client-supplied userId`);
   }
+});
+
+test("unassigned Find My Tailor fits are visible to tailors and private images follow assignment", async () => {
+  const [firstList, secondList] = await Promise.all([
+    request(tailorOneId, `/api/tailor/customers?tailorId=${encodeURIComponent(tailorOneId)}`),
+    request(tailorTwoId, `/api/tailor/customers?tailorId=${encodeURIComponent(tailorTwoId)}`),
+  ]);
+  assert.equal(firstList.status, 200);
+  assert.equal(secondList.status, 200);
+  const firstRequest = firstList.body.find((fit) => fit.id === unassignedImageFitId);
+  const secondRequest = secondList.body.find((fit) => fit.id === unassignedImageFitId);
+  for (const fit of [firstRequest, secondRequest]) {
+    assert.ok(fit);
+    assert.equal(fit.findMyTailor, true);
+    assert.equal(fit.assignedTailorId, null);
+    assert.equal(fit.conversationId, null);
+    assert.ok(fit.imageUrl);
+    assert.ok(fit.thumbnailUrl);
+  }
+
+  const firstImageResponse = await fetch(firstRequest.imageUrl, {
+    headers: { Cookie: sessionCookies.get(tailorOneId) },
+  });
+  assert.equal(firstImageResponse.status, 200);
+  assert.match(firstImageResponse.headers.get("content-type") ?? "", /^image\/png/);
+  assert.ok((await firstImageResponse.arrayBuffer()).byteLength > 0);
+
+  const nonTailorUrl = new URL(firstRequest.imageUrl);
+  nonTailorUrl.searchParams.set("userId", nonParticipantId);
+  const nonTailorImage = await fetch(nonTailorUrl, {
+    headers: { Cookie: sessionCookies.get(nonParticipantId) },
+  });
+  assert.equal(nonTailorImage.status, 403);
+
+  const opened = await openFit(tailorOneId, unassignedImageFitId);
+  assert.equal(opened.status, 201);
+  const message = await request(tailorOneId, "/api/chat/messages", {
+    method: "POST",
+    body: { conversationId: opened.body.id, senderId: tailorOneId, content: "I can make this blouse design." },
+  });
+  assert.equal(message.status, 201);
+  const quote = await request(tailorOneId, `/api/chat/conversations/${opened.body.id}/quote`, {
+    method: "POST",
+    body: { amountCents: 8750 },
+  });
+  assert.equal(quote.status, 200);
+  const customerMessages = await request(customerId, `/api/chat/messages?conversationId=${opened.body.id}`);
+  assert.equal(customerMessages.status, 200);
+  assert.ok(customerMessages.body.some((entry) => entry.content === "I can make this blouse design."));
+  assert.ok(customerMessages.body.some((entry) => /CAD \$87\.50/.test(entry.content)));
+  const [assignedList, otherTailorList] = await Promise.all([
+    request(tailorOneId, `/api/tailor/customers?tailorId=${encodeURIComponent(tailorOneId)}`),
+    request(tailorTwoId, `/api/tailor/customers?tailorId=${encodeURIComponent(tailorTwoId)}`),
+  ]);
+  const assignedFit = assignedList.body.find((fit) => fit.id === unassignedImageFitId);
+  assert.equal(assignedFit?.assignedTailorId, tailorOneId);
+  assert.ok(assignedFit?.conversationId);
+  assert.ok(!otherTailorList.body.some((fit) => fit.id === unassignedImageFitId));
+
+  const assignedImage = await fetch(assignedFit.imageUrl, {
+    headers: { Cookie: sessionCookies.get(tailorOneId) },
+  });
+  assert.equal(assignedImage.status, 200);
+  const otherTailorImage = await fetch(secondRequest.imageUrl, {
+    headers: { Cookie: sessionCookies.get(tailorTwoId) },
+  });
+  assert.equal(otherTailorImage.status, 403);
 });
 
 test("session-derived sharing only allows the saved fit owner", async () => {
@@ -239,6 +337,9 @@ after(async () => {
     }
     if (userIds.length) await db.delete(usersTable).where(inArray(usersTable.id, userIds));
   } finally {
+    await Promise.all(privateImageStorageKeys.map((storageKey) =>
+      unlink(path.join(process.cwd(), ".private-images", storageKey)).catch(() => undefined),
+    ));
     if (server) {
       server.closeAllConnections?.();
       await new Promise((resolve) => server.close(resolve));
