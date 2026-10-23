@@ -138,7 +138,7 @@ export default function ChatThread({
   const { data: fitPayment } = useQuery<FitPaymentSummary>({
     queryKey: ["fit-payment", conversationId],
     queryFn: async () => {
-      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/payment`, {
+      const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/payment?userId=${encodeURIComponent(currentUserId)}`, {
         credentials: "include",
       });
       if (!r.ok) throw new Error("Could not load fit payment details");

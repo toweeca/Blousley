@@ -86,6 +86,7 @@ function openFit(tailorId, fitId) {
   return request(tailorId, "/api/chat/conversations", {
     method: "POST",
     body: {
+      userId: tailorId,
       customerId,
       tailorId,
       requesterId: tailorId,
@@ -151,7 +152,14 @@ test("session-derived sharing only allows the saved fit owner", async () => {
     method: "PATCH",
     body: { userId: customerId },
   })).status, 403);
-  const shared = await request(customerId, path, { method: "PATCH" });
+  assert.equal((await request(customerId, path, {
+    method: "PATCH",
+    body: { userId: nonParticipantId },
+  })).status, 403);
+  const shared = await request(customerId, path, {
+    method: "PATCH",
+    body: { userId: customerId },
+  });
   assert.equal(shared.status, 200);
   assert.equal(shared.body.findMyTailor, true);
   assert.equal(shared.body.userId, customerId);
@@ -185,6 +193,10 @@ test("session-derived Checkout rejects another customer and identity spoofing", 
   assert.equal((await request(nonParticipantId, path, {
     method: "POST",
     body: { userId: customerId },
+  })).status, 403);
+  assert.equal((await request(customerId, path, {
+    method: "POST",
+    body: { userId: nonParticipantId },
   })).status, 403);
   const [stored] = await db.select().from(conversations).where(eq(conversations.id, conversationId));
   assert.equal(stored.fitStripeCheckoutSessionId, null);
@@ -251,6 +263,19 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
   });
 
   await t.test("2. simultaneous different-tailor opens assign the shared fit once", async () => {
+    const mismatchedIdentity = await request(tailorOneId, "/api/chat/conversations", {
+      method: "POST",
+      body: {
+        userId: nonParticipantId,
+        customerId,
+        tailorId: tailorOneId,
+        requesterId: tailorOneId,
+        fitId: crossTailorFitId,
+        title: "Mismatched identity regression",
+      },
+    });
+    assert.equal(mismatchedIdentity.status, 403);
+
     const responses = await Promise.all([
       openFit(tailorOneId, crossTailorFitId),
       openFit(tailorTwoId, crossTailorFitId),
@@ -309,13 +334,17 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
   await t.test("5. the assigned customer can open the conversation and payment details", async () => {
     const [conversationsResponse, payment] = await Promise.all([
       request(customerId, `/api/chat/conversations?fitId=${sameTailorFitId}`),
-      request(customerId, `/api/chat/conversations/${sameTailorConversationId}/payment`),
+      request(customerId, `/api/chat/conversations/${sameTailorConversationId}/payment?userId=${encodeURIComponent(customerId)}`),
     ]);
     assert.equal(conversationsResponse.status, 200);
     assert.ok(conversationsResponse.body.some((item) => item.id === sameTailorConversationId));
     assert.equal(payment.status, 200);
     assert.equal(payment.body.id, sameTailorConversationId);
     assert.equal(payment.body.fitId, sameTailorFitId);
+    assert.equal(
+      (await request(customerId, `/api/chat/conversations/${sameTailorConversationId}/payment?userId=${encodeURIComponent(nonParticipantId)}`)).status,
+      403,
+    );
   });
 
   await t.test("6. a non-participant cannot read the conversation or payment details", async () => {

@@ -277,6 +277,8 @@ export default function HistoryScreen() {
       const res = await fetch(`${domain}/api/blouse/fits/${id}/find-tailor`, {
         method: "PATCH",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id }),
       });
       if (!res.ok) throw new Error("Find tailor failed");
     },

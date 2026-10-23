@@ -712,6 +712,7 @@ export default function TailorScreen() {
         credentials: "include",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
+          userId: user.id,
           customerId: fit.userId,
           tailorId: user.id,
           requesterId: user.id,

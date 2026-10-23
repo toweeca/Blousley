@@ -115,6 +115,8 @@ export default function FitDetailScreen() {
       const res = await fetch(`${apiBase}/api/blouse/fits/${id}/find-tailor`, {
         method: "PATCH",
         credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ userId: user?.id }),
       });
       if (!res.ok) throw new Error("Could not add fit");
       return res.json();
