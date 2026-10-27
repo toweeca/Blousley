@@ -58,10 +58,11 @@
     "zod-validation-error": "^3.4.0"
   },
   "dependencies": {
+    "@react-native/metro-config": "0.86.3",
     "expo-file-system": "^57.0.7",
     "expo-media-library": "^57.0.5",
+    "expo-secure-store": "~57.0.4",
     "expo-sharing": "^57.0.20",
-    "@react-native/metro-config": "0.86.3",
     "react-native-webview": "^13.16.1"
   }
 }

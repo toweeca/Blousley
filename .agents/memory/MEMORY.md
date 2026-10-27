@@ -13,3 +13,4 @@
 - [Blousley change scope](blousley-scope.md) — keep Blousley changes to the smallest possible set and prefer the lowest-credit approach.
 - [Stripe test Checkout](stripe-test-checkout.md) — use the backend test key and dynamic methods; fit Checkout must match stored CAD quote/session, with chat refresh on app foreground.
 - [Expo preview authentication](expo-preview-auth.md) — preview and API have different origins; authenticated fetches must explicitly include cookies.
+- [Native cookie transport](native-cookie-transport.md) — Android automatic cookies can override explicit headers; browser and native credential modes must stay distinct.

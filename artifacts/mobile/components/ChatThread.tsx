@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import { apiFetch as fetch, getApiSessionCookie } from "@/lib/api-client";
 import {
   View,
   Text,
@@ -251,30 +252,9 @@ export default function ChatThread({
       // Older deployed fit-checkout handlers require this; the API still verifies it against the session.
       body: JSON.stringify({ userId: currentUserId }),
     };
-    const diagnosticsEnabled = process.env.EXPO_PUBLIC_ENABLE_FIT_CHECKOUT_DIAGNOSTICS === "true";
-    const timestamp = new Date().toISOString();
-    let diagnosticOutput = "";
-    if (diagnosticsEnabled) {
-      // Cookie presence/authentication are recorded only by the workspace API.
-      console.info("fit_checkout_diagnostic", JSON.stringify({ timestamp, url }));
-    }
     try {
       const response = await fetch(url, options);
-      if (diagnosticsEnabled) {
-        diagnosticOutput = JSON.stringify({ timestamp, url, status: response.status });
-        console.info("fit_checkout_diagnostic", diagnosticOutput);
-      }
       const result = await response.json();
-      if (diagnosticsEnabled) {
-        diagnosticOutput = JSON.stringify({
-          timestamp, url,
-          status: response.status,
-          errorCode: typeof result.code === "string" ? result.code.slice(0, 256) : null,
-          error: typeof result.error === "string" ? result.error.slice(0, 512) : null,
-          message: typeof result.message === "string" ? result.message.slice(0, 512) : null,
-        });
-        console.info("fit_checkout_diagnostic", diagnosticOutput);
-      }
       if (!response.ok || typeof result.url !== "string") {
         throw new Error(result.error ?? "Could not start Checkout");
       }
@@ -284,9 +264,7 @@ export default function ChatThread({
     } catch (error) {
       const message = error instanceof Error ? error.message : "Please try again.";
       setCheckoutError(message);
-      Alert.alert("Checkout unavailable", diagnosticsEnabled
-        ? `${message}\n\nFit Checkout diagnostic:\n${diagnosticOutput || JSON.stringify({ timestamp, url })}`
-        : message);
+      Alert.alert("Checkout unavailable", message);
     } finally {
       setCheckoutPending(false);
     }
@@ -312,23 +290,39 @@ export default function ChatThread({
   useEffect(() => {
     if (!visible || conversationId <= 0 || !currentUserId) return;
     const wsBase = apiBase.replace(/^http/, "ws");
-    const socket = new WebSocket(
-      `${wsBase}/api/chat/ws?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`,
-    );
-    socket.onmessage = (event) => {
-      try {
-        const payload = JSON.parse(event.data);
-        if (payload.type !== "message" || !payload.message) return;
-        qc.setQueryData<Message[]>(["chat-messages", conversationId], (current = []) =>
-          current.some((message) => message.id === payload.message.id)
-            ? current
-            : [...current, payload.message],
-        );
-      } catch {
-        // Ignore malformed real-time events; REST remains the fallback.
-      }
+    let cancelled = false;
+    let socket: WebSocket | undefined;
+    void getApiSessionCookie(`${apiBase}/api/chat/ws`).then((cookie) => {
+      if (cancelled || (Platform.OS !== "web" && !cookie)) return;
+      const url = `${wsBase}/api/chat/ws?conversationId=${conversationId}&userId=${encodeURIComponent(currentUserId)}`;
+      // Browser WebSockets use HttpOnly cookies; native sockets need the same
+      // securely stored cookie as the authenticated REST client.
+      const NativeWebSocket = WebSocket as typeof WebSocket & {
+        new(url: string, protocols: undefined, options: { headers: { Cookie: string } }): WebSocket;
+      };
+      socket = cookie
+        ? new NativeWebSocket(url, undefined, { headers: { Cookie: cookie } })
+        : new WebSocket(url);
+      socket.onmessage = (event) => {
+        try {
+          const payload = JSON.parse(event.data);
+          if (payload.type !== "message" || !payload.message) return;
+          qc.setQueryData<Message[]>(["chat-messages", conversationId], (current = []) =>
+            current.some((message) => message.id === payload.message.id)
+              ? current
+              : [...current, payload.message],
+          );
+        } catch {
+          // Ignore malformed real-time events; REST remains the fallback.
+        }
+      };
+    }).catch(() => {
+      // The authenticated REST poll still reports errors and refreshes messages.
+    });
+    return () => {
+      cancelled = true;
+      socket?.close();
     };
-    return () => socket.close();
   }, [visible, conversationId, currentUserId, apiBase, qc]);
 
   const sendMutation = useMutation({

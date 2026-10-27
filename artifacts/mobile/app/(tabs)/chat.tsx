@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { Feather } from "@expo/vector-icons";
 import { CopyrightNotice } from "@/components/LegalLinks";
 import { LinearGradient } from "expo-linear-gradient";

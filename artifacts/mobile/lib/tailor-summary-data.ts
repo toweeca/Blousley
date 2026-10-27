@@ -15,12 +15,13 @@ export function tailorSummaryConversationsQueryOptions(
   userId: string | undefined,
   apiBase: string,
   enabled = true,
+  fetcher: typeof fetch = fetch,
 ) {
   return {
     queryKey: ["chat-conversations", userId] as const,
     queryFn: async (): Promise<TailorConversation[]> => {
       if (!userId) throw new Error("Tailor sign-in required");
-      const response = await fetch(`${apiBase}/api/chat/conversations?userId=${encodeURIComponent(userId)}`, {
+      const response = await fetcher(`${apiBase}/api/chat/conversations?userId=${encodeURIComponent(userId)}`, {
         credentials: "include",
       });
       if (!response.ok) throw new Error("Could not load conversations");

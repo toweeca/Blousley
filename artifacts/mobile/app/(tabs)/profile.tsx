@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import * as ImagePicker from "expo-image-picker";
@@ -3461,10 +3462,15 @@ export default function ProfileScreen() {
   });
 
   const handleSave = () => {
+    if (!user) {
+      setShowAccountModal(false);
+      router.push("/(tabs)/account");
+      return;
+    }
     if (!role) { Alert.alert("Choose account type", "Please select Customer or Tailor first."); return; }
     if (!name.trim()) { Alert.alert("Name required", "Please enter your name."); return; }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) { Alert.alert("Valid email required", "Please enter a valid email address."); return; }
-    const userId = user?.id ?? `user_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`;
+    const userId = user.id;
     setUser({ id: userId, name: name.trim(), email: email.trim().toLowerCase(), phone: phone.trim() || undefined, role });
     setShowAccountModal(false);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);

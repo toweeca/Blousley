@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { BlurView } from "expo-blur";
 import { isLiquidGlassAvailable } from "expo-glass-effect";
 import { Tabs } from "expo-router";

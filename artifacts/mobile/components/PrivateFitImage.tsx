@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from "react";
+import { apiFetch as fetch } from "@/lib/api-client";
 import {
   ActivityIndicator,
   Image,

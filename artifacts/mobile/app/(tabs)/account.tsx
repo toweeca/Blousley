@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";

@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { UploadConsent, MeasurementConsent } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";

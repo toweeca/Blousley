@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { Feather } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { router, useLocalSearchParams } from "expo-router";
@@ -79,6 +80,7 @@ export default function TailorSummaryScreen() {
     user?.id,
     apiBase,
     user?.role === "tailor" && activeSection !== "skills",
+    fetch,
   ));
   const {
     data: profile,

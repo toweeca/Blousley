@@ -1,4 +1,5 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import { apiFetch as fetch, clearApiSession, logoutApiSession } from "@/lib/api-client";
 import React, {
   createContext,
   useContext,
@@ -22,7 +23,7 @@ const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
 
 interface AppContextType {
   user: AppUser | null;
-  setUser: (user: AppUser | null) => void;
+  setUser: (user: AppUser | null) => Promise<void>;
   isLoading: boolean;
 }
 
@@ -42,10 +43,19 @@ export function AppProvider({ children }: { children: ReactNode }) {
     try {
       const stored = await AsyncStorage.getItem(USER_STORAGE_KEY);
       if (stored) {
-        setUserState(JSON.parse(stored));
+        const response = await fetch(`${API_BASE}/api/auth/me`);
+        if (response.status === 401) {
+          await clearApiSession();
+          await AsyncStorage.removeItem(USER_STORAGE_KEY);
+          return;
+        }
+        if (!response.ok) throw new Error("Could not validate the API session");
+        const account: AppUser = await response.json();
+        setUserState(account);
+        await AsyncStorage.setItem(USER_STORAGE_KEY, JSON.stringify(account));
       }
     } catch (e) {
-      console.error("Failed to load user", e);
+      console.error("Could not validate the saved account session");
     } finally {
       setIsLoading(false);
     }
@@ -64,9 +74,7 @@ export function AppProvider({ children }: { children: ReactNode }) {
         }).catch((e) => console.error("Failed to sync user to server", e));
       }
     } else {
-      if (API_BASE) {
-        await fetch(`${API_BASE}/api/auth/logout`, { method: "POST", credentials: "include" }).catch(() => undefined);
-      }
+      await logoutApiSession().catch(() => undefined);
       await AsyncStorage.removeItem(USER_STORAGE_KEY);
     }
   };

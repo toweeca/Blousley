@@ -7,6 +7,7 @@ import path from "path";
 import router from "./routes";
 import { rateLimit, requireHttps, securityHeaders } from "./lib/security";
 import { processStripeWebhook } from "./webhookHandlers";
+import { authDiagnostics } from "./lib/authDiagnostics";
 
 const app: Express = express();
 
@@ -39,36 +40,9 @@ app.get("/api/ideas/checkout/cancel", (_req, res) => {
 app.use(express.json({ limit: "8mb" }));
 app.use(express.urlencoded({ extended: true, limit: "1mb" }));
 
-// Temporary, explicitly enabled workspace diagnostics; never enabled in production.
-if (process.env.NODE_ENV !== "production" && process.env.ENABLE_FIT_CHECKOUT_DIAGNOSTICS === "true") {
-  app.use((req, res, next) => {
-    if (req.method !== "POST" || !/^\/api\/chat\/conversations\/\d+\/fit-checkout\/?$/.test(req.path)) {
-      next();
-      return;
-    }
-    const timestamp = new Date().toISOString();
-    const url = `${req.protocol}://${req.get("host")}${req.path}`;
-    const sessionCookiePresent = typeof req.cookies?.blousley_session === "string"
-      && req.cookies.blousley_session.length > 0;
-    let errorCode: string | null = null;
-    let error: string | null = null;
-    let message: string | null = null;
-    const sendJson = res.json.bind(res);
-    res.json = (body) => {
-      errorCode = typeof body?.code === "string" ? body.code.slice(0, 256) : null;
-      error = typeof body?.error === "string" ? body.error.slice(0, 512) : null;
-      message = typeof body?.message === "string" ? body.message.slice(0, 512) : null;
-      return sendJson(body);
-    };
-    res.once("finish", () => {
-      console.info("fit_checkout_api_response", JSON.stringify({
-        timestamp, url, sessionCookiePresent, sessionAuthenticated: Boolean(req.userId),
-        status: res.statusCode, errorCode, error, message,
-      }));
-    });
-    next();
-  });
-}
+app.use(authDiagnostics(
+  process.env.NODE_ENV !== "production" && process.env.ENABLE_FIT_CHECKOUT_DIAGNOSTICS === "true",
+));
 
 app.use("/api/blouse/fits", rateLimit(60 * 60 * 1000, 20, "upload", "ip", ["POST"]));
 app.use("/api/blouse/fits", rateLimit(60 * 60 * 1000, 20, "upload-user", "user", ["POST"]));

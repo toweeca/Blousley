@@ -1,4 +1,5 @@
 // Copyright © 2026 Blousley. All rights reserved.
+import { apiFetch as fetch } from "@/lib/api-client";
 import { Feather, MaterialCommunityIcons } from "@expo/vector-icons";
 import { CopyrightNotice } from "@/components/LegalLinks";
 import * as Haptics from "expo-haptics";
@@ -464,7 +465,7 @@ function TailorProfileCard({
     data: conversations,
     isLoading: conversationsLoading,
     isError: conversationsError,
-  } = useQuery(tailorSummaryConversationsQueryOptions(user.id, apiBase, user.role === "tailor"));
+  } = useQuery(tailorSummaryConversationsQueryOptions(user.id, apiBase, user.role === "tailor", fetch));
 
   const saveMutation = useMutation({
     mutationFn: async (payload: { bio?: string; skills?: string[] }) => {
@@ -793,6 +794,7 @@ export default function TailorScreen() {
       sort: requestSort,
       filter: requestFilter,
       apiBase,
+      fetcher: fetch,
     }),
   );
   const { availableFitRequests, customerFits } = user?.role === "tailor"
