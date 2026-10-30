@@ -77,7 +77,7 @@ export function createSessionApiClient({
       headers,
       // Android's automatic cookie jar can override an explicit Cookie header.
       // Disable it on native; the browser still owns its HttpOnly cookie.
-      credentials: native ? "omit" : "include",
+      credentials: native && !signingIn ? "omit" : "include",
     });
 
     if (native && signingIn && response.ok) {

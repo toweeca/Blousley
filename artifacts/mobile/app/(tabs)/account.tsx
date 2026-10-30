@@ -25,9 +25,11 @@ import { useQuery, useQueryClient } from "@tanstack/react-query";
 import Colors from "@/constants/colors";
 import { useApp, type UserRole } from "@/context/AppContext";
 import { SignupConsent, LegalFooter } from "@/components/LegalLinks";
+import { readAuthJson, resolveApiBaseUrl } from "@/lib/api-base-url";
 
-const _raw = process.env.EXPO_PUBLIC_DOMAIN ?? "";
-const API_BASE = _raw && !_raw.startsWith("http") ? `https://${_raw}` : _raw;
+const API_BASE = process.env.EXPO_PUBLIC_DOMAIN
+  ? resolveApiBaseUrl(process.env.EXPO_PUBLIC_DOMAIN)
+  : "";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -92,15 +94,18 @@ export default function AccountScreen() {
     if (!EMAIL_RE.test(email.trim())) { Alert.alert("Valid email required", "Please enter a valid email address."); return; }
     if (password.length < 12) { Alert.alert("Password required", "Use at least 12 characters."); return; }
     try {
-      const response = await fetch(`${API_BASE}/api/auth/${isLogin ? "login" : "register"}`, {
+      const apiBase = resolveApiBaseUrl(process.env.EXPO_PUBLIC_DOMAIN);
+      const response = await fetch(`${apiBase}/api/auth/${isLogin ? "login" : "register"}`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify(isLogin
           ? { email: email.trim().toLowerCase(), password }
           : { name: name.trim(), email: email.trim().toLowerCase(), password, phone: phone.trim() || undefined, role }),
       });
-      const account = await response.json();
+      const account = await readAuthJson<
+        Exclude<Parameters<ReturnType<typeof useApp>["setUser"]>[0], null> & { error?: string }
+      >(response);
       if (!response.ok) throw new Error(account.error ?? "Could not sign in");
       await setUser(account);
       setPassword("");

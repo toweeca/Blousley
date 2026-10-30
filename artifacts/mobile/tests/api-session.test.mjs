@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { createSessionApiClient } from "../lib/api-session.ts";
+import { readAuthJson, resolveApiBaseUrl } from "../lib/api-base-url.ts";
 
 const baseUrl = "https://api.example.invalid";
 const token = "A".repeat(43);
@@ -36,18 +37,40 @@ test("native login persists only the issued cookie in the secure-store adapter, 
   });
   const response = await f.client.request(`${baseUrl}/api/auth/login`, {
     method: "POST", body: JSON.stringify({ email: "test@example.invalid", password: "synthetic-test-only" }),
+    headers: { Accept: "application/json" },
   });
   assert.deepEqual(await response.json(), { id: "test-account", role: "customer" });
   assert.deepEqual(JSON.parse(f.value()), { origin: baseUrl, token });
   assert.equal(f.writes(), 1);
   assert.equal(calls[0].init.headers.has("Cookie"), false);
-  assert.equal(calls[0].init.credentials, "omit");
+  assert.equal(calls[0].init.credentials, "include");
+  assert.equal(calls[0].init.headers.get("Accept"), "application/json");
   const restarted = createSessionApiClient({ baseUrl, native: true, store: f.store, fetcher: async (_url, init) => {
     assert.equal(init.headers.get("Cookie"), cookie);
     return Response.json({});
   } });
   await restarted.request(`${baseUrl}/api/ideas`);
   assert.equal(await restarted.cookieHeader(), cookie);
+});
+
+test("native login and registration both send credentials and request JSON", async () => {
+  const requests = [];
+  const f = fixture(async (_url, init) => {
+    requests.push(init);
+    return loginResponse();
+  });
+  for (const route of ["/api/auth/login", "/api/auth/register"]) {
+    await f.client.request(`${baseUrl}${route}`, {
+      method: "POST",
+      credentials: "include",
+      headers: { Accept: "application/json" },
+    });
+  }
+  assert.equal(requests.length, 2);
+  for (const init of requests) {
+    assert.equal(init.credentials, "include");
+    assert.equal(init.headers.get("Accept"), "application/json");
+  }
 });
 
 test("all approved POST flows receive the same explicit session cookie and retain their bodies", async () => {
@@ -132,4 +155,26 @@ test("sessions cannot be sent to another API origin or restored from a different
   const other = createSessionApiClient({ baseUrl: "https://other.example.invalid", native: true, store: f.store });
   assert.equal(await other.cookieHeader(), undefined);
   assert.equal(f.value(), null);
+});
+
+test("auth configuration requires an HTTPS API host and normalizes its origin", () => {
+  assert.equal(resolveApiBaseUrl(" blousley.replit.app "), baseUrl.replace("api.example.invalid", "blousley.replit.app"));
+  assert.throws(() => resolveApiBaseUrl(undefined), /host is missing/);
+  assert.throws(() => resolveApiBaseUrl("http://blousley.replit.app"), /host is invalid/);
+  assert.throws(() => resolveApiBaseUrl("https://blousley.replit.app/api"), /host is invalid/);
+});
+
+test("HTML or malformed auth responses produce a clear API configuration error", async () => {
+  await assert.rejects(
+    readAuthJson(new Response("<html>wrong host</html>", { headers: { "Content-Type": "text/html" } })),
+    /API host is incorrect/,
+  );
+  await assert.rejects(
+    readAuthJson(new Response("{", { headers: { "Content-Type": "application/json" } })),
+    /API host returned invalid JSON/,
+  );
+  assert.deepEqual(
+    await readAuthJson(new Response('{"id":"test"}', { headers: { "Content-Type": "application/json; charset=utf-8" } })),
+    { id: "test" },
+  );
 });
