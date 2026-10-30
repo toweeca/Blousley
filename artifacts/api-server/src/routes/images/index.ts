@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { blouseFitsTable, conversations, messages, privateImages, usersTable } from "@workspace/db/schema";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { readPrivateImage } from "../../lib/privateImages";
+import { readPrivateChatImage, readPrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
@@ -125,7 +125,7 @@ router.get("/chat/:conversationId/:messageId", async (req, res) => {
 
     let image: Buffer;
     try {
-      image = await readPrivateImage(storageKey);
+      image = await readPrivateChatImage(storageKey);
     } catch {
       res.status(404).json({ error: "Image not found." });
       return;

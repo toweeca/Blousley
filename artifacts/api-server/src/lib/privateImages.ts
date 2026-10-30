@@ -1,7 +1,15 @@
-import { randomUUID } from "node:crypto";
 import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
+import {
+  deletePrivateChatObject,
+  migratePrivateChatObject,
+  newPrivateChatImageKey,
+  privateChatImageMimeType,
+  privateChatObjectExists,
+  readPrivateChatObject,
+  savePrivateChatObject,
+} from "./privateChatImages";
 
 const PRIVATE_IMAGE_DIR = path.resolve(process.cwd(), ".private-images");
 const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
@@ -44,7 +52,7 @@ export async function savePrivateImage(
   image: string,
   userId: string,
   originalName?: string,
-  options?: { format?: "png" },
+  options?: { format?: "png"; storage?: "object" },
 ) {
   const match = image.match(DATA_URI_RE);
   const svgMatch = image.match(SVG_DATA_URI_RE);
@@ -84,8 +92,12 @@ export async function savePrivateImage(
   }
 
   await mkdir(PRIVATE_IMAGE_DIR, { recursive: true, mode: 0o700 });
-  const storageKey = `${randomUUID()}.${extensionForMimeType(mimeType)}`;
-  await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), sanitizedBuffer, { mode: 0o600, flag: "wx" });
+  const storageKey = newPrivateChatImageKey(extensionForMimeType(mimeType));
+  if (options?.storage === "object") {
+    await savePrivateChatObject(storageKey, sanitizedBuffer, mimeType);
+  } else {
+    await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), sanitizedBuffer, { mode: 0o600, flag: "wx" });
+  }
   console.info("image_upload", { userId, mimeType, size: sanitizedBuffer.length });
   return { storageKey, mimeType };
 }
@@ -116,4 +128,32 @@ export async function deletePrivateImage(storageKey: string) {
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
   }
+}
+
+export async function readPrivateChatImage(storageKey: string) {
+  const durableImage = await readPrivateChatObject(storageKey);
+  if (durableImage) return durableImage;
+  return readFile(path.join(PRIVATE_IMAGE_DIR, storageKey));
+}
+
+export async function deletePrivateChatImage(storageKey: string) {
+  await Promise.all([
+    deletePrivateChatObject(storageKey),
+    deletePrivateImage(storageKey),
+  ]);
+}
+
+export async function migrateLegacyPrivateChatImage(storageKey: string) {
+  if (await privateChatObjectExists(storageKey)) return "already-durable" as const;
+  const localImage = await readFile(path.join(PRIVATE_IMAGE_DIR, storageKey)).catch((error: unknown) => {
+    if ((error as NodeJS.ErrnoException).code === "ENOENT") return null;
+    throw error;
+  });
+  if (!localImage) return "missing" as const;
+  const migrated = await migratePrivateChatObject(
+    storageKey,
+    localImage,
+    privateChatImageMimeType(storageKey),
+  );
+  return migrated ? "migrated" as const : "already-durable" as const;
 }

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { randomBytes } from "node:crypto";
-import { unlink } from "node:fs/promises";
+import { access, unlink } from "node:fs/promises";
 import path from "node:path";
 import test, { after, before } from "node:test";
 import { and, eq, inArray, or } from "drizzle-orm";
@@ -9,7 +9,11 @@ import { db, blouseFitsTable, conversations, messages, sessions, usersTable } fr
 import { privateImages } from "@workspace/db/schema";
 import { createSessionToken } from "../src/lib/auth.ts";
 import { withRlsUser } from "../src/lib/rls.ts";
-import { savePrivateImage } from "../src/lib/privateImages.ts";
+import {
+  deletePrivateChatImage,
+  migrateLegacyPrivateChatImage,
+  savePrivateImage,
+} from "../src/lib/privateImages.ts";
 import { getStripeClient } from "../src/stripeClient.ts";
 
 if (process.env.NODE_ENV === "production") {
@@ -338,7 +342,9 @@ after(async () => {
     if (userIds.length) await db.delete(usersTable).where(inArray(usersTable.id, userIds));
   } finally {
     await Promise.all(privateImageStorageKeys.map((storageKey) =>
-      unlink(path.join(process.cwd(), ".private-images", storageKey)).catch(() => undefined),
+      deletePrivateChatImage(storageKey).catch(() =>
+        unlink(path.join(process.cwd(), ".private-images", storageKey)).catch(() => undefined),
+      ),
     ));
     if (server) {
       server.closeAllConnections?.();
@@ -579,6 +585,10 @@ test("conversation image batches are private, validated, and all-or-nothing", as
     assert.ok(Date.parse(message.createdAt));
     assert.match(message.content, /^blousley-chat-image-v1:[0-9a-f-]{36}\.png$/);
     privateImageStorageKeys.push(message.content.slice("blousley-chat-image-v1:".length));
+    await assert.rejects(
+      access(path.join(process.cwd(), ".private-images", privateImageStorageKeys.at(-1))),
+      { code: "ENOENT" },
+    );
   }
   assert.equal(result.messages.find((message) => message.role === "user").content, "Please see these photos.");
 
@@ -619,6 +629,28 @@ test("conversation image batches are private, validated, and all-or-nothing", as
     conversationList.body.find((conversation) => conversation.id === conversationId).lastMessage.content,
     "Image attachment",
   );
+
+  const legacyImage = await savePrivateImage(
+    `data:image/png;base64,${Buffer.from(imageBytes).toString("base64")}`,
+    customerId,
+  );
+  privateImageStorageKeys.push(legacyImage.storageKey);
+  const [legacyMessage] = await withRlsUser(customerId, (tx) =>
+    tx.insert(messages).values({
+      conversationId,
+      senderId: customerId,
+      role: "image_attachment",
+      content: `blousley-chat-image-v1:${legacyImage.storageKey}`,
+      isRead: false,
+    }).returning(),
+  );
+  assert.equal(await migrateLegacyPrivateChatImage(legacyImage.storageKey), "migrated");
+  await unlink(path.join(process.cwd(), ".private-images", legacyImage.storageKey));
+  const migratedRead = await fetch(
+    `${baseUrl}/api/images/chat/${conversationId}/${legacyMessage.id}`,
+    { headers: { Cookie: sessionCookies.get(customerId) } },
+  );
+  assert.equal(migratedRead.status, 200);
 
   const [nonFitConversation] = await db.insert(conversations).values({
     title: "Non-fit attachment rejection fixture",
