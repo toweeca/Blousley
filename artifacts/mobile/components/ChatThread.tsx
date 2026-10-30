@@ -658,81 +658,6 @@ export default function ChatThread({
           </View>
         ) : null}
 
-        {isFitConversation ? (
-          <View style={[styles.fitQuoteCard, { backgroundColor: theme.card, borderColor: theme.border }]}>
-            <Text style={[styles.fitQuoteLabel, { color: theme.textMuted }]}>MY FITS · TAILOR QUOTE</Text>
-            {fitPayment?.fitQuoteCents != null ? (
-              <Text style={[styles.fitQuoteAmount, { color: theme.text }]}>
-                CAD ${(fitPayment.fitQuoteCents / 100).toFixed(2)}
-                {fitPayment.fitPaidAt ? " · Paid" : " · Awaiting payment"}
-              </Text>
-            ) : (
-              <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
-                {isFitTailor ? "Send a quote when you’re ready." : "Waiting for your tailor to send a quote."}
-              </Text>
-            )}
-
-            {isFitTailor && !fitPayment?.fitPaidAt && (
-              fitPayment?.quoteCheckoutStarted ? (
-                <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
-                  Checkout has started, so this quote is locked.
-                </Text>
-              ) : (
-                <>
-                  <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
-                    Set the amount the customer can pay securely here.
-                  </Text>
-                  <View style={styles.quoteInputRow}>
-                    <Text style={[styles.quoteCurrency, { color: theme.text }]}>CAD $</Text>
-                    <TextInput
-                      style={[styles.quoteInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
-                      value={quoteAmount}
-                      onChangeText={setQuoteAmount}
-                      keyboardType="decimal-pad"
-                      placeholder="125.00"
-                      placeholderTextColor={theme.textMuted}
-                      accessibilityLabel="Tailor quote in Canadian dollars"
-                    />
-                  </View>
-                  {!!quoteError && <Text style={[styles.checkoutError, { color: "#CC3333" }]}>{quoteError}</Text>}
-                  <TouchableOpacity
-                    accessibilityRole="button"
-                    style={[styles.payNowButton, { opacity: setFitQuoteMutation.isPending || !quoteInputIsValid ? 0.6 : 1 }]}
-                    onPress={() => setFitQuoteMutation.mutate()}
-                    disabled={setFitQuoteMutation.isPending || !quoteInputIsValid}
-                  >
-                    {setFitQuoteMutation.isPending ? (
-                      <ActivityIndicator color="#fff" size="small" />
-                    ) : (
-                      <Text style={styles.payNowText}>
-                        {fitPayment?.fitQuoteCents != null ? "Update Quote" : "Send Quote"}
-                      </Text>
-                    )}
-                  </TouchableOpacity>
-                </>
-              )
-            )}
-
-            {canPayForFit ? (
-              <TouchableOpacity
-                accessibilityRole="button"
-                style={[styles.payNowButton, { opacity: checkoutPending ? 0.65 : 1 }]}
-                onPress={startFitCheckout}
-                disabled={checkoutPending}
-              >
-                {checkoutPending ? (
-                  <ActivityIndicator color="#fff" size="small" />
-                ) : (
-                  <Text style={styles.payNowText}>
-                    Pay CAD ${((fitPayment?.fitQuoteCents ?? 0) / 100).toFixed(2)}
-                  </Text>
-                )}
-              </TouchableOpacity>
-            ) : null}
-            {checkoutError ? <Text style={[styles.checkoutError, { color: "#CC3333" }]}>{checkoutError}</Text> : null}
-          </View>
-        ) : null}
-
         {/* Design context banner */}
         {idea ? (
           <View style={[styles.ideaBanner, { backgroundColor: theme.card, borderColor: theme.border }]}>
@@ -828,6 +753,91 @@ export default function ChatThread({
             keyboardShouldPersistTaps="handled"
           />
         )}
+
+        {isFitConversation ? (
+          <View
+            testID="fit-quote-card"
+            style={[styles.fitQuoteCard, { backgroundColor: theme.card, borderColor: theme.border }]}
+          >
+            <Text style={[styles.fitQuoteLabel, { color: theme.textMuted }]}>MY FITS · TAILOR QUOTE</Text>
+            {fitPayment?.fitQuoteCents != null ? (
+              <>
+                <Text style={[styles.fitQuoteAmount, { color: theme.text }]}>
+                  CAD ${(fitPayment.fitQuoteCents / 100).toFixed(2)}
+                </Text>
+                <Text testID="fit-payment-status" style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                  {fitPayment.fitPaidAt ? "Paid" : "Awaiting payment"}
+                </Text>
+              </>
+            ) : (
+              <Text testID="fit-payment-status" style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                {isFitTailor ? "Send a quote when you’re ready." : "Waiting for your tailor to send a quote."}
+              </Text>
+            )}
+
+            {isFitTailor && !fitPayment?.fitPaidAt && (
+              fitPayment?.quoteCheckoutStarted ? (
+                <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                  Checkout has started, so this quote is locked.
+                </Text>
+              ) : (
+                <>
+                  <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
+                    Set the amount the customer can pay securely here.
+                  </Text>
+                  <View style={styles.quoteInputRow}>
+                    <Text style={[styles.quoteCurrency, { color: theme.text }]}>CAD $</Text>
+                    <TextInput
+                      testID="fit-quote-input"
+                      style={[styles.quoteInput, { backgroundColor: theme.background, color: theme.text, borderColor: theme.border }]}
+                      value={quoteAmount}
+                      onChangeText={setQuoteAmount}
+                      keyboardType="decimal-pad"
+                      placeholder="125.00"
+                      placeholderTextColor={theme.textMuted}
+                      accessibilityLabel="Tailor quote in Canadian dollars"
+                    />
+                  </View>
+                  {!!quoteError && <Text style={[styles.checkoutError, { color: "#CC3333" }]}>{quoteError}</Text>}
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    testID="fit-send-quote"
+                    style={[styles.payNowButton, { opacity: setFitQuoteMutation.isPending || !quoteInputIsValid ? 0.6 : 1 }]}
+                    onPress={() => setFitQuoteMutation.mutate()}
+                    disabled={setFitQuoteMutation.isPending || !quoteInputIsValid}
+                  >
+                    {setFitQuoteMutation.isPending ? (
+                      <ActivityIndicator color="#fff" size="small" />
+                    ) : (
+                      <Text style={styles.payNowText}>
+                        {fitPayment?.fitQuoteCents != null ? "Update Quote" : "Send Quote"}
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                </>
+              )
+            )}
+
+            {canPayForFit ? (
+              <TouchableOpacity
+                accessibilityRole="button"
+                testID="fit-pay-button"
+                style={[styles.payNowButton, { opacity: checkoutPending ? 0.65 : 1 }]}
+                onPress={startFitCheckout}
+                disabled={checkoutPending}
+              >
+                {checkoutPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Text style={styles.payNowText}>
+                    Pay CAD ${((fitPayment?.fitQuoteCents ?? 0) / 100).toFixed(2)}
+                  </Text>
+                )}
+              </TouchableOpacity>
+            ) : null}
+            {checkoutError ? <Text style={[styles.checkoutError, { color: "#CC3333" }]}>{checkoutError}</Text> : null}
+          </View>
+        ) : null}
 
         {/* Input bar */}
         <View
