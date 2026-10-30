@@ -65,6 +65,7 @@ export default function AccountScreen() {
   const [phone, setPhone] = useState(user?.phone ?? "");
   const [role, setRole] = useState<UserRole | null>(user?.role ?? null);
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [isLogin, setIsLogin] = useState(false);
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -187,6 +188,7 @@ export default function AccountScreen() {
 
       <ScrollView
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
         contentContainerStyle={[styles.content, { paddingBottom: 100 + bottomPad }]}
       >
         {!user ? (
@@ -290,18 +292,33 @@ export default function AccountScreen() {
                 </View>}
                 <View style={styles.formField}>
                   <Text style={[styles.fieldLabel, { color: theme.textSecondary }]}>Password</Text>
-                  <TextInput
-                    style={[styles.input, { backgroundColor: theme.card, color: theme.text, borderColor: theme.border }]}
-                    value={password}
-                    onChangeText={setPassword}
-                    placeholder="At least 12 characters"
-                    placeholderTextColor={theme.textMuted}
-                    secureTextEntry
-                    autoCapitalize="none"
-                    autoCorrect={false}
-                    autoComplete={isLogin ? "current-password" : "new-password"}
-                    testID="password-input"
-                  />
+                  <View style={[styles.passwordInputWrap, { backgroundColor: theme.card, borderColor: theme.border }]}>
+                    <TextInput
+                      style={[styles.passwordInput, { color: theme.text }]}
+                      value={password}
+                      onChangeText={setPassword}
+                      placeholder="At least 12 characters"
+                      placeholderTextColor={theme.textMuted}
+                      secureTextEntry={!showPassword}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      autoComplete="off"
+                      testID="password-input"
+                    />
+                    <TouchableOpacity
+                      style={styles.passwordToggle}
+                      onPress={() => setShowPassword((visible) => !visible)}
+                      accessibilityRole="button"
+                      accessibilityLabel={showPassword ? "Hide password" : "Show password"}
+                      testID="password-visibility-toggle"
+                    >
+                      <Feather
+                        name={showPassword ? "eye-off" : "eye"}
+                        size={18}
+                        color={theme.textSecondary}
+                      />
+                    </TouchableOpacity>
+                  </View>
                 </View>
               </Animated.View>
             )}
@@ -317,7 +334,7 @@ export default function AccountScreen() {
                 {isLogin ? "Sign In" : role ? `Continue as ${role === "tailor" ? "Tailor" : "Customer"}` : "Select an account type"}
               </Text>
             </TouchableOpacity>
-            <TouchableOpacity onPress={() => { setIsLogin((value) => !value); setPassword(""); }}>
+            <TouchableOpacity onPress={() => { setIsLogin((value) => !value); setPassword(""); setShowPassword(false); }}>
               <Text style={[styles.sectionSub, { color: Colors.brand.primary, textAlign: "center" }]}>
                 {isLogin ? "Need an account? Create one" : "Already have an account? Sign in"}
               </Text>
@@ -754,6 +771,26 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     fontFamily: "Inter_400Regular",
     fontSize: 15,
+  },
+  passwordInputWrap: {
+    height: 48,
+    flexDirection: "row",
+    alignItems: "center",
+    borderWidth: 1,
+    borderRadius: 12,
+  },
+  passwordInput: {
+    flex: 1,
+    height: "100%",
+    paddingHorizontal: 14,
+    fontFamily: "Inter_400Regular",
+    fontSize: 15,
+  },
+  passwordToggle: {
+    width: 48,
+    height: 48,
+    alignItems: "center",
+    justifyContent: "center",
   },
   roleCard: {
     flexDirection: "row",
