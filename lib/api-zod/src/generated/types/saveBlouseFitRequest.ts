@@ -5,8 +5,8 @@
  * Saree Blouse Fitter API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { Measurements } from './measurements';
-import type { StylePrefs } from './stylePrefs';
+import type { Measurements } from "./measurements";
+import type { StylePrefs } from "./stylePrefs";
 
 export interface SaveBlouseFitRequest {
   userId: string;

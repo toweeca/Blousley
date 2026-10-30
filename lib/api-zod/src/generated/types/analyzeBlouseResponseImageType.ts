@@ -6,10 +6,10 @@
  * OpenAPI spec version: 0.1.0
  */
 
-export type AnalyzeBlouseResponseImageType = typeof AnalyzeBlouseResponseImageType[keyof typeof AnalyzeBlouseResponseImageType];
-
+export type AnalyzeBlouseResponseImageType =
+  (typeof AnalyzeBlouseResponseImageType)[keyof typeof AnalyzeBlouseResponseImageType];
 
 export const AnalyzeBlouseResponseImageType = {
-  person: 'person',
-  blouse: 'blouse',
+  person: "person",
+  blouse: "blouse",
 } as const;

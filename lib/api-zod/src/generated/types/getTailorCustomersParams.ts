@@ -7,5 +7,5 @@
  */
 
 export type GetTailorCustomersParams = {
-tailorId: string;
+  tailorId: string;
 };

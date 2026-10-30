@@ -49,12 +49,12 @@ export interface AnalysisPoint {
   detail: string;
 }
 
-export type AnalyzeBlouseResponseImageType = typeof AnalyzeBlouseResponseImageType[keyof typeof AnalyzeBlouseResponseImageType];
-
+export type AnalyzeBlouseResponseImageType =
+  (typeof AnalyzeBlouseResponseImageType)[keyof typeof AnalyzeBlouseResponseImageType];
 
 export const AnalyzeBlouseResponseImageType = {
-  person: 'person',
-  blouse: 'blouse',
+  person: "person",
+  blouse: "blouse",
 } as const;
 
 export interface AnalyzeBlouseResponse {
@@ -98,11 +98,11 @@ export interface ChatImageUploadResponse {
 }
 
 export type GetBlouseFitsParams = {
-userId: string;
+  userId: string;
 };
 
 export type GetBlouseFitParams = {
-userId: string;
+  userId: string;
 };
 
 export type SubmitFitToTailorsBody = {
@@ -110,16 +110,15 @@ export type SubmitFitToTailorsBody = {
 };
 
 export type GetTailorCustomersParams = {
-tailorId: string;
+  tailorId: string;
 };
 
 export type UploadChatImagesBody = {
   /**
-     * @minItems 1
-     * @maxItems 5
-     */
+   * @minItems 1
+   * @maxItems 5
+   */
   images: (Blob | File)[];
   /** @maxLength 4000 */
   message?: string;
 };
-

@@ -8,9 +8,9 @@
 
 export type UploadChatImagesBody = {
   /**
-     * @minItems 1
-     * @maxItems 5
-     */
+   * @minItems 1
+   * @maxItems 5
+   */
   images: (Blob | File)[];
   /** @maxLength 4000 */
   message?: string;

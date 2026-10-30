@@ -7,5 +7,5 @@
  */
 
 export type GetBlouseFitsParams = {
-userId: string;
+  userId: string;
 };

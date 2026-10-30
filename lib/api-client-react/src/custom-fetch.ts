@@ -310,7 +310,10 @@ export async function customFetch<T = unknown>(
   const requestUrl = resolveUrl(input, baseUrl);
   const requestInfo = { method, url: requestUrl };
 
-  const response = await fetcher(requestUrl, { ...init, method, headers });
+  const requestInput = baseUrl && typeof input === "string" && input.startsWith("/")
+    ? requestUrl
+    : input;
+  const response = await fetcher(requestInput, { ...init, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

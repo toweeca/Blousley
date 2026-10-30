@@ -178,6 +178,11 @@ export default function ChatThread({
   });
 
   const isFitConversation = fitPayment?.fitId != null;
+  useEffect(() => {
+    setSelectedImages([]);
+    setImagePreview(null);
+    setImageUploadStatus("");
+  }, [conversationId, currentUserId, visible]);
   const isFitTailor = isFitConversation && user?.role === "tailor" && fitPayment?.tailorId === currentUserId;
   const isFitCustomer = isFitConversation && user?.role === "customer" && fitPayment?.customerId === currentUserId;
   useEffect(() => {
@@ -374,18 +379,24 @@ export default function ChatThread({
   });
 
   const imageUploadMutation = useMutation({
-    mutationFn: async ({ images, text }: { images: ImagePicker.ImagePickerAsset[]; text: string }) => {
-      const endpoint = `${apiBase.replace(/\/+$/, "")}/api/chat/conversations/${conversationId}/images`;
+    mutationFn: async ({ images, text, targetId }: { images: ImagePicker.ImagePickerAsset[]; text: string; targetId: number }) => {
+      const endpoint = `${apiBase.replace(/\/+$/, "")}/api/chat/conversations/${targetId}/images`;
       const cookie = await getApiSessionCookie(endpoint);
       if (Platform.OS !== "web" && !cookie) {
         throw new Error("Your sign-in has expired. Sign in again before sending images.");
       }
 
       const requestBody: Parameters<typeof uploadChatImages>[1] = {
-        images: images.map((asset) => new File(asset.uri)),
+        images: images.map((asset) => {
+          if (Platform.OS === "web") {
+            if (!asset.file) throw new Error("The selected photo is unavailable. Please select it again.");
+            return asset.file;
+          }
+          return new File(asset.uri);
+        }),
         ...(text ? { message: text } : {}),
       };
-      return uploadChatImages(conversationId, requestBody, {
+      return uploadChatImages(targetId, requestBody, {
         baseUrl: apiBase.replace(/\/+$/, ""),
         fetcher: expoFetch,
         credentials: Platform.OS === "web" ? "include" : "omit",
@@ -394,7 +405,7 @@ export default function ChatThread({
     },
     onSuccess: (result, variables) => {
       const newMessages = result.messages as unknown as Message[];
-      qc.setQueryData<Message[]>(["chat-messages", conversationId], (current = []) => {
+      qc.setQueryData<Message[]>(["chat-messages", variables.targetId], (current = []) => {
         const byId = new Map(current.map((message) => [message.id, message]));
         for (const message of newMessages) byId.set(message.id, message);
         return [...byId.values()].sort(
@@ -403,11 +414,13 @@ export default function ChatThread({
       });
       void qc.invalidateQueries({ queryKey: ["chat-conversations"] });
       void qc.invalidateQueries({ queryKey: ["chat-conversations-badge"] });
-      setSelectedImages([]);
-      setDraft("");
-      setImageUploadStatus(
-        `${variables.images.length} ${variables.images.length === 1 ? "image" : "images"} sent.`,
-      );
+      if (variables.targetId === conversationId && visible) {
+        setSelectedImages([]);
+        setDraft("");
+        setImageUploadStatus(
+          `${variables.images.length} ${variables.images.length === 1 ? "image" : "images"} sent.`,
+        );
+      }
     },
     onError: (error) => {
       const message = error instanceof Error ? error.message : "Please try again.";
@@ -417,12 +430,22 @@ export default function ChatThread({
   });
 
   const handlePickImages = useCallback(async () => {
-    if (imageUploadMutation.isPending) return;
+    if (imageUploadMutation.isPending || !isFitConversation) return;
     try {
       if (Platform.OS !== "web") {
         const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
         if (permission.status !== "granted") {
-          Alert.alert("Photo access needed", "Allow photo access to attach images to this chat.");
+          Alert.alert("Photo access needed", "Allow photo access to attach images to this chat.", [
+            { text: "Cancel", style: "cancel" },
+            ...(!permission.canAskAgain ? [{
+              text: "Open Settings",
+              onPress: () => {
+                void Linking.openSettings().catch(() => {
+                  Alert.alert("Settings unavailable", "Open your device settings to allow photo access.");
+                });
+              },
+            }] : []),
+          ]);
           return;
         }
       }
@@ -471,7 +494,7 @@ export default function ChatThread({
         error instanceof Error ? error.message : "Please try again.",
       );
     }
-  }, [imageUploadMutation.isPending, selectedImages]);
+  }, [imageUploadMutation.isPending, isFitConversation, selectedImages]);
 
   const handleSend = useCallback(() => {
     const t = draft.trim();
@@ -482,11 +505,11 @@ export default function ChatThread({
     ]).start();
     if (selectedImages.length) {
       setImageUploadStatus(`Uploading ${selectedImages.length} ${selectedImages.length === 1 ? "image" : "images"}…`);
-      imageUploadMutation.mutate({ images: [...selectedImages], text: t });
+      imageUploadMutation.mutate({ images: [...selectedImages], text: t, targetId: conversationId });
     } else {
       sendMutation.mutate(t);
     }
-  }, [draft, imageUploadMutation, selectedImages, sendMutation, sendBtnScale]);
+  }, [conversationId, draft, imageUploadMutation, selectedImages, sendMutation, sendBtnScale]);
 
   useEffect(() => {
     if (msgs.length > 0 && visible) {
@@ -832,6 +855,7 @@ export default function ChatThread({
                     accessibilityRole="button"
                     accessibilityLabel={`Remove image ${index + 1}`}
                     testID={`chat-remove-image-${index}`}
+                    disabled={imageUploadMutation.isPending}
                     style={[styles.removeAttachmentButton, { backgroundColor: theme.card }]}
                     onPress={() => {
                       setSelectedImages((current) => current.filter((item) => item.uri !== asset.uri));
@@ -861,7 +885,7 @@ export default function ChatThread({
             </View>
           ) : null}
           <View style={styles.inputRow}>
-            <TouchableOpacity
+            {isFitConversation ? <TouchableOpacity
               accessibilityRole="button"
               accessibilityLabel="Attach images"
               testID="chat-attach-images"
@@ -870,7 +894,7 @@ export default function ChatThread({
               disabled={imageUploadMutation.isPending}
             >
               <Feather name="paperclip" size={20} color={theme.textSecondary} />
-            </TouchableOpacity>
+            </TouchableOpacity> : null}
             <TextInput
               style={[
                 styles.input,
@@ -881,6 +905,7 @@ export default function ChatThread({
                 },
               ]}
               value={draft}
+              editable={!imageUploadMutation.isPending}
               onChangeText={(value) => {
                 setDraft(value);
                 if (imageUploadStatus) setImageUploadStatus("");

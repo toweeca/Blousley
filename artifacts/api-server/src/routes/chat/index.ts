@@ -363,7 +363,9 @@ router.get("/conversations", async (req, res) => {
           customerName: c.customerId ? participantNames.get(c.customerId) ?? null : null,
           tailorName: c.tailorId ? participantNames.get(c.tailorId) ?? null : null,
           unreadCount: unread,
-          lastMessage: lastMsgRows[0] ?? null,
+          lastMessage: lastMsgRows[0]?.role === "image_attachment"
+            ? { ...lastMsgRows[0], content: "Image attachment" }
+            : lastMsgRows[0] ?? null,
         };
       })
     );
@@ -543,8 +545,8 @@ router.post(
     if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required." });
 
     try {
-      const [conversation] = await withRlsUser<Array<{ customerId: string | null; tailorId: string | null }>>(userId, (tx) =>
-        tx.select({ customerId: conversations.customerId, tailorId: conversations.tailorId })
+      const [conversation] = await withRlsUser<Array<{ customerId: string | null; tailorId: string | null; fitId: number | null }>>(userId, (tx) =>
+        tx.select({ customerId: conversations.customerId, tailorId: conversations.tailorId, fitId: conversations.fitId })
           .from(conversations)
           .where(eq(conversations.id, conversationId))
           .limit(1),
@@ -552,6 +554,9 @@ router.post(
       if (!conversation) return res.status(404).json({ error: "Conversation not found." });
       if (conversation.customerId !== userId && conversation.tailorId !== userId) {
         return res.status(403).json({ error: "Not a participant in this conversation." });
+      }
+      if (conversation.fitId === null) {
+        return res.status(409).json({ error: "Images are only available in My Fits conversations." });
       }
       return next();
     } catch {

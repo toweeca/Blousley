@@ -5,9 +5,9 @@
  * Saree Blouse Fitter API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { AnalysisPoint } from './analysisPoint';
-import type { AnalyzeBlouseResponseImageType } from './analyzeBlouseResponseImageType';
-import type { Measurements } from './measurements';
+import type { AnalysisPoint } from "./analysisPoint";
+import type { AnalyzeBlouseResponseImageType } from "./analyzeBlouseResponseImageType";
+import type { Measurements } from "./measurements";
 
 export interface AnalyzeBlouseResponse {
   imageType: AnalyzeBlouseResponseImageType;

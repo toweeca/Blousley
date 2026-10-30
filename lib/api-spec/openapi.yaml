@@ -209,7 +209,7 @@ paths:
     post:
       operationId: uploadChatImages
       tags: [chat]
-      summary: Upload private images to a conversation
+      summary: Upload private images to a My Fits conversation
       parameters:
         - name: conversationId
           in: path
@@ -249,6 +249,10 @@ paths:
           description: User is not a conversation participant
         "413":
           description: An image exceeds the per-file size limit
+        "409":
+          description: Attachments are only available in My Fits conversations
+        "415":
+          description: Unsupported image type
 
   /images/chat/{conversationId}/{messageId}:
     get:

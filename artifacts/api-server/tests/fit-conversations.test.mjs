@@ -607,10 +607,38 @@ test("conversation image batches are private, validated, and all-or-nothing", as
   spoofedUpload.append("userId", customerId);
   assert.equal((await upload(nonParticipantId, spoofedUpload)).status, 403);
 
+  const tailorForm = new FormData();
+  appendPng(tailorForm);
+  const tailorResponse = await upload(tailorOneId, tailorForm);
+  assert.equal(tailorResponse.status, 201);
+  const tailorResult = await tailorResponse.json();
+  assert.equal(tailorResult.messages[0].senderId, tailorOneId);
+  privateImageStorageKeys.push(tailorResult.messages[0].content.slice("blousley-chat-image-v1:".length));
+  const conversationList = await request(customerId, "/api/chat/conversations");
+  assert.equal(
+    conversationList.body.find((conversation) => conversation.id === conversationId).lastMessage.content,
+    "Image attachment",
+  );
+
+  const [nonFitConversation] = await db.insert(conversations).values({
+    title: "Non-fit attachment rejection fixture",
+    customerId,
+    tailorId: tailorOneId,
+  }).returning();
+  const nonFitForm = new FormData();
+  appendPng(nonFitForm);
+  const nonFitResponse = await fetch(`${baseUrl}/api/chat/conversations/${nonFitConversation.id}/images`, {
+    method: "POST",
+    headers: { Cookie: sessionCookies.get(customerId) },
+    body: nonFitForm,
+  });
+  assert.equal(nonFitResponse.status, 409);
+
   const beforeFailedUpload = await request(customerId, messagesPath);
   const invalidBatch = new FormData();
   appendPng(invalidBatch);
   appendPng(invalidBatch, Buffer.from("not a png"));
+  invalidBatch.append("message", "This text must not be sent when an image fails.");
   assert.equal((await upload(customerId, invalidBatch)).status, 400);
   const afterFailedUpload = await request(customerId, messagesPath);
   assert.deepEqual(
