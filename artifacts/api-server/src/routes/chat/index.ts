@@ -10,7 +10,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { findSessionUser } from "../../lib/auth";
 import { getStripeClient } from "../../stripeClient";
-import { deletePrivateChatImage, imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
+import { deletePrivateImage, imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
 
 const router = Router();
 const chatSockets = new Map<number, Set<WebSocket>>();
@@ -590,7 +590,7 @@ router.post(
         const dataUri = imageDataUriFromBase64(
           `data:${file.mimetype};base64,${file.buffer.toString("base64")}`,
         );
-        uploaded.push(await savePrivateImage(dataUri, userId, undefined, { storage: "object" }));
+        uploaded.push(await savePrivateImage(dataUri, userId));
       }
 
       const content = uploaded.map(({ storageKey }) => `${CHAT_IMAGE_CONTENT_PREFIX}${storageKey}`);
@@ -627,7 +627,7 @@ router.post(
       return res.status(201).json({ messages: newMessages });
     } catch (error) {
       await Promise.all(uploaded.map(({ storageKey }) =>
-        deletePrivateChatImage(storageKey).catch(() => undefined),
+        deletePrivateImage(storageKey).catch(() => undefined),
       ));
       const message = error instanceof Error ? error.message : "";
       if (message === "Upload limit exceeded") {
