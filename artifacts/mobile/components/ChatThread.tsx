@@ -1,5 +1,8 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
 import { apiFetch as fetch, getApiSessionCookie } from "@/lib/api-client";
+import { File } from "expo-file-system";
+import { fetch as expoFetch } from "expo/fetch";
+import * as ImagePicker from "expo-image-picker";
 import {
   View,
   Text,
@@ -7,8 +10,8 @@ import {
   Modal,
   TouchableOpacity,
   FlatList,
+  ScrollView,
   TextInput,
-  KeyboardAvoidingView,
   Platform,
   AppState,
   useColorScheme,
@@ -21,6 +24,8 @@ import {
 import { Feather } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+import { KeyboardAvoidingView } from "react-native-keyboard-controller";
+import { uploadChatImages } from "@workspace/api-client-react";
 
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
@@ -31,6 +36,7 @@ interface Message {
   conversationId: number;
   senderId: string | null;
   content: string;
+  role?: string;
   isRead: boolean;
   createdAt: string;
 }
@@ -86,6 +92,24 @@ function formatDate(iso: string) {
   return d.toLocaleDateString("en-IN", { day: "numeric", month: "short" });
 }
 
+const MAX_CHAT_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_CHAT_IMAGES_PER_MESSAGE = 5;
+const CHAT_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const CHAT_IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+  webp: "image/webp",
+};
+
+function getImageMimeType(asset: ImagePicker.ImagePickerAsset) {
+  if (asset.mimeType) return asset.mimeType.toLowerCase();
+  const uriPath = asset.uri.split(/[?#]/, 1)[0];
+  const fileName = asset.fileName ?? uriPath.split("/").pop() ?? "";
+  const extension = fileName.toLowerCase().split(".").pop() ?? "";
+  return CHAT_IMAGE_MIME_BY_EXTENSION[extension] ?? "";
+}
+
 export default function ChatThread({
   visible,
   onClose,
@@ -102,6 +126,9 @@ export default function ChatThread({
   const qc = useQueryClient();
   const flatListRef = useRef<FlatList>(null);
   const [draft, setDraft] = useState("");
+  const [selectedImages, setSelectedImages] = useState<ImagePicker.ImagePickerAsset[]>([]);
+  const [imagePreview, setImagePreview] = useState<Message | null>(null);
+  const [imageUploadStatus, setImageUploadStatus] = useState("");
   const [checkoutPending, setCheckoutPending] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [quoteAmount, setQuoteAmount] = useState("");
@@ -346,15 +373,120 @@ export default function ChatThread({
     },
   });
 
+  const imageUploadMutation = useMutation({
+    mutationFn: async ({ images, text }: { images: ImagePicker.ImagePickerAsset[]; text: string }) => {
+      const endpoint = `${apiBase.replace(/\/+$/, "")}/api/chat/conversations/${conversationId}/images`;
+      const cookie = await getApiSessionCookie(endpoint);
+      if (Platform.OS !== "web" && !cookie) {
+        throw new Error("Your sign-in has expired. Sign in again before sending images.");
+      }
+
+      const requestBody: Parameters<typeof uploadChatImages>[1] = {
+        images: images.map((asset) => new File(asset.uri)),
+        ...(text ? { message: text } : {}),
+      };
+      return uploadChatImages(conversationId, requestBody, {
+        baseUrl: apiBase.replace(/\/+$/, ""),
+        fetcher: expoFetch,
+        credentials: Platform.OS === "web" ? "include" : "omit",
+        ...(cookie ? { headers: { Cookie: cookie } } : {}),
+      });
+    },
+    onSuccess: (result, variables) => {
+      const newMessages = result.messages as unknown as Message[];
+      qc.setQueryData<Message[]>(["chat-messages", conversationId], (current = []) => {
+        const byId = new Map(current.map((message) => [message.id, message]));
+        for (const message of newMessages) byId.set(message.id, message);
+        return [...byId.values()].sort(
+          (left, right) => new Date(left.createdAt).getTime() - new Date(right.createdAt).getTime(),
+        );
+      });
+      void qc.invalidateQueries({ queryKey: ["chat-conversations"] });
+      void qc.invalidateQueries({ queryKey: ["chat-conversations-badge"] });
+      setSelectedImages([]);
+      setDraft("");
+      setImageUploadStatus(
+        `${variables.images.length} ${variables.images.length === 1 ? "image" : "images"} sent.`,
+      );
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : "Please try again.";
+      setImageUploadStatus(`Upload failed: ${message}`);
+      Alert.alert("Image upload failed", message);
+    },
+  });
+
+  const handlePickImages = useCallback(async () => {
+    if (imageUploadMutation.isPending) return;
+    try {
+      if (Platform.OS !== "web") {
+        const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (permission.status !== "granted") {
+          Alert.alert("Photo access needed", "Allow photo access to attach images to this chat.");
+          return;
+        }
+      }
+
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ["images"],
+        allowsMultipleSelection: true,
+        selectionLimit: MAX_CHAT_IMAGES_PER_MESSAGE,
+      });
+      if (result.canceled) return;
+
+      const accepted: ImagePicker.ImagePickerAsset[] = [];
+      let unsupportedCount = 0;
+      let oversizedCount = 0;
+      for (const asset of result.assets) {
+        if (!CHAT_IMAGE_MIME_TYPES.has(getImageMimeType(asset))) {
+          unsupportedCount += 1;
+        } else if (asset.fileSize != null && asset.fileSize > MAX_CHAT_IMAGE_BYTES) {
+          oversizedCount += 1;
+        } else {
+          accepted.push(asset);
+        }
+      }
+
+      const unique = accepted.filter(
+        (asset) => !selectedImages.some((selected) => selected.uri === asset.uri),
+      );
+      const available = MAX_CHAT_IMAGES_PER_MESSAGE - selectedImages.length;
+      const additions = unique.slice(0, available);
+      const overLimitCount = unique.length - additions.length;
+      if (unsupportedCount || oversizedCount || overLimitCount) {
+        const reasons = [
+          unsupportedCount ? `${unsupportedCount} unsupported` : "",
+          oversizedCount ? `${oversizedCount} over 5 MB` : "",
+          overLimitCount ? `only ${MAX_CHAT_IMAGES_PER_MESSAGE} images can be sent at once` : "",
+        ].filter(Boolean);
+        Alert.alert("Some images were not added", reasons.join(". ") + ".");
+      }
+      if (additions.length) {
+        setSelectedImages((current) => [...current, ...additions]);
+        setImageUploadStatus("");
+      }
+    } catch (error) {
+      Alert.alert(
+        "Photo library unavailable",
+        error instanceof Error ? error.message : "Please try again.",
+      );
+    }
+  }, [imageUploadMutation.isPending, selectedImages]);
+
   const handleSend = useCallback(() => {
     const t = draft.trim();
-    if (!t) return;
+    if (imageUploadMutation.isPending || sendMutation.isPending || (!t && selectedImages.length === 0)) return;
     Animated.sequence([
       Animated.spring(sendBtnScale, { toValue: 0.85, useNativeDriver: true, speed: 40 }),
       Animated.spring(sendBtnScale, { toValue: 1, useNativeDriver: true, speed: 40 }),
     ]).start();
-    sendMutation.mutate(t);
-  }, [draft, sendMutation, sendBtnScale]);
+    if (selectedImages.length) {
+      setImageUploadStatus(`Uploading ${selectedImages.length} ${selectedImages.length === 1 ? "image" : "images"}…`);
+      imageUploadMutation.mutate({ images: [...selectedImages], text: t });
+    } else {
+      sendMutation.mutate(t);
+    }
+  }, [draft, imageUploadMutation, selectedImages, sendMutation, sendBtnScale]);
 
   useEffect(() => {
     if (msgs.length > 0 && visible) {
@@ -375,6 +507,9 @@ export default function ChatThread({
 
   const renderItem = ({ item }: { item: Message }) => {
     const isMine = item.senderId === currentUserId;
+    const isImageAttachment =
+      item.role === "image_attachment" && item.content.startsWith("blousley-chat-image-v1:");
+    const imageUrl = `${apiBase.replace(/\/+$/, "")}/api/images/chat/${item.conversationId}/${item.id}`;
     return (
       <View style={[styles.bubbleRow, isMine ? styles.bubbleRowRight : styles.bubbleRowLeft]}>
         {!isMine && (
@@ -392,9 +527,26 @@ export default function ChatThread({
               : { backgroundColor: theme.card, borderColor: theme.border, borderWidth: 1, borderBottomLeftRadius: 4 },
           ]}
         >
-          <Text style={[styles.bubbleText, { color: isMine ? "#fff" : theme.text }]}>
-            {item.content}
-          </Text>
+          {isImageAttachment ? (
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Open chat image"
+              testID={`chat-image-${item.id}`}
+              style={styles.chatImageButton}
+              onPress={() => setImagePreview(item)}
+            >
+              <PrivateFitImage
+                source={{ uri: imageUrl }}
+                style={styles.chatImage}
+                resizeMode="cover"
+                fallbackColor={theme.background}
+              />
+            </TouchableOpacity>
+          ) : (
+            <Text style={[styles.bubbleText, { color: isMine ? "#fff" : theme.text }]}>
+              {item.content}
+            </Text>
+          )}
           <Text
             style={[
               styles.bubbleTime,
@@ -412,10 +564,16 @@ export default function ChatThread({
   };
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="pageSheet" onRequestClose={onClose}>
+    <Modal
+      visible={visible}
+      animationType="slide"
+      presentationStyle="pageSheet"
+      onRequestClose={() => imagePreview ? setImagePreview(null) : onClose()}
+    >
       <KeyboardAvoidingView
         style={[styles.container, { backgroundColor: theme.background }]}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        behavior="padding"
+        keyboardVerticalOffset={0}
       >
         {/* Header */}
         <View
@@ -643,6 +801,8 @@ export default function ChatThread({
             )}
             contentContainerStyle={styles.msgList}
             showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
+            keyboardShouldPersistTaps="handled"
           />
         )}
 
@@ -657,41 +817,133 @@ export default function ChatThread({
             },
           ]}
         >
-          <TextInput
-            style={[
-              styles.input,
-              {
-                backgroundColor: theme.background,
-                color: theme.text,
-                borderColor: theme.border,
-              },
-            ]}
-            value={draft}
-            onChangeText={setDraft}
-            placeholder="Type a message…"
-            placeholderTextColor={theme.textMuted}
-            multiline
-            maxLength={1000}
-            onSubmitEditing={handleSend}
-            returnKeyType="send"
-            blurOnSubmit={false}
-          />
-          <Animated.View style={{ transform: [{ scale: sendBtnScale }] }}>
+          {selectedImages.length ? (
+            <ScrollView
+              horizontal
+              style={styles.attachmentList}
+              contentContainerStyle={styles.attachmentListContent}
+              showsHorizontalScrollIndicator={false}
+              keyboardShouldPersistTaps="handled"
+            >
+              {selectedImages.map((asset, index) => (
+                <View key={asset.uri} style={styles.attachmentThumbWrap}>
+                  <Image source={{ uri: asset.uri }} style={styles.attachmentThumb} resizeMode="cover" />
+                  <TouchableOpacity
+                    accessibilityRole="button"
+                    accessibilityLabel={`Remove image ${index + 1}`}
+                    testID={`chat-remove-image-${index}`}
+                    style={[styles.removeAttachmentButton, { backgroundColor: theme.card }]}
+                    onPress={() => {
+                      setSelectedImages((current) => current.filter((item) => item.uri !== asset.uri));
+                      setImageUploadStatus("");
+                    }}
+                  >
+                    <Feather name="x" size={15} color={theme.text} />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          ) : null}
+          {imageUploadStatus ? (
+            <View style={styles.uploadStatusRow} accessibilityLiveRegion="polite">
+              {imageUploadMutation.isPending ? (
+                <ActivityIndicator size="small" color={Colors.brand.primary} />
+              ) : null}
+              <Text
+                numberOfLines={2}
+                style={[
+                  styles.uploadStatusText,
+                  { color: imageUploadStatus.startsWith("Upload failed") ? "#CC3333" : theme.textMuted },
+                ]}
+              >
+                {imageUploadStatus}
+              </Text>
+            </View>
+          ) : null}
+          <View style={styles.inputRow}>
             <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Attach images"
+              testID="chat-attach-images"
+              style={styles.attachButton}
+              onPress={handlePickImages}
+              disabled={imageUploadMutation.isPending}
+            >
+              <Feather name="paperclip" size={20} color={theme.textSecondary} />
+            </TouchableOpacity>
+            <TextInput
               style={[
-                styles.sendBtn,
+                styles.input,
                 {
-                  backgroundColor:
-                    draft.trim().length > 0 ? Colors.brand.primary : Colors.brand.primary + "40",
+                  backgroundColor: theme.background,
+                  color: theme.text,
+                  borderColor: theme.border,
                 },
               ]}
-              onPress={handleSend}
-              disabled={!draft.trim() || sendMutation.isPending}
-            >
-              <Feather name="send" size={18} color="#fff" />
-            </TouchableOpacity>
-          </Animated.View>
+              value={draft}
+              onChangeText={(value) => {
+                setDraft(value);
+                if (imageUploadStatus) setImageUploadStatus("");
+              }}
+              placeholder="Type a message…"
+              placeholderTextColor={theme.textMuted}
+              multiline
+              maxLength={1000}
+              onSubmitEditing={handleSend}
+              returnKeyType="send"
+              blurOnSubmit={false}
+            />
+            <Animated.View style={{ transform: [{ scale: sendBtnScale }] }}>
+              <TouchableOpacity
+                accessibilityRole="button"
+                accessibilityLabel="Send message"
+                testID="chat-send-message"
+                style={[
+                  styles.sendBtn,
+                  {
+                    backgroundColor:
+                      draft.trim().length > 0 || selectedImages.length > 0
+                        ? Colors.brand.primary
+                        : Colors.brand.primary + "40",
+                  },
+                ]}
+                onPress={handleSend}
+                disabled={
+                  (!draft.trim() && selectedImages.length === 0) ||
+                  sendMutation.isPending ||
+                  imageUploadMutation.isPending
+                }
+              >
+                {imageUploadMutation.isPending ? (
+                  <ActivityIndicator color="#fff" size="small" />
+                ) : (
+                  <Feather name="send" size={18} color="#fff" />
+                )}
+              </TouchableOpacity>
+            </Animated.View>
+          </View>
         </View>
+        {imagePreview ? (
+          <View style={[StyleSheet.absoluteFill, styles.imagePreviewOverlay]}>
+            <PrivateFitImage
+              source={{
+                uri: `${apiBase.replace(/\/+$/, "")}/api/images/chat/${imagePreview.conversationId}/${imagePreview.id}`,
+              }}
+              style={styles.imagePreview}
+              resizeMode="contain"
+              fallbackColor={Colors.dark.background}
+            />
+            <TouchableOpacity
+              accessibilityRole="button"
+              accessibilityLabel="Close image preview"
+              testID="chat-image-preview-close"
+              style={[styles.imagePreviewClose, { top: insets.top + 12, backgroundColor: Colors.dark.card }]}
+              onPress={() => setImagePreview(null)}
+            >
+              <Feather name="x" size={22} color={Colors.dark.text} />
+            </TouchableOpacity>
+          </View>
+        ) : null}
       </KeyboardAvoidingView>
     </Modal>
   );
@@ -830,15 +1082,24 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     gap: 4,
   },
+  chatImageButton: { overflow: "hidden", borderRadius: 12 },
+  chatImage: { width: 190, height: 170, borderRadius: 12 },
   bubbleText: { fontFamily: "Inter_400Regular", fontSize: 15, lineHeight: 21 },
   bubbleTime: { fontFamily: "Inter_400Regular", fontSize: 10, alignSelf: "flex-end" },
   inputBar: {
-    flexDirection: "row",
-    alignItems: "flex-end",
-    gap: 10,
+    flexDirection: "column",
+    alignItems: "stretch",
+    gap: 8,
     paddingHorizontal: 14,
     paddingTop: 10,
     borderTopWidth: 1,
+  },
+  inputRow: { flexDirection: "row", alignItems: "flex-end", gap: 8 },
+  attachButton: {
+    width: 42,
+    height: 44,
+    alignItems: "center",
+    justifyContent: "center",
   },
   input: {
     flex: 1,
@@ -850,6 +1111,28 @@ const styles = StyleSheet.create({
     fontSize: 15,
     maxHeight: 120,
   },
+  attachmentList: { maxHeight: 70 },
+  attachmentListContent: { paddingVertical: 2 },
+  attachmentThumbWrap: {
+    width: 64,
+    height: 64,
+    marginRight: 8,
+    borderRadius: 10,
+    overflow: "hidden",
+  },
+  attachmentThumb: { width: 64, height: 64 },
+  removeAttachmentButton: {
+    position: "absolute",
+    top: 3,
+    right: 3,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  uploadStatusRow: { flexDirection: "row", alignItems: "center", gap: 8, minHeight: 18 },
+  uploadStatusText: { flex: 1, fontFamily: "Inter_400Regular", fontSize: 12 },
   sendBtn: {
     width: 44,
     height: 44,
@@ -857,5 +1140,22 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginBottom: 1,
+  },
+  imagePreviewOverlay: {
+    zIndex: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: Colors.dark.background,
+  },
+  imagePreview: { width: "100%", height: "100%" },
+  imagePreviewClose: {
+    position: "absolute",
+    right: 18,
+    zIndex: 11,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: "center",
+    justifyContent: "center",
   },
 });

@@ -2,6 +2,7 @@
 import { Router } from "express";
 import type { Server } from "node:http";
 import Stripe from "stripe";
+import multer from "multer";
 import { db, usersTable } from "@workspace/db";
 import { conversations, messages, customerIdeasTable, blouseFitsTable, privateImages } from "@workspace/db/schema";
 import { eq, or, desc, and, ne, isNull, isNotNull, inArray } from "drizzle-orm";
@@ -9,12 +10,31 @@ import { WebSocket, WebSocketServer } from "ws";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { findSessionUser } from "../../lib/auth";
 import { getStripeClient } from "../../stripeClient";
+import { deletePrivateImage, imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
 
 const router = Router();
 const chatSockets = new Map<number, Set<WebSocket>>();
 const MIN_FIT_QUOTE_CENTS = 50;
 const MAX_FIT_QUOTE_CENTS = 99_999_999;
+const MAX_CHAT_IMAGE_BYTES = 5 * 1024 * 1024;
+const MAX_CHAT_IMAGES_PER_MESSAGE = 5;
+const CHAT_IMAGE_CONTENT_PREFIX = "blousley-chat-image-v1:";
+const CHAT_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
+const chatImageUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_CHAT_IMAGE_BYTES, files: MAX_CHAT_IMAGES_PER_MESSAGE },
+}).array("images", MAX_CHAT_IMAGES_PER_MESSAGE);
 let fitProductId: string | undefined;
+
+function parseChatImageUpload(req: Parameters<typeof chatImageUpload>[0], res: Parameters<typeof chatImageUpload>[1], next: Parameters<typeof chatImageUpload>[2]) {
+  chatImageUpload(req, res, (error) => {
+    if (!error) return next();
+    if (error instanceof multer.MulterError && error.code === "LIMIT_FILE_SIZE") {
+      return res.status(413).json({ error: "Each image must be 5 MB or smaller." });
+    }
+    return res.status(400).json({ error: "Select up to five supported images." });
+  });
+}
 
 async function getFitProduct(stripe: Stripe): Promise<string> {
   if (fitProductId) return fitProductId;
@@ -511,6 +531,110 @@ router.get("/messages", async (req, res) => {
     res.status(500).json({ error: e.message });
   }
 });
+
+router.post(
+  "/conversations/:id/images",
+  async (req, res, next) => {
+    const conversationId = Number(req.params.id);
+    const userId = req.userId;
+    if (!Number.isSafeInteger(conversationId) || conversationId <= 0) {
+      return res.status(400).json({ error: "Valid conversation id required." });
+    }
+    if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required." });
+
+    try {
+      const [conversation] = await withRlsUser<Array<{ customerId: string | null; tailorId: string | null }>>(userId, (tx) =>
+        tx.select({ customerId: conversations.customerId, tailorId: conversations.tailorId })
+          .from(conversations)
+          .where(eq(conversations.id, conversationId))
+          .limit(1),
+      );
+      if (!conversation) return res.status(404).json({ error: "Conversation not found." });
+      if (conversation.customerId !== userId && conversation.tailorId !== userId) {
+        return res.status(403).json({ error: "Not a participant in this conversation." });
+      }
+      return next();
+    } catch {
+      return res.status(500).json({ error: "Could not authorize this upload." });
+    }
+  },
+  parseChatImageUpload,
+  async (req, res) => {
+    const conversationId = Number(req.params.id);
+    const userId = req.userId;
+    if (!isValidUserId(userId)) return res.status(401).json({ error: "Authentication required." });
+
+    const files = Array.isArray(req.files) ? req.files : [];
+    if (!files.length) return res.status(400).json({ error: "Choose at least one image." });
+    if (files.some((file) => !CHAT_IMAGE_MIME_TYPES.has(file.mimetype.toLowerCase()))) {
+      return res.status(415).json({ error: "Use JPEG, PNG, or WebP images." });
+    }
+
+    const rawMessage = req.body?.message;
+    if (rawMessage !== undefined && typeof rawMessage !== "string") {
+      return res.status(400).json({ error: "Message content is invalid." });
+    }
+    const textMessage = typeof rawMessage === "string" ? rawMessage.trim() : "";
+    if (textMessage.length > 4_000 || /[\u0000-\u0008\u000B\u000C\u000E-\u001F]/.test(textMessage)) {
+      return res.status(400).json({ error: "Message content is invalid." });
+    }
+
+    const uploaded: Array<{ storageKey: string; mimeType: string }> = [];
+    try {
+      for (const file of files) {
+        const dataUri = imageDataUriFromBase64(
+          `data:${file.mimetype};base64,${file.buffer.toString("base64")}`,
+        );
+        uploaded.push(await savePrivateImage(dataUri, userId));
+      }
+
+      const content = uploaded.map(({ storageKey }) => `${CHAT_IMAGE_CONTENT_PREFIX}${storageKey}`);
+      const newMessages = await withRlsUser(userId, async (tx) => {
+        const now = Date.now();
+        const values = [
+          ...content.map((imageContent, index) => ({
+            conversationId,
+            senderId: userId,
+            content: imageContent,
+            role: "image_attachment",
+            isRead: false,
+            createdAt: new Date(now + index),
+          })),
+          ...(textMessage
+            ? [{
+                conversationId,
+                senderId: userId,
+                content: textMessage,
+                role: "user",
+                isRead: false,
+                createdAt: new Date(now + content.length),
+              }]
+            : []),
+        ];
+        const inserted = await tx.insert(messages).values(values).returning();
+        await tx.update(conversations)
+          .set({ lastMessageAt: new Date(now + values.length - 1) })
+          .where(eq(conversations.id, conversationId));
+        return inserted;
+      });
+
+      for (const message of newMessages) broadcastChatMessage(conversationId, message);
+      return res.status(201).json({ messages: newMessages });
+    } catch (error) {
+      await Promise.all(uploaded.map(({ storageKey }) =>
+        deletePrivateImage(storageKey).catch(() => undefined),
+      ));
+      const message = error instanceof Error ? error.message : "";
+      if (message === "Upload limit exceeded") {
+        return res.status(429).json({ error: "Image upload limit reached. Try again later." });
+      }
+      if (/invalid|oversized/i.test(message)) {
+        return res.status(400).json({ error: "The image is invalid or larger than 5 MB." });
+      }
+      return res.status(500).json({ error: "Could not upload images. No chat message was sent." });
+    }
+  },
+);
 
 router.post("/messages", async (req, res) => {
   const { conversationId, content } = req.body as {

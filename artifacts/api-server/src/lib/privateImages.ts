@@ -1,5 +1,5 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import { mkdir, readFile, unlink, writeFile } from "node:fs/promises";
 import path from "node:path";
 import sharp from "sharp";
 
@@ -107,4 +107,13 @@ export async function normalizeLegacyImageDataUri(image: string) {
 export async function readPrivateImage(storageKey: string) {
   if (!KEY_RE.test(storageKey)) throw new Error("Invalid image key");
   return readFile(path.join(PRIVATE_IMAGE_DIR, storageKey));
+}
+
+export async function deletePrivateImage(storageKey: string) {
+  if (!KEY_RE.test(storageKey)) return;
+  try {
+    await unlink(path.join(PRIVATE_IMAGE_DIR, storageKey));
+  } catch (error) {
+    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
+  }
 }

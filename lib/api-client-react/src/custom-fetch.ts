@@ -1,5 +1,7 @@
 export type CustomFetchOptions = RequestInit & {
   responseType?: "json" | "text" | "blob" | "auto";
+  baseUrl?: string;
+  fetcher?: typeof fetch;
 };
 
 export type ErrorType<T = unknown> = ApiError<T>;
@@ -25,10 +27,12 @@ function isUrl(input: RequestInfo | URL): input is URL {
   return typeof URL !== "undefined" && input instanceof URL;
 }
 
-function resolveUrl(input: RequestInfo | URL): string {
-  if (typeof input === "string") return input;
-  if (isUrl(input)) return input.toString();
-  return input.url;
+function resolveUrl(input: RequestInfo | URL, baseUrl?: string): string {
+  const inputUrl = typeof input === "string" ? input : isUrl(input) ? input.toString() : input.url;
+  if (baseUrl && inputUrl.startsWith("/")) {
+    return new URL(inputUrl, `${baseUrl.replace(/\/+$/, "")}/`).toString();
+  }
+  return inputUrl;
 }
 
 function mergeHeaders(...sources: Array<HeadersInit | undefined>): Headers {
@@ -275,7 +279,13 @@ export async function customFetch<T = unknown>(
   input: RequestInfo | URL,
   options: CustomFetchOptions = {},
 ): Promise<T> {
-  const { responseType = "auto", headers: headersInit, ...init } = options;
+  const {
+    responseType = "auto",
+    headers: headersInit,
+    baseUrl,
+    fetcher = globalThis.fetch,
+    ...init
+  } = options;
 
   const method = resolveMethod(input, init.method);
 
@@ -297,9 +307,10 @@ export async function customFetch<T = unknown>(
     headers.set("accept", DEFAULT_JSON_ACCEPT);
   }
 
-  const requestInfo = { method, url: resolveUrl(input) };
+  const requestUrl = resolveUrl(input, baseUrl);
+  const requestInfo = { method, url: requestUrl };
 
-  const response = await fetch(input, { ...init, method, headers });
+  const response = await fetcher(requestUrl, { ...init, method, headers });
 
   if (!response.ok) {
     const errorData = await parseErrorBody(response, method);

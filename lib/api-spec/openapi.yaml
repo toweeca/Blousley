@@ -13,6 +13,10 @@ tags:
     description: Blouse fitting operations
   - name: tailor
     description: Tailor operations
+  - name: chat
+    description: Conversation operations
+  - name: images
+    description: Private image operations
 paths:
   /healthz:
     get:
@@ -201,6 +205,90 @@ paths:
                 items:
                   $ref: "#/components/schemas/BlouseFit"
 
+  /chat/conversations/{conversationId}/images:
+    post:
+      operationId: uploadChatImages
+      tags: [chat]
+      summary: Upload private images to a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: integer
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              properties:
+                images:
+                  type: array
+                  minItems: 1
+                  maxItems: 5
+                  items:
+                    type: string
+                    format: binary
+                message:
+                  type: string
+                  maxLength: 4000
+              required: [images]
+      responses:
+        "201":
+          description: Uploaded image messages and optional text message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ChatImageUploadResponse"
+        "400":
+          description: Invalid image or message
+        "401":
+          description: Authentication required
+        "403":
+          description: User is not a conversation participant
+        "413":
+          description: An image exceeds the per-file size limit
+
+  /images/chat/{conversationId}/{messageId}:
+    get:
+      operationId: getChatImage
+      tags: [images]
+      summary: Read an image attachment from a conversation
+      parameters:
+        - name: conversationId
+          in: path
+          required: true
+          schema:
+            type: integer
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: integer
+      responses:
+        "200":
+          description: Private image attachment
+          content:
+            image/jpeg:
+              schema:
+                type: string
+                format: binary
+            image/png:
+              schema:
+                type: string
+                format: binary
+            image/webp:
+              schema:
+                type: string
+                format: binary
+        "401":
+          description: Authentication required
+        "403":
+          description: User is not a conversation participant
+        "404":
+          description: Image message or image not found
+
 components:
   schemas:
     HealthStatus:
@@ -372,3 +460,34 @@ components:
           type: boolean
       required:
         - success
+
+    ChatImageUploadResponse:
+      type: object
+      properties:
+        messages:
+          type: array
+          items:
+            $ref: "#/components/schemas/ChatMessage"
+      required: [messages]
+
+    ChatMessage:
+      type: object
+      properties:
+        id:
+          type: integer
+        conversationId:
+          type: integer
+        role:
+          type: string
+        content:
+          type: string
+        senderId:
+          type: string
+          nullable: true
+        isRead:
+          type: boolean
+          nullable: true
+        createdAt:
+          type: string
+          format: date-time
+      required: [id, conversationId, role, content, createdAt]

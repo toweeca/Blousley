@@ -41,7 +41,7 @@
       [
         "expo-image-picker",
         {
-          "photosPermission": "Allow Saree Blouse Fitter to access your photos to upload for blouse fitting analysis.",
+          "photosPermission": "Allow Saree Blouse Fitter to select photos for fit analysis and tailor chat attachments.",
           "cameraPermission": "Allow Saree Blouse Fitter to access your camera to analyze your body shape for perfect blouse fitting."
         }
       ],

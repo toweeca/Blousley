@@ -541,3 +541,89 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
     assert.equal(after.length, 0);
   });
 });
+
+test("conversation image batches are private, validated, and all-or-nothing", async () => {
+  const conversationId = sameTailorConversationId;
+  const conversationPath = `/api/chat/conversations/${conversationId}/images`;
+  const messagesPath = `/api/chat/messages?conversationId=${conversationId}`;
+  const imageBytes = await sharp({
+    create: { width: 2, height: 2, channels: 4, background: { r: 90, g: 130, b: 170, alpha: 1 } },
+  }).png().toBuffer();
+
+  const appendPng = (form, bytes = imageBytes, name = "chat.png") => {
+    form.append("images", new Blob([bytes], { type: "image/png" }), name);
+  };
+  const upload = (userId, form) => fetch(`${baseUrl}${conversationPath}`, {
+    method: "POST",
+    headers: { Cookie: sessionCookies.get(userId) },
+    body: form,
+  });
+
+  const initial = await request(customerId, messagesPath);
+  assert.equal(initial.status, 200);
+
+  const form = new FormData();
+  appendPng(form);
+  appendPng(form, imageBytes, "second.png");
+  form.append("message", "Please see these photos.");
+  const response = await upload(customerId, form);
+  assert.equal(response.status, 201);
+  const result = await response.json();
+  assert.equal(result.messages.length, 3);
+
+  const imageMessages = result.messages.filter((message) => message.role === "image_attachment");
+  assert.equal(imageMessages.length, 2);
+  for (const message of imageMessages) {
+    assert.equal(message.senderId, customerId);
+    assert.equal(message.conversationId, conversationId);
+    assert.ok(Date.parse(message.createdAt));
+    assert.match(message.content, /^blousley-chat-image-v1:[0-9a-f-]{36}\.png$/);
+    privateImageStorageKeys.push(message.content.slice("blousley-chat-image-v1:".length));
+  }
+  assert.equal(result.messages.find((message) => message.role === "user").content, "Please see these photos.");
+
+  const imagePath = `/api/images/chat/${conversationId}/${imageMessages[0].id}`;
+  for (const participantId of [customerId, tailorOneId]) {
+    const imageResponse = await fetch(`${baseUrl}${imagePath}`, {
+      headers: { Cookie: sessionCookies.get(participantId) },
+    });
+    assert.equal(imageResponse.status, 200);
+    assert.equal(imageResponse.headers.get("content-type"), "image/png");
+    assert.deepEqual(
+      Buffer.from(await imageResponse.arrayBuffer()).subarray(0, 8),
+      Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]),
+    );
+  }
+
+  const privateRead = await fetch(`${baseUrl}${imagePath}`, {
+    headers: { Cookie: sessionCookies.get(nonParticipantId) },
+  });
+  assert.equal(privateRead.status, 403);
+  const unauthenticatedRead = await fetch(`${baseUrl}${imagePath}`);
+  assert.equal(unauthenticatedRead.status, 401);
+
+  const spoofedUpload = new FormData();
+  appendPng(spoofedUpload);
+  spoofedUpload.append("userId", customerId);
+  assert.equal((await upload(nonParticipantId, spoofedUpload)).status, 403);
+
+  const beforeFailedUpload = await request(customerId, messagesPath);
+  const invalidBatch = new FormData();
+  appendPng(invalidBatch);
+  appendPng(invalidBatch, Buffer.from("not a png"));
+  assert.equal((await upload(customerId, invalidBatch)).status, 400);
+  const afterFailedUpload = await request(customerId, messagesPath);
+  assert.deepEqual(
+    afterFailedUpload.body.map((message) => message.id),
+    beforeFailedUpload.body.map((message) => message.id),
+    "a partial image batch must not create any chat messages",
+  );
+
+  const unsupported = new FormData();
+  unsupported.append("images", new Blob([imageBytes], { type: "image/gif" }), "chat.gif");
+  assert.equal((await upload(customerId, unsupported)).status, 415);
+
+  const oversized = new FormData();
+  appendPng(oversized, Buffer.alloc(5 * 1024 * 1024 + 1), "large.png");
+  assert.equal((await upload(customerId, oversized)).status, 413);
+});

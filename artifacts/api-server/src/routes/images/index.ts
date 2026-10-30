@@ -1,7 +1,7 @@
 import { Router, type IRouter } from "express";
 import { and, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
-import { blouseFitsTable, conversations, privateImages, usersTable } from "@workspace/db/schema";
+import { blouseFitsTable, conversations, messages, privateImages, usersTable } from "@workspace/db/schema";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { readPrivateImage } from "../../lib/privateImages";
 
@@ -73,6 +73,75 @@ router.get("/fits/:fitId", async (req, res) => {
     res.send(file);
   } catch {
     res.status(403).json({ error: "Not authorized to view this image" });
+  }
+});
+
+router.get("/chat/:conversationId/:messageId", async (req, res) => {
+  const conversationId = Number(req.params.conversationId);
+  const messageId = Number(req.params.messageId);
+  const userId = req.userId;
+  if (!Number.isSafeInteger(conversationId) || conversationId <= 0 ||
+      !Number.isSafeInteger(messageId) || messageId <= 0) {
+    res.status(400).json({ error: "Valid conversation and message ids are required." });
+    return;
+  }
+  if (!isValidUserId(userId)) {
+    res.status(401).json({ error: "Authentication required." });
+    return;
+  }
+
+  try {
+    const [conversation] = await withRlsUser<Array<{ customerId: string | null; tailorId: string | null }>>(userId, (tx) =>
+      tx.select({ customerId: conversations.customerId, tailorId: conversations.tailorId })
+        .from(conversations)
+        .where(eq(conversations.id, conversationId))
+        .limit(1),
+    );
+    if (!conversation) {
+      res.status(404).json({ error: "Conversation not found." });
+      return;
+    }
+    if (conversation.customerId !== userId && conversation.tailorId !== userId) {
+      res.status(403).json({ error: "Not a participant in this conversation." });
+      return;
+    }
+
+    const [message] = await withRlsUser<Array<{ role: string; content: string }>>(userId, (tx) =>
+      tx.select({ role: messages.role, content: messages.content })
+        .from(messages)
+        .where(and(
+          eq(messages.id, messageId),
+          eq(messages.conversationId, conversationId),
+        ))
+        .limit(1),
+    );
+    const storageKey = message?.role === "image_attachment"
+      ? message.content.match(/^blousley-chat-image-v1:([0-9a-f-]{36}\.(?:jpg|png|webp))$/)?.[1]
+      : undefined;
+    if (!storageKey) {
+      res.status(404).json({ error: "Image not found." });
+      return;
+    }
+
+    let image: Buffer;
+    try {
+      image = await readPrivateImage(storageKey);
+    } catch {
+      res.status(404).json({ error: "Image not found." });
+      return;
+    }
+
+    const mimeType = storageKey.endsWith(".jpg")
+      ? "image/jpeg"
+      : storageKey.endsWith(".png")
+        ? "image/png"
+        : "image/webp";
+    res.setHeader("Content-Type", mimeType);
+    res.setHeader("Cache-Control", "private, no-store");
+    res.setHeader("X-Content-Type-Options", "nosniff");
+    res.send(image);
+  } catch {
+    res.status(500).json({ error: "Could not load this image." });
   }
 });
 
