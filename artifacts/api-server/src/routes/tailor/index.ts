@@ -71,7 +71,7 @@ router.get("/customers", async (req, res) => {
         }
         return { ...request, imageUrl: null, thumbnailUrl: null };
       }
-      const image = await withRlsUser(tailorId, async (tx) => {
+      const image = await withRlsUser(fit.userId, async (tx) => {
         const [row] = await tx
           .select({ id: privateImages.id })
           .from(privateImages)

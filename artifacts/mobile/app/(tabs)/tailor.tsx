@@ -863,8 +863,10 @@ export default function TailorScreen() {
         }),
       });
        if (!res.ok) throw new Error("Could not open chat");
-       const convo = await res.json();
-       qc.invalidateQueries({ queryKey: ["tailor-customers"] });
+       const convo = await res.json() as { id?: number; fitId?: number };
+       if (typeof convo.id !== "number" || !Number.isSafeInteger(convo.id) || convo.fitId !== fit.id) {
+         throw new Error("The selected fit conversation could not be verified");
+       }
       setChatConvoId(convo.id);
       setChatPartnerName(formatPersonName(fit.customerName, "Customer", fit.userId));
       setChatVisible(true);

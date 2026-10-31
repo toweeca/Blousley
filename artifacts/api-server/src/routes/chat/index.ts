@@ -126,7 +126,7 @@ router.get("/conversations/:id/payment", async (req, res) => {
     if (!allowed) return res.status(403).json({ error: "Not a participant in this conversation" });
     const { fitId, customerId } = convo;
     const [fit] = fitId !== null && customerId
-      ? await withRlsUser(userId, (tx) => tx.select({
+      ? await withRlsUser(customerId, (tx) => tx.select({
         design: {
           id: blouseFitsTable.id,
           bodyShape: blouseFitsTable.bodyShape,

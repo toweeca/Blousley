@@ -231,6 +231,17 @@ test("unassigned Find My Tailor fits are visible to tailors and private images f
     headers: { Cookie: sessionCookies.get(tailorOneId) },
   });
   assert.equal(assignedImage.status, 200);
+  const fitPayment = await request(
+    tailorOneId,
+    `/api/chat/conversations/${assignedFit.conversationId}/payment`,
+  );
+  assert.equal(fitPayment.status, 200);
+  assert.equal(fitPayment.body.fit.id, unassignedImageFitId);
+  assert.ok(fitPayment.body.fit.imageUrl);
+  const chatFitImage = await fetch(fitPayment.body.fit.imageUrl, {
+    headers: { Cookie: sessionCookies.get(tailorOneId) },
+  });
+  assert.equal(chatFitImage.status, 200);
   const otherTailorImage = await fetch(secondRequest.imageUrl, {
     headers: { Cookie: sessionCookies.get(tailorTwoId) },
   });
