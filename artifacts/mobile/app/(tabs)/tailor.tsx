@@ -733,6 +733,13 @@ export default function TailorScreen() {
   const [chatConvoId, setChatConvoId] = useState<number | null>(null);
   const [chatPartnerName, setChatPartnerName] = useState("");
   const [chatVisible, setChatVisible] = useState(false);
+  const [chatFitContext, setChatFitContext] = useState<{
+    fitId: number;
+    customerId: string;
+    tailorId: string;
+    fitQuoteCents?: number | null;
+    fitPaidAt?: string | null;
+  } | null>(null);
   const openingFit = useRef(false);
   const [customerFitsFocused, setCustomerFitsFocused] = useState(false);
 
@@ -844,6 +851,13 @@ export default function TailorScreen() {
     if (fit.conversationId && fit.assignedTailorId === user.id) {
       setChatConvoId(fit.conversationId);
       setChatPartnerName(formatPersonName(fit.customerName, "Customer", fit.userId));
+      setChatFitContext({
+        fitId: fit.id,
+        customerId: fit.userId,
+        tailorId: user.id,
+        fitQuoteCents: fit.fitQuoteCents,
+        fitPaidAt: fit.fitPaidAt,
+      });
       setChatVisible(true);
       return;
     }
@@ -869,6 +883,13 @@ export default function TailorScreen() {
        }
       setChatConvoId(convo.id);
       setChatPartnerName(formatPersonName(fit.customerName, "Customer", fit.userId));
+       setChatFitContext({
+         fitId: fit.id,
+         customerId: fit.userId,
+         tailorId: user.id,
+         fitQuoteCents: fit.fitQuoteCents,
+         fitPaidAt: fit.fitPaidAt,
+       });
       setChatVisible(true);
     } catch {
       Alert.alert("Error", "Could not open chat. Please try again.");
@@ -1177,11 +1198,16 @@ export default function TailorScreen() {
       {chatConvoId && user && (
         <ChatThread
           visible={chatVisible}
-          onClose={() => { setChatVisible(false); refreshCustomerFits(); }}
+          onClose={() => {
+            setChatVisible(false);
+            setChatFitContext(null);
+            refreshCustomerFits();
+          }}
           conversationId={chatConvoId}
           partnerName={chatPartnerName}
           currentUserId={user.id}
           apiBase={apiBase}
+          fitContext={chatFitContext ?? undefined}
         />
       )}
 

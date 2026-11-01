@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect, useCallback } from "react";
+import Constants from "expo-constants";
 import { apiFetch as fetch, getApiSessionCookie } from "@/lib/api-client";
 import { File } from "expo-file-system";
 import { fetch as expoFetch } from "expo/fetch";
@@ -76,6 +77,13 @@ interface ChatThreadProps {
   partnerName: string;
   currentUserId: string;
   apiBase: string;
+  fitContext?: {
+    fitId: number;
+    customerId: string;
+    tailorId: string;
+    fitQuoteCents?: number | null;
+    fitPaidAt?: string | null;
+  };
 }
 
 function formatTime(iso: string) {
@@ -94,6 +102,8 @@ function formatDate(iso: string) {
 
 const MAX_CHAT_IMAGE_BYTES = 5 * 1024 * 1024;
 const MAX_CHAT_IMAGES_PER_MESSAGE = 5;
+const FIT_QUOTE_DIAGNOSTICS_ENABLED =
+  process.env.EXPO_PUBLIC_ENABLE_FIT_CHECKOUT_DIAGNOSTICS === "true";
 const CHAT_IMAGE_MIME_TYPES = new Set(["image/jpeg", "image/png", "image/webp"]);
 const CHAT_IMAGE_MIME_BY_EXTENSION: Record<string, string> = {
   jpg: "image/jpeg",
@@ -117,6 +127,7 @@ export default function ChatThread({
   partnerName,
   currentUserId,
   apiBase,
+  fitContext,
 }: ChatThreadProps) {
   const colorScheme = useColorScheme();
   const isDark = colorScheme === "dark";
@@ -163,7 +174,7 @@ export default function ChatThread({
         : false,
   });
 
-  const { data: fitPayment } = useQuery<FitPaymentSummary>({
+  const { data: fitPayment, isError: fitPaymentError } = useQuery<FitPaymentSummary>({
     queryKey: ["fit-payment", conversationId],
     queryFn: async () => {
       const r = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/payment?userId=${encodeURIComponent(currentUserId)}`, {
@@ -177,19 +188,54 @@ export default function ChatThread({
       query.state.data?.fitId != null && query.state.data.fitPaidAt === null ? 5000 : false,
   });
 
-  const isFitConversation = fitPayment?.fitId != null;
+  const isFitConversation = fitPayment?.fitId != null || fitContext != null;
   useEffect(() => {
     setSelectedImages([]);
     setImagePreview(null);
     setImageUploadStatus("");
   }, [conversationId, currentUserId, visible]);
-  const isFitTailor = isFitConversation && user?.role === "tailor" && fitPayment?.tailorId === currentUserId;
+  const isFitTailor = isFitConversation && user?.role === "tailor" && (
+    fitPayment?.tailorId === currentUserId ||
+    ((fitPayment?.tailorId == null) && fitContext?.tailorId === currentUserId)
+  );
   const isFitCustomer = isFitConversation && user?.role === "customer" && fitPayment?.customerId === currentUserId;
+  const fitQuoteCents = fitPayment
+    ? fitPayment.fitQuoteCents
+    : fitContext?.fitQuoteCents ?? null;
+  const fitPaidAt = fitPayment
+    ? fitPayment.fitPaidAt
+    : fitContext?.fitPaidAt ?? null;
+  const quoteCheckoutStarted = fitPayment?.quoteCheckoutStarted ?? false;
+  const lastFitQuoteDiagnostic = useRef<string | null>(null);
   useEffect(() => {
-    if (fitPayment?.fitId != null) {
-      void qc.invalidateQueries({ queryKey: ["tailor-customers"] });
+    if (!visible) {
+      lastFitQuoteDiagnostic.current = null;
+      return;
     }
-  }, [fitPayment?.fitId, fitPayment?.fitPaidAt, fitPayment?.fitQuoteCents, qc]);
+    if (!FIT_QUOTE_DIAGNOSTICS_ENABLED) return;
+    const quoteInputVisible =
+      isFitTailor && !fitPaidAt && !quoteCheckoutStarted;
+    const signature = `${fitPaymentError}:${isFitConversation}:${quoteInputVisible}`;
+    if (lastFitQuoteDiagnostic.current === signature) return;
+    lastFitQuoteDiagnostic.current = signature;
+
+    let apiHost = "invalid";
+    try {
+      apiHost = new URL(apiBase).host;
+    } catch {
+      // Keep diagnostics limited to a sanitized host value.
+    }
+    console.info("fit_chat_diag", JSON.stringify({
+      buildMarker: Constants.expoConfig?.extra?.fitQuoteBuildMarker ?? "missing",
+      appVersion: Constants.expoConfig?.version ?? "unknown",
+      androidVersionCode: Constants.expoConfig?.android?.versionCode ?? null,
+      apiHost,
+      quoteUi: "chat-thread",
+      fitPaymentError,
+      fitConversation: isFitConversation,
+      quoteInputVisible,
+    }));
+  }, [visible, apiBase, fitPaymentError, fitPayment, isFitConversation, isFitTailor, fitPaidAt, quoteCheckoutStarted]);
   useEffect(() => {
     if (!visible || !isFitConversation) return;
     const subscription = AppState.addEventListener("change", (state) => {
@@ -210,10 +256,10 @@ export default function ChatThread({
     !fitPayment?.fitPaidAt;
 
   useEffect(() => {
-    setQuoteAmount(fitPayment?.fitQuoteCents != null ? (fitPayment.fitQuoteCents / 100).toFixed(2) : "");
+    setQuoteAmount(fitQuoteCents != null ? (fitQuoteCents / 100).toFixed(2) : "");
     setQuoteError("");
     setCheckoutError("");
-  }, [conversationId, fitPayment?.fitQuoteCents]);
+  }, [conversationId, fitQuoteCents]);
 
   const isRequestOwner = user?.role === "customer" && idea?.userId === currentUserId;
   const hasStoredPrice = Number.isInteger(idea?.requestPriceCents);
@@ -260,12 +306,24 @@ export default function ChatThread({
       if (!response.ok) throw new Error(result.error ?? "Could not send quote");
       return result;
     },
-    onSuccess: async () => {
+    onSuccess: async (result: { fitQuoteCents: number; fitPaidAt: string | null }) => {
       setQuoteError("");
+      qc.setQueryData<FitPaymentSummary | undefined>(["fit-payment", conversationId], (current) => {
+        if (!current && !fitContext) return current;
+        return {
+          id: current?.id ?? conversationId,
+          customerId: current?.customerId ?? fitContext?.customerId ?? null,
+          tailorId: current?.tailorId ?? fitContext?.tailorId ?? null,
+          fitId: current?.fitId ?? fitContext?.fitId ?? null,
+          fitQuoteCents: result.fitQuoteCents,
+          fitPaidAt: result.fitPaidAt,
+          quoteCheckoutStarted: current?.quoteCheckoutStarted ?? false,
+          ...(current?.fit ? { fit: current.fit } : {}),
+        };
+      });
       await qc.invalidateQueries({ queryKey: ["fit-payment", conversationId] });
       await qc.invalidateQueries({ queryKey: ["chat-messages", conversationId] });
       await qc.invalidateQueries({ queryKey: ["chat-conversations"] });
-      await qc.invalidateQueries({ queryKey: ["tailor-customers"] });
     },
     onError: (error) => {
       setQuoteError(error instanceof Error ? error.message : "Could not send quote");
@@ -760,13 +818,13 @@ export default function ChatThread({
             style={[styles.fitQuoteCard, { backgroundColor: theme.card, borderColor: theme.border }]}
           >
             <Text style={[styles.fitQuoteLabel, { color: theme.textMuted }]}>MY FITS · TAILOR QUOTE</Text>
-            {fitPayment?.fitQuoteCents != null ? (
+            {fitQuoteCents != null ? (
               <>
                 <Text style={[styles.fitQuoteAmount, { color: theme.text }]}>
-                  CAD ${(fitPayment.fitQuoteCents / 100).toFixed(2)}
+                  CAD ${(fitQuoteCents / 100).toFixed(2)}
                 </Text>
                 <Text testID="fit-payment-status" style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
-                  {fitPayment.fitPaidAt ? "Paid" : "Awaiting payment"}
+                  {fitPaidAt ? "Paid" : "Awaiting payment"}
                 </Text>
               </>
             ) : (
@@ -775,8 +833,8 @@ export default function ChatThread({
               </Text>
             )}
 
-            {isFitTailor && !fitPayment?.fitPaidAt && (
-              fitPayment?.quoteCheckoutStarted ? (
+            {isFitTailor && !fitPaidAt && (
+              quoteCheckoutStarted ? (
                 <Text style={[styles.fitQuoteStatus, { color: theme.textMuted }]}>
                   Checkout has started, so this quote is locked.
                 </Text>
@@ -810,7 +868,7 @@ export default function ChatThread({
                       <ActivityIndicator color="#fff" size="small" />
                     ) : (
                       <Text style={styles.payNowText}>
-                        {fitPayment?.fitQuoteCents != null ? "Update Quote" : "Send Quote"}
+                        {fitQuoteCents != null ? "Update Quote" : "Send Quote"}
                       </Text>
                     )}
                   </TouchableOpacity>
