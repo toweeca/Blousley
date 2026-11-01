@@ -164,14 +164,14 @@ test("auth configuration requires an HTTPS API host and normalizes its origin", 
   assert.throws(() => resolveApiBaseUrl("https://blousley.replit.app/api"), /host is invalid/);
 });
 
-test("HTML or malformed auth responses produce a clear API configuration error", async () => {
+test("HTML or malformed auth responses show a clear server connection error", async () => {
   await assert.rejects(
     readAuthJson(new Response("<html>wrong host</html>", { headers: { "Content-Type": "text/html" } })),
-    /API host is incorrect/,
+    /Server connection error: API host returned an invalid response/,
   );
   await assert.rejects(
     readAuthJson(new Response("{", { headers: { "Content-Type": "application/json" } })),
-    /API host returned invalid JSON/,
+    /Server connection error: API host returned an invalid response/,
   );
   assert.deepEqual(
     await readAuthJson(new Response('{"id":"test"}', { headers: { "Content-Type": "application/json; charset=utf-8" } })),

@@ -8,3 +8,9 @@ Include credentials on authenticated API requests from the Expo web preview, inc
 **Why:** The Expo preview and API use different origins. Browser fetch defaults omit cross-origin session cookies, so an account can look signed in locally while API calls return 401.
 
 **How to apply:** When adding authenticated requests, use the existing cookie-based API contract with `credentials: "include"`. Do not weaken server authentication or treat a failed authenticated read as successful empty data.
+
+Do not bake the workspace `.replit.dev` host into standalone APKs. It returned 502 while the API artifact workflow was stopped, then returned the expected JSON auth responses after the workflow started.
+
+**Why:** A workspace API host depends on the workspace service being awake; a standalone APK cannot ensure that process is running.
+
+**How to apply:** Keep Expo preview pointed at the workspace API when appropriate, but pin diagnostic and standalone builds to the stable deployed API alias.

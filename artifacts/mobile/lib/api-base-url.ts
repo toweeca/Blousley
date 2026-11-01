@@ -20,11 +20,11 @@ export function resolveApiBaseUrl(configured: string | undefined): string {
 export async function readAuthJson<T>(response: Response): Promise<T> {
   const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase();
   if (contentType !== "application/json" && !contentType?.endsWith("+json")) {
-    throw new Error("Server configuration error: API host is incorrect.");
+    throw new Error("Server connection error: API host returned an invalid response");
   }
   try {
     return await response.json() as T;
   } catch {
-    throw new Error("Server configuration error: API host returned invalid JSON.");
+    throw new Error("Server connection error: API host returned an invalid response");
   }
 }

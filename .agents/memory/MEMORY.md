@@ -12,6 +12,6 @@
 - [GitHub connector repository bootstrap](github-connector-repository-bootstrap.md) — use the authenticated Git Database API for atomic commits when direct Git credentials are unavailable; bootstrap empty repos and throttle blobs.
 - [Blousley change scope](blousley-scope.md) — keep Blousley changes to the smallest possible set and prefer the lowest-credit approach.
 - [Stripe test Checkout](stripe-test-checkout.md) — use the backend test key and dynamic methods; fit Checkout must match stored CAD quote/session, with chat refresh on app foreground.
-- [Expo preview authentication](expo-preview-auth.md) — preview and API have different origins; authenticated fetches must explicitly include cookies.
+- [Expo preview authentication](expo-preview-auth.md) — keep cookies on authenticated requests; standalone APKs need the stable API alias, not the workspace dev host.
 - [Native cookie transport](native-cookie-transport.md) — Android automatic cookies can override explicit headers; browser and native credential modes must stay distinct.
 - [Cross-package code generation](cross-package-codegen.md) — explicitly match validator runtime majors; regeneration can leave Metro with a stale missing-module error.
