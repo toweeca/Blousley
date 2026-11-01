@@ -10,7 +10,7 @@ import { privateImages } from "@workspace/db/schema";
 import { createSessionToken } from "../src/lib/auth.ts";
 import { withRlsUser } from "../src/lib/rls.ts";
 import { savePrivateImage } from "../src/lib/privateImages.ts";
-import { getStripeClient } from "../src/stripeClient.ts";
+import { getStripeClient, getStripeSync } from "../src/stripeClient.ts";
 
 if (process.env.NODE_ENV === "production") {
   throw new Error("Fit-conversation integration tests cannot run against production");
@@ -551,6 +551,92 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
     const after = await checkoutSessionsFor(conversationId);
     assert.equal(after.length, 0);
   });
+});
+
+test("signed webhook fixtures enforce fit confirmation guards without making a payment", async (t) => {
+  const sync = await getStripeSync();
+  const signingSecret = `whsec_synthetic_fixture_${randomBytes(16).toString("hex")}`;
+  // Isolate StripeSync event persistence/managed-secret lookup, not the application
+  // handler or HTTP route. The real Stripe SDK still verifies each fixture signature.
+  t.mock.method(sync, "processWebhook", async (payload, signature) => {
+    stripe.webhooks.constructEvent(payload, signature, signingSecret);
+  });
+
+  for (const eventType of ["checkout.session.completed", "checkout.session.async_payment_succeeded"]) {
+    await t.test(eventType, async () => {
+      const fitId = await addSharedFit();
+      const opened = await openFit(tailorOneId, fitId);
+      assert.equal(opened.status, 201);
+      const conversationId = opened.body.id;
+      const route = `/api/chat/conversations/${conversationId}`;
+      assert.equal((await request(tailorOneId, `${route}/quote`, {
+        method: "POST", body: { amountCents: 8750 },
+      })).status, 200);
+      const checkout = await request(customerId, `${route}/fit-checkout`, { method: "POST" });
+      assert.equal(checkout.status, 200);
+      const sessionId = checkout.body.url.match(/cs_test_[A-Za-z0-9]+/)?.[0];
+      assert.ok(sessionId, "The fixture must use a real test-mode Checkout session");
+      assert.equal((await request(tailorOneId, `${route}/quote`, {
+        method: "POST", body: { amountCents: 8750 },
+      })).status, 409, "Checkout locks the quote");
+
+      const metadata = {
+        fitConversationId: String(conversationId),
+        customerId,
+        tailorId: tailorOneId,
+        fitQuoteCents: "8750",
+      };
+      const session = {
+        id: sessionId, object: "checkout.session", livemode: false,
+        currency: "cad", amount_total: 8750, payment_status: "paid", metadata,
+      };
+      const event = {
+        id: `evt_synthetic_${randomBytes(8).toString("hex")}`,
+        object: "event", type: eventType, livemode: false, data: { object: session },
+      };
+      const deliver = async (value, validSignature = true) => {
+        const payload = JSON.stringify(value);
+        const signature = stripe.webhooks.generateTestHeaderString({
+          payload, secret: signingSecret,
+        });
+        const response = await fetch(`${baseUrl}/api/stripe/webhook`, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "stripe-signature": validSignature ? signature : "invalid",
+          },
+          body: payload,
+        });
+        return response.status;
+      };
+      const paidAt = async () => {
+        const [stored] = await db.select({ value: conversations.fitPaidAt })
+          .from(conversations).where(eq(conversations.id, conversationId));
+        return stored.value;
+      };
+      assert.equal(await deliver(event, false), 400);
+      assert.equal(await paidAt(), null);
+      assert.equal(await deliver({ ...event, livemode: true }), 400);
+      assert.equal(await paidAt(), null);
+      for (const invalidSession of [
+        { ...session, payment_status: "unpaid" },
+        { ...session, currency: "usd" },
+        { ...session, amount_total: 8751 },
+        { ...session, id: `${sessionId}_mismatch` },
+        { ...session, metadata: { ...metadata, fitQuoteCents: "8751" } },
+        { ...session, metadata: { ...metadata, customerId: nonParticipantId } },
+        { ...session, metadata: { ...metadata, tailorId: tailorTwoId } },
+      ]) {
+        assert.equal(await deliver({ ...event, data: { object: invalidSession } }), 200);
+        assert.equal(await paidAt(), null, "Mismatched events must not confirm payment");
+      }
+      assert.equal(await deliver(event), 200);
+      const confirmedAt = await paidAt();
+      assert.ok(confirmedAt instanceof Date);
+      assert.equal(await deliver(event), 200);
+      assert.equal((await paidAt()).getTime(), confirmedAt.getTime(), "Duplicate delivery is idempotent");
+    });
+  }
 });
 
 test("conversation image batches are private, validated, and all-or-nothing", async () => {

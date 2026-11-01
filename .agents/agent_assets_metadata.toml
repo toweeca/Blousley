@@ -1,0 +1,16 @@
+uploads = []
+generated = []
+
+[[outputs]]
+id = "6B8-0brYHM3FwympvSeDO"
+uri = "file://docs/fit-api-update-readiness.md"
+type = "text"
+title = "Fit API update readiness report"
+description = "Validation results, complete API route/source inventory, production storage and webhook blockers, Stripe publishing prerequisites, and APK build order. Nothing published."
+logical_id = "f72a3d2d-673d-4509-a63f-0449f2099305"
+content_hash = "sha256:76a8fc61a40aa7303c972cad4b2dfdf5819813430b89d732b2275612073426b9"
+size = 12656
+mtime_ms = 1793572828581
+storage_uri = "gcs://replit-rams-assets-kirk/rams/assets/repl:bd4fad89-2637-4126-8a52-0d6e18ee7e00/f72a3d2d-673d-4509-a63f-0449f2099305/cc1a39d6-3d93-4b87-b4e8-a9d267e0ba6f"
+storage_version_token = "1793572858748490"
+content_type = "text/markdown"
