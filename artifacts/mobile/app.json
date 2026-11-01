@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.blousley.app",
-      "versionCode": 1,
+      "versionCode": 2,
       "backgroundColor": "#0D0508"
     },
     "web": {
@@ -58,6 +58,7 @@
       "reactCompiler": true
     },
     "extra": {
+      "fitQuoteBuildMarker": "fit-chat-quote-2026-11-01",
       "eas": {
         "projectId": "04c3b1de-738c-43f1-9627-91153f4aea59"
       }
