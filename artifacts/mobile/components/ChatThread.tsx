@@ -31,6 +31,7 @@ import { uploadChatImages } from "@workspace/api-client-react";
 import Colors from "@/constants/colors";
 import { useApp } from "@/context/AppContext";
 import PrivateFitImage from "@/components/PrivateFitImage";
+import { readApiJson } from "@/lib/api-base-url";
 
 interface Message {
   id: number;
@@ -299,11 +300,32 @@ export default function ChatThread({
       const response = await fetch(`${apiBase}/api/chat/conversations/${conversationId}/quote`, {
         method: "POST",
         credentials: "include",
-        headers: { "Content-Type": "application/json" },
+        headers: { "Content-Type": "application/json", Accept: "application/json" },
         body: JSON.stringify({ amountCents }),
       });
-      const result = await response.json();
-      if (!response.ok) throw new Error(result.error ?? "Could not send quote");
+      if (FIT_QUOTE_DIAGNOSTICS_ENABLED) {
+        const contentType = response.headers.get("content-type")?.split(";", 1)[0].trim().toLowerCase() ?? "";
+        console.info("fit_chat_diag", JSON.stringify({
+          operation: "send_quote",
+          apiHost: new URL(apiBase).host,
+          status: response.status,
+          responseType: contentType === "application/json" || contentType.endsWith("+json")
+            ? "json" : contentType === "text/html" ? "html" : "other",
+          redirected: response.redirected,
+        }));
+      }
+      const result = await readApiJson<{
+        error?: string;
+        fitQuoteCents: number;
+        fitPaidAt: string | null;
+      }>(response, response.status === 404
+        ? "Quote service is unavailable on this API version. The API needs to be updated; your quote was not sent."
+        : undefined);
+      if (!response.ok) throw new Error(result?.error ?? "Could not send quote");
+      if (!result || result.fitQuoteCents !== amountCents ||
+          (result.fitPaidAt !== null && typeof result.fitPaidAt !== "string")) {
+        throw new Error("Server connection error: API host returned an invalid response");
+      }
       return result;
     },
     onSuccess: async (result: { fitQuoteCents: number; fitPaidAt: string | null }) => {

@@ -34,6 +34,7 @@ import PrivateFitImage from "@/components/PrivateFitImage";
 import { formatPersonName, getPersonInitials } from "@/lib/person-name";
 import { getTailorSummaryItems, tailorSummaryConversationsQueryOptions } from "@/lib/tailor-summary-data";
 import { getTailorFitSections } from "@/lib/tailor-fit-sections";
+import { readApiJson, resolvePrivateFitImageUrl } from "@/lib/api-base-url";
 import {
   getTailorOfferAlert,
   runTailorOfferFlow,
@@ -767,7 +768,11 @@ export default function TailorScreen() {
           : `${apiBase}/api/blouse/fits?userId=${user?.id ?? "guest"}`;
       const res = await fetch(endpoint, { credentials: "include" });
       if (!res.ok) throw new Error("Failed to fetch");
-      return res.json();
+      const rows = await readApiJson<BlouseFit[]>(res);
+      return rows.map((fit) => ({
+        ...fit,
+        imageUrl: resolvePrivateFitImageUrl(apiBase, fit.id, user?.id),
+      }));
     },
     refetchInterval: (query) =>
       customerFitsFocused && AppState.currentState === "active" &&

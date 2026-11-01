@@ -14,3 +14,9 @@ Do not bake the workspace `.replit.dev` host into standalone APKs. It returned 5
 **Why:** A workspace API host depends on the workspace service being awake; a standalone APK cannot ensure that process is running.
 
 **How to apply:** Keep Expo preview pointed at the workspace API when appropriate, but pin diagnostic and standalone builds to the stable deployed API alias.
+
+Verify new API endpoints with an authenticated request before claiming an APK flow works. An unauthenticated 401 JSON response confirms the host is reachable, not that the requested route exists.
+
+**Why:** Global authentication can answer before routing. An absent route can return 401 while signed out, then HTML 404 after sign-in; a JSON parser then obscures the actual failure.
+
+**How to apply:** Treat published-backend route availability separately from mobile bundle freshness. Do not claim a quote was sent unless the authenticated POST returns the expected quote data.

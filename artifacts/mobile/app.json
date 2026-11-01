@@ -2,7 +2,7 @@
   "expo": {
     "name": "Blousley",
     "slug": "mobile",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "mobile",
@@ -14,7 +14,7 @@
     },
     "android": {
       "package": "com.blousley.app",
-      "versionCode": 3,
+      "versionCode": 4,
       "backgroundColor": "#0D0508"
     },
     "web": {
@@ -58,7 +58,7 @@
       "reactCompiler": true
     },
     "extra": {
-      "fitQuoteBuildMarker": "fit-chat-auth-host-2026-11-01",
+      "fitQuoteBuildMarker": "fit-chat-quote-hub-image-2026-11-01",
       "eas": {
         "projectId": "04c3b1de-738c-43f1-9627-91153f4aea59"
       }
