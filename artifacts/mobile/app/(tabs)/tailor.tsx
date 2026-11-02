@@ -301,12 +301,10 @@ function IdeaRequestCard({
 function FitDesignRequestCard({
   fit,
   onMessage,
-  onQuote,
   delay,
 }: {
   fit: BlouseFit;
   onMessage: (fit: BlouseFit) => void;
-  onQuote: (fit: BlouseFit) => void;
   delay: number;
 }) {
   const colorScheme = useColorScheme();
@@ -414,16 +412,6 @@ function FitDesignRequestCard({
           >
             <Feather name="message-circle" size={13} color="#fff" />
             <Text style={[styles.fitRequestActionText, { color: "#fff" }]}>Message Customer</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            accessibilityRole="button"
-            accessibilityLabel={`Send quote for ${title}`}
-            testID={`quote-fit-request-${fit.id}`}
-            style={[styles.fitRequestAction, { backgroundColor: Colors.brand.goldDark, borderColor: Colors.brand.goldDark }]}
-            onPress={() => onQuote(fit)}
-          >
-            <Feather name="dollar-sign" size={13} color="#fff" />
-            <Text style={[styles.fitRequestActionText, { color: "#fff" }]}>Send Quote</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -886,6 +874,7 @@ export default function TailorScreen() {
        if (typeof convo.id !== "number" || !Number.isSafeInteger(convo.id) || convo.fitId !== fit.id) {
          throw new Error("The selected fit conversation could not be verified");
        }
+       await qc.invalidateQueries({ queryKey: ["tailor-customers", user.id] });
       setChatConvoId(convo.id);
       setChatPartnerName(formatPersonName(fit.customerName, "Customer", fit.userId));
        setChatFitContext({
@@ -1148,7 +1137,6 @@ export default function TailorScreen() {
                     key={`fit-request-${fit.id}`}
                     fit={fit}
                     onMessage={handleMessage}
-                    onQuote={handleMessage}
                     delay={i * 60}
                   />
                 ))}
