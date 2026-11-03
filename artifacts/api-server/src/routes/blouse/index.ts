@@ -189,7 +189,7 @@ router.get("/fits", async (req, res) => {
     );
     res.json(securedFits);
   } catch (error) {
-    console.error("Error fetching fits:", error);
+    console.error("Error fetching fits");
     res.status(500).json({ error: "Failed to fetch fits" });
   }
 });
@@ -256,7 +256,7 @@ router.post("/fits", async (req, res) => {
       thumbnailUrl: savedFit.thumbnailUrl ? imageUrl : null,
     });
   } catch (error) {
-    console.error("Error saving fit:", error);
+    console.error("Error saving fit");
     if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP|extension|Upload limit/.test(error.message)) {
       res.status(400).json({ error: "Invalid image upload" });
       return;
@@ -293,7 +293,7 @@ router.get("/fits/:id", async (req, res) => {
     const imageUrl = hasImage ? privateImageUrl(req, fit.id) : null;
     res.json({ ...fit, imageUrl, thumbnailUrl: imageUrl });
   } catch (error) {
-    console.error("Error fetching fit:", error);
+    console.error("Error fetching fit");
     res.status(500).json({ error: "Failed to fetch fit" });
   }
 });

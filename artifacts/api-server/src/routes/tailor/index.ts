@@ -82,7 +82,7 @@ router.get("/customers", async (req, res) => {
     }));
     res.json(securedRows.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()));
   } catch (error) {
-    console.error("Error fetching customer fits:", error);
+    console.error("Error fetching customer fits");
     res.status(500).json({ error: "Failed to fetch customer fits" });
   }
 });
@@ -131,7 +131,7 @@ router.post("/fits", async (req, res) => {
       thumbnailUrl: savedFit.thumbnailUrl ? savedImageUrl : null,
     });
   } catch (error) {
-    console.error("Error adding fit:", error);
+    console.error("Error adding fit");
     if (error instanceof Error && /image upload|image data|PNG, JPEG, and WebP|extension|Upload limit/.test(error.message)) {
       res.status(400).json({ error: "Invalid image upload" });
       return;

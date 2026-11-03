@@ -9,7 +9,7 @@ import { db, blouseFitsTable, conversations, messages, sessions, usersTable } fr
 import { privateImages } from "@workspace/db/schema";
 import { createSessionToken } from "../src/lib/auth.ts";
 import { withRlsUser } from "../src/lib/rls.ts";
-import { savePrivateImage } from "../src/lib/privateImages.ts";
+import { readLegacyFitImage, savePrivateImage } from "../src/lib/privateImages.ts";
 import { getStripeClient, getStripeSync } from "../src/stripeClient.ts";
 
 if (process.env.NODE_ENV === "production") {
@@ -259,6 +259,10 @@ test("unassigned Find My Tailor fits are visible to tailors and private images f
     assert.equal(fit.conversationId, null);
     assert.ok(fit.imageUrl);
     assert.ok(fit.thumbnailUrl);
+    const imageUrl = new URL(fit.imageUrl);
+    assert.equal(imageUrl.pathname, `/api/images/fits/${unassignedImageFitId}`);
+    assert.equal(imageUrl.search, "");
+    assert.equal(imageUrl.hash, "");
   }
 
   const firstImageResponse = await fetch(firstRequest.imageUrl, {
@@ -349,7 +353,7 @@ test("legacy fit images use the private endpoint without exposing image data", a
   assert.equal(fit.thumbnailUrl, fit.imageUrl);
   assert.ok(!fit.imageUrl.includes("data:"));
   assert.ok(!fit.imageUrl.includes("private-images"));
-  assert.equal(new URL(fit.imageUrl).searchParams.has("userId"), false);
+  assert.equal(new URL(fit.imageUrl).search, "");
   assert.ok(!JSON.stringify(fit).includes(imageDataUri));
 
   const tailorImage = await fetch(fit.imageUrl, {
@@ -363,11 +367,37 @@ test("legacy fit images use the private endpoint without exposing image data", a
     headers: { Cookie: sessionCookies.get(customerId) },
   });
   assert.equal(ownerImage.status, 200);
+  assert.deepEqual(
+    Buffer.from(await ownerImage.arrayBuffer()),
+    Buffer.from(imageDataUri.split(",")[1], "base64"),
+    "The image response must contain only the stored image bytes",
+  );
 
   const otherCustomerImage = await fetch(ownerImageUrl, {
     headers: { Cookie: sessionCookies.get(nonParticipantId) },
   });
   assert.equal(otherCustomerImage.status, 403);
+});
+
+test("legacy image decoding rejects arbitrary external URLs without fetching them", async () => {
+  const originalFetch = globalThis.fetch;
+  let fetchCalls = 0;
+  globalThis.fetch = async () => {
+    fetchCalls += 1;
+    throw new Error("External image fetching is forbidden");
+  };
+  try {
+    for (const value of [
+      "https://example.invalid/private-image.png",
+      "http://127.0.0.1/internal-image.png",
+      "file:///private/image.png",
+    ]) {
+      assert.equal(await readLegacyFitImage(value), null);
+    }
+    assert.equal(fetchCalls, 0);
+  } finally {
+    globalThis.fetch = originalFetch;
+  }
 });
 
 test("session-derived sharing only allows the saved fit owner", async () => {

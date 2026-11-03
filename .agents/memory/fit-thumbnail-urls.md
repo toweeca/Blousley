@@ -26,3 +26,9 @@ Keep legacy database-embedded fit images behind the same authenticated image end
 **Why:** existing uploads must remain usable without schema changes, bulk data mutation, or exposing permanent public image URLs.
 
 **How to apply:** preserve owner/tailor authorization before reading legacy image data; never fetch arbitrary legacy external URLs as a fallback.
+
+Apply the identifier/personal-data restriction to image payloads and diagnostics only. Keep fit/customer identifiers, names, and measurements in existing Tailor Hub/chat contracts. Generated image URLs may identify the fit resource but must not include user IDs, customer names, measurements, or other personal fields.
+
+**Why:** the user explicitly chose this scope because existing chat, navigation, and tailor workflows need those API fields.
+
+**How to apply:** image success responses contain image bytes only; keep image logging free of content, full URLs, and personal data without redacting unrelated workflow contracts.
