@@ -17,6 +17,12 @@ Private fit URLs must be fetched with the authenticated app session before rende
 
 For a shared but unassigned fit request, allow image reads only for authenticated tailor accounts while `findMyTailor` is true and no conversation assignment exists. After assignment, only the assigned tailor may read it. Since image-metadata RLS is owner/participant-based, authorize the request first, then query the metadata under the fit owner's RLS context; do not broaden the policy or make the file public for this flow.
 
-**Why:** eligible tailors need to preview shared requests before a conversation exists, but the existing RLS policy intentionally excludes them until assignment.
+**Why:** the user requires customer-uploaded fit images to be visible initially to every authenticated tailor in Tailor Hub before assignment, but never publicly accessible. Existing metadata RLS excludes those tailors until assignment.
 
 **How to apply:** keep the request gate and owner-context metadata query together in the private image endpoint, and test access before and after assignment.
+
+Keep legacy database-embedded fit images behind the same authenticated image endpoint rather than requiring a data migration just to display them.
+
+**Why:** existing uploads must remain usable without schema changes, bulk data mutation, or exposing permanent public image URLs.
+
+**How to apply:** preserve owner/tailor authorization before reading legacy image data; never fetch arbitrary legacy external URLs as a fallback.

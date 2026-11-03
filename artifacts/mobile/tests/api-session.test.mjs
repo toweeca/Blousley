@@ -130,7 +130,8 @@ test("missing session sends no native cookie; a 401 clears an invalid stored ses
 
 test("native private fit-image requests use the authenticated API session", async () => {
   let sentRequest;
-  const f = fixture(async (_url, init) => {
+  const f = fixture(async (url, init) => {
+    if (url.endsWith("/auth/login")) return loginResponse();
     sentRequest = init;
     return new Response(new Uint8Array([137, 80, 78, 71]), {
       status: 200,
