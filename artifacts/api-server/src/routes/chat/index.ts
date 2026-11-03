@@ -192,6 +192,13 @@ router.post("/conversations/:id/quote", async (req, res) => {
       }
     }
 
+    if (convo.fitQuoteCents === amountCents) {
+      return res.json({
+        fitQuoteCents: convo.fitQuoteCents,
+        fitPaidAt: convo.fitPaidAt,
+      });
+    }
+
     const quoteCondition = convo.fitQuoteCents === null
       ? isNull(conversations.fitQuoteCents)
       : eq(conversations.fitQuoteCents, convo.fitQuoteCents);

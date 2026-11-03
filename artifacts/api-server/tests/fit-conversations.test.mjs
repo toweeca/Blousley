@@ -479,6 +479,24 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
     assert.equal(response.body.fitQuoteCents, 8750);
   });
 
+  await t.test("7a. retrying the same quote does not create a duplicate quote message", async () => {
+    const quotePath = `/api/chat/conversations/${sameTailorConversationId}/quote`;
+    const before = await db.select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.conversationId, sameTailorConversationId));
+    const responses = await Promise.all([1, 2].map(() => request(tailorOneId, quotePath, {
+      method: "POST",
+      body: { amountCents: 8750 },
+    })));
+    const after = await db.select({ id: messages.id })
+      .from(messages)
+      .where(eq(messages.conversationId, sameTailorConversationId));
+
+    assert.ok(responses.every((response) => response.status === 200));
+    assert.ok(responses.every((response) => response.body.fitQuoteCents === 8750));
+    assert.equal(after.length, before.length);
+  });
+
   await t.test("8. a customer or another tailor cannot send a quote", async () => {
     const [customerQuote, otherTailorQuote] = await Promise.all([
       request(customerId, `/api/chat/conversations/${sameTailorConversationId}/quote`, {
