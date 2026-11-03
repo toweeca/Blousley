@@ -6,15 +6,15 @@ import { ai } from "@workspace/integrations-gemini-ai";
 import { conversations } from "@workspace/db/schema";
 import designRouter from "./design";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { imageDataUriFromBase64, normalizeLegacyImageDataUri, savePrivateImage } from "../../lib/privateImages";
+import { imageDataUriFromBase64, isLegacyFitImage, savePrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
 router.use("/design", designRouter);
 
-function privateImageUrl(req: any, fitId: number, userId: string) {
+function privateImageUrl(req: any, fitId: number) {
   const protocol = (req.header("x-forwarded-proto") ?? req.protocol).split(",")[0];
-  return `${protocol}://${req.get("host")}/api/images/fits/${fitId}?userId=${encodeURIComponent(userId)}`;
+  return `${protocol}://${req.get("host")}/api/images/fits/${fitId}`;
 }
 
 function privateImagePath(fitId: number) {
@@ -182,9 +182,9 @@ router.get("/fits", async (req, res) => {
             .limit(1);
           return row;
         });
-        const legacyImageUrl = fit.imageUrl ? await normalizeLegacyImageDataUri(fit.imageUrl) : null;
-        const imageUrl = image ? privateImageUrl(req, fit.id, userId) : legacyImageUrl;
-        return { ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : legacyImageUrl };
+        const hasImage = Boolean(image) || isLegacyFitImage(fit.imageUrl) || isLegacyFitImage(fit.thumbnailUrl);
+        const imageUrl = hasImage ? privateImageUrl(req, fit.id) : null;
+        return { ...fit, imageUrl, thumbnailUrl: imageUrl };
       }),
     );
     res.json(securedFits);
@@ -238,7 +238,6 @@ router.post("/fits", async (req, res) => {
           mimeType: privateImage.mimeType,
         }),
       );
-      console.info("image_upload_complete", { userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
 
     const thumbnailUrl = privateImage ? privateImagePath(fit.id) : null;
@@ -249,7 +248,7 @@ router.post("/fits", async (req, res) => {
           .where(eq(blouseFitsTable.id, fit.id))
           .returning()
       : [fit];
-    const imageUrl = privateImage ? privateImageUrl(req, fit.id, userId) : null;
+    const imageUrl = privateImage ? privateImageUrl(req, fit.id) : null;
 
     res.status(201).json({
       ...savedFit,
@@ -290,9 +289,9 @@ router.get("/fits/:id", async (req, res) => {
         .limit(1);
       return row;
     });
-    const legacyImageUrl = fit.imageUrl ? await normalizeLegacyImageDataUri(fit.imageUrl) : null;
-    const imageUrl = image ? privateImageUrl(req, fit.id, userId) : legacyImageUrl;
-    res.json({ ...fit, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : legacyImageUrl });
+    const hasImage = Boolean(image) || isLegacyFitImage(fit.imageUrl) || isLegacyFitImage(fit.thumbnailUrl);
+    const imageUrl = hasImage ? privateImageUrl(req, fit.id) : null;
+    res.json({ ...fit, imageUrl, thumbnailUrl: imageUrl });
   } catch (error) {
     console.error("Error fetching fit:", error);
     res.status(500).json({ error: "Failed to fetch fit" });

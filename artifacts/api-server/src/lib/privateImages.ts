@@ -9,6 +9,7 @@ const UPLOAD_WINDOW_MS = 60 * 60 * 1000;
 const MAX_UPLOADS_PER_USER = 20;
 const DATA_URI_RE = /^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=\s]+)$/i;
 const SVG_DATA_URI_RE = /^data:image\/svg\+xml;base64,([A-Za-z0-9+/=\s]+)$/i;
+const LEGACY_IMAGE_DATA_URI_RE = /^data:image\/(?:jpeg|png|webp|svg\+xml);base64,/i;
 const KEY_RE = /^[0-9a-f-]{36}\.(?:jpg|png|webp)$/;
 const uploadBuckets = new Map<string, { startedAt: number; count: number }>();
 
@@ -86,7 +87,6 @@ export async function savePrivateImage(
   await mkdir(PRIVATE_IMAGE_DIR, { recursive: true, mode: 0o700 });
   const storageKey = `${randomUUID()}.${extensionForMimeType(mimeType)}`;
   await writeFile(path.join(PRIVATE_IMAGE_DIR, storageKey), sanitizedBuffer, { mode: 0o600, flag: "wx" });
-  console.info("image_upload", { userId, mimeType, size: sanitizedBuffer.length });
   return { storageKey, mimeType };
 }
 
@@ -99,6 +99,28 @@ export async function normalizeLegacyImageDataUri(image: string) {
       limitInputPixels: 40_000_000,
     }).png().toBuffer();
     return `data:image/png;base64,${png.toString("base64")}`;
+  } catch {
+    return null;
+  }
+}
+
+export function isLegacyFitImage(value: unknown): value is string {
+  return typeof value === "string" && LEGACY_IMAGE_DATA_URI_RE.test(value);
+}
+
+export async function readLegacyFitImage(value: unknown) {
+  if (!isLegacyFitImage(value)) return null;
+  const normalized = await normalizeLegacyImageDataUri(value);
+  if (!normalized) return null;
+
+  try {
+    const validated = imageDataUriFromBase64(normalized);
+    const match = validated.match(/^data:(image\/(?:jpeg|png|webp));base64,([A-Za-z0-9+/=]+)$/i);
+    if (!match) return null;
+    return {
+      buffer: Buffer.from(match[2], "base64"),
+      mimeType: match[1].toLowerCase(),
+    };
   } catch {
     return null;
   }

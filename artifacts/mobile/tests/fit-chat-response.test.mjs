@@ -34,14 +34,14 @@ test("valid quote responses retain their exact server values", async () => {
   assert.deepEqual(await readApiJson(Response.json(quote)), quote);
 });
 
-test("Hub fit pictures use the configured API origin even when image metadata is absent or stale", () => {
+test("Hub fit pictures use the configured API origin only when an image exists", () => {
   assert.equal(
-    resolvePrivateFitImageUrl("https://blousley.replit.app", 42, "tailor one"),
-    "https://blousley.replit.app/api/images/fits/42?userId=tailor+one",
-  );
-  assert.equal(
-    resolvePrivateFitImageUrl("blousley.replit.app", 42),
+    resolvePrivateFitImageUrl("https://blousley.replit.app", 42, true),
     "https://blousley.replit.app/api/images/fits/42",
   );
-  assert.throws(() => resolvePrivateFitImageUrl("https://blousley.replit.app", 0), /Invalid fit/);
+  assert.equal(
+    resolvePrivateFitImageUrl("blousley.replit.app", 42, false),
+    null,
+  );
+  assert.throws(() => resolvePrivateFitImageUrl("https://blousley.replit.app", 0, true), /Invalid fit/);
 });

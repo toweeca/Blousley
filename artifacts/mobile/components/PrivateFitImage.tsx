@@ -66,7 +66,6 @@ export default function PrivateFitImage({ source, style, fallbackColor, ...props
       })
       .catch((error: unknown) => {
         if (!cancelled && (error as { name?: string })?.name !== "AbortError") {
-          console.error("Private fit image failed:", error);
           setLoading(false);
           setFailed(true);
         }

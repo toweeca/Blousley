@@ -17,11 +17,10 @@ export function resolveApiBaseUrl(configured: string | undefined): string {
   return parsed.origin;
 }
 
-export function resolvePrivateFitImageUrl(baseUrl: string, fitId: number, userId?: string): string {
+export function resolvePrivateFitImageUrl(baseUrl: string, fitId: number, available = true): string | null {
+  if (!available) return null;
   if (!Number.isSafeInteger(fitId) || fitId <= 0) throw new Error("Invalid fit image ID.");
-  const url = new URL(`/api/images/fits/${fitId}`, resolveApiBaseUrl(baseUrl));
-  if (userId) url.searchParams.set("userId", userId);
-  return url.href;
+  return new URL(`/api/images/fits/${fitId}`, resolveApiBaseUrl(baseUrl)).href;
 }
 
 export async function readApiJson<T>(

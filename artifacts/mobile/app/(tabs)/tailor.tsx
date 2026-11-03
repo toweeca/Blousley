@@ -759,7 +759,7 @@ export default function TailorScreen() {
       const rows = await readApiJson<BlouseFit[]>(res);
       return rows.map((fit) => ({
         ...fit,
-        imageUrl: resolvePrivateFitImageUrl(apiBase, fit.id, user?.id),
+        imageUrl: resolvePrivateFitImageUrl(apiBase, fit.id, Boolean(fit.imageUrl)),
       }));
     },
     refetchInterval: (query) =>

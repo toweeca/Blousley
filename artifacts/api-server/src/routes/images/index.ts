@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@workspace/db";
 import { blouseFitsTable, conversations, messages, privateImages, usersTable } from "@workspace/db/schema";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { readPrivateImage } from "../../lib/privateImages";
+import { readLegacyFitImage, readPrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
@@ -20,6 +20,8 @@ router.get("/fits/:fitId", async (req, res) => {
       .select({
         userId: blouseFitsTable.userId,
         findMyTailor: blouseFitsTable.findMyTailor,
+        imageUrl: blouseFitsTable.imageUrl,
+        thumbnailUrl: blouseFitsTable.thumbnailUrl,
       })
       .from(blouseFitsTable)
       .where(eq(blouseFitsTable.id, fitId))
@@ -52,7 +54,7 @@ router.get("/fits/:fitId", async (req, res) => {
 
     const image = await withRlsUser(fit.userId, async (tx) => {
       const [privateImage] = await tx
-        .select()
+        .select({ storageKey: privateImages.storageKey, mimeType: privateImages.mimeType })
         .from(privateImages)
         .where(and(
           eq(privateImages.fitId, fitId),
@@ -61,13 +63,15 @@ router.get("/fits/:fitId", async (req, res) => {
         .limit(1);
       return privateImage;
     });
-    if (!image) {
+    const legacyImage = image ? null : await readLegacyFitImage(fit.imageUrl) ??
+      await readLegacyFitImage(fit.thumbnailUrl);
+    if (!image && !legacyImage) {
       res.status(404).json({ error: "Image not found" });
       return;
     }
 
-    const file = await readPrivateImage(image.storageKey);
-    res.setHeader("Content-Type", image.mimeType);
+    const file = image ? await readPrivateImage(image.storageKey) : legacyImage!.buffer;
+    res.setHeader("Content-Type", image ? image.mimeType : legacyImage!.mimeType);
     res.setHeader("Cache-Control", "private, no-store");
     res.setHeader("X-Content-Type-Options", "nosniff");
     res.send(file);

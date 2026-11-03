@@ -4,13 +4,13 @@ import { db, blouseFitsTable, privateImages, tailorsTable, usersTable } from "@w
 import { conversations } from "@workspace/db/schema";
 import { desc, eq, count, and, isNull, or } from "drizzle-orm";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
-import { imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
+import { imageDataUriFromBase64, isLegacyFitImage, savePrivateImage } from "../../lib/privateImages";
 
 const router: IRouter = Router();
 
-function privateImageUrl(req: any, fitId: number, userId: string) {
+function privateImageUrl(req: any, fitId: number) {
   const protocol = (req.header("x-forwarded-proto") ?? req.protocol).split(",")[0];
-  return `${protocol}://${req.get("host")}/api/images/fits/${fitId}?userId=${encodeURIComponent(userId)}`;
+  return `${protocol}://${req.get("host")}/api/images/fits/${fitId}`;
 }
 
 function privateImagePath(fitId: number) {
@@ -55,8 +55,22 @@ router.get("/customers", async (req, res) => {
     const securedRows = await Promise.all(rows.map(async ({
       fit, assignedTailorId, customerName, conversationId, lastMessageAt, fitQuoteCents, fitPaidAt,
     }) => {
+      const { imageUrl: storedImageUrl, thumbnailUrl: storedThumbnailUrl, ...fitData } = fit;
+      const [privateImage] = await withRlsUser(fit.userId, async (tx) =>
+        tx.select({ id: privateImages.id })
+          .from(privateImages)
+          .where(and(
+            eq(privateImages.fitId, fit.id),
+            eq(privateImages.ownerId, fit.userId),
+          ))
+          .limit(1),
+      );
+      const hasImage = Boolean(privateImage) ||
+        isLegacyFitImage(storedImageUrl) ||
+        isLegacyFitImage(storedThumbnailUrl);
+      const imageUrl = hasImage ? privateImageUrl(req, fit.id) : null;
       const request = {
-        ...fit, customerName, assignedTailorId, conversationId,
+        ...fitData, customerName, assignedTailorId, conversationId,
         lastActivityAt: new Date(Math.max(
           (lastMessageAt ?? fit.createdAt).getTime(),
           fit.updatedAt.getTime(),
@@ -64,23 +78,7 @@ router.get("/customers", async (req, res) => {
         )),
         fitQuoteCents, fitPaidAt,
       };
-      if (assignedTailorId !== tailorId) {
-        if (!assignedTailorId && fit.findMyTailor) {
-          const imageUrl = fit.thumbnailUrl ? privateImageUrl(req, fit.id, tailorId) : null;
-          return { ...request, imageUrl, thumbnailUrl: imageUrl };
-        }
-        return { ...request, imageUrl: null, thumbnailUrl: null };
-      }
-      const image = await withRlsUser(fit.userId, async (tx) => {
-        const [row] = await tx
-          .select({ id: privateImages.id })
-          .from(privateImages)
-          .where(eq(privateImages.fitId, fit.id))
-          .limit(1);
-        return row;
-      });
-      const imageUrl = image ? privateImageUrl(req, fit.id, tailorId) : null;
-      return { ...request, imageUrl, thumbnailUrl: fit.thumbnailUrl ? imageUrl : null };
+      return { ...request, imageUrl, thumbnailUrl: imageUrl };
     }));
     res.json(securedRows.sort((a, b) => b.lastActivityAt.getTime() - a.lastActivityAt.getTime()));
   } catch (error) {
@@ -117,7 +115,6 @@ router.post("/fits", async (req, res) => {
           mimeType: privateImage.mimeType,
         }),
       );
-      console.info("image_upload_complete", { userId, fitId: fit.id, mimeType: privateImage.mimeType });
     }
     const thumbnailUrl = privateImage ? privateImagePath(fit.id) : null;
     const [savedFit] = thumbnailUrl
@@ -127,7 +124,7 @@ router.post("/fits", async (req, res) => {
           .where(eq(blouseFitsTable.id, fit.id))
           .returning()
       : [fit];
-    const savedImageUrl = privateImage ? privateImageUrl(req, fit.id, userId) : null;
+    const savedImageUrl = privateImage ? privateImageUrl(req, fit.id) : null;
     res.json({
       ...savedFit,
       imageUrl: savedImageUrl,

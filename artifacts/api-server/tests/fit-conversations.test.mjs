@@ -160,6 +160,18 @@ async function addSharedFitWithImage() {
   return fitId;
 }
 
+async function addLegacySharedFitWithImage() {
+  const fitId = await addSharedFit();
+  const imageBuffer = await sharp({
+    create: { width: 2, height: 2, channels: 4, background: { r: 85, g: 135, b: 195, alpha: 1 } },
+  }).png().toBuffer();
+  const imageDataUri = `data:image/png;base64,${imageBuffer.toString("base64")}`;
+  await db.update(blouseFitsTable)
+    .set({ imageUrl: imageDataUri, updatedAt: new Date() })
+    .where(eq(blouseFitsTable.id, fitId));
+  return { fitId, imageDataUri };
+}
+
 async function request(userId, path, { method = "GET", body } = {}) {
   const response = await fetch(`${baseUrl}${path}`, {
     method,
@@ -255,9 +267,28 @@ test("unassigned Find My Tailor fits are visible to tailors and private images f
   assert.equal(firstImageResponse.status, 200);
   assert.match(firstImageResponse.headers.get("content-type") ?? "", /^image\/png/);
   assert.ok((await firstImageResponse.arrayBuffer()).byteLength > 0);
+  const secondImageResponse = await fetch(secondRequest.imageUrl, {
+    headers: { Cookie: sessionCookies.get(tailorTwoId) },
+  });
+  assert.equal(secondImageResponse.status, 200);
+  const ownerImageResponse = await fetch(firstRequest.imageUrl, {
+    headers: { Cookie: sessionCookies.get(customerId) },
+  });
+  assert.equal(ownerImageResponse.status, 200);
+  assert.equal(
+    (await fetch(firstRequest.imageUrl)).status,
+    401,
+    "An image URL alone must not grant access",
+  );
+  assert.equal(
+    (await fetch(firstRequest.imageUrl, {
+      headers: { Cookie: `blousley_session=${"x".repeat(48)}` },
+    })).status,
+    401,
+    "An invalid session must not grant access",
+  );
 
   const nonTailorUrl = new URL(firstRequest.imageUrl);
-  nonTailorUrl.searchParams.set("userId", nonParticipantId);
   const nonTailorImage = await fetch(nonTailorUrl, {
     headers: { Cookie: sessionCookies.get(nonParticipantId) },
   });
@@ -307,6 +338,36 @@ test("unassigned Find My Tailor fits are visible to tailors and private images f
     headers: { Cookie: sessionCookies.get(tailorTwoId) },
   });
   assert.equal(otherTailorImage.status, 403);
+});
+
+test("legacy fit images use the private endpoint without exposing image data", async () => {
+  const { fitId, imageDataUri } = await addLegacySharedFitWithImage();
+  const response = await request(tailorTwoId, `/api/tailor/customers?tailorId=${tailorTwoId}`);
+  assert.equal(response.status, 200);
+  const fit = response.body.find((row) => row.id === fitId);
+  assert.ok(fit?.imageUrl);
+  assert.equal(fit.thumbnailUrl, fit.imageUrl);
+  assert.ok(!fit.imageUrl.includes("data:"));
+  assert.ok(!fit.imageUrl.includes("private-images"));
+  assert.equal(new URL(fit.imageUrl).searchParams.has("userId"), false);
+  assert.ok(!JSON.stringify(fit).includes(imageDataUri));
+
+  const tailorImage = await fetch(fit.imageUrl, {
+    headers: { Cookie: sessionCookies.get(tailorTwoId) },
+  });
+  assert.equal(tailorImage.status, 200);
+  assert.match(tailorImage.headers.get("content-type") ?? "", /^image\/png/);
+
+  const ownerImageUrl = new URL(fit.imageUrl);
+  const ownerImage = await fetch(ownerImageUrl, {
+    headers: { Cookie: sessionCookies.get(customerId) },
+  });
+  assert.equal(ownerImage.status, 200);
+
+  const otherCustomerImage = await fetch(ownerImageUrl, {
+    headers: { Cookie: sessionCookies.get(nonParticipantId) },
+  });
+  assert.equal(otherCustomerImage.status, 403);
 });
 
 test("session-derived sharing only allows the saved fit owner", async () => {

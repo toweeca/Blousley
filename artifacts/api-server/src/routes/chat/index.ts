@@ -10,7 +10,7 @@ import { WebSocket, WebSocketServer } from "ws";
 import { isValidUserId, withRlsUser } from "../../lib/rls";
 import { findSessionUser } from "../../lib/auth";
 import { getStripeClient } from "../../stripeClient";
-import { deletePrivateImage, imageDataUriFromBase64, savePrivateImage } from "../../lib/privateImages";
+import { deletePrivateImage, imageDataUriFromBase64, isLegacyFitImage, savePrivateImage } from "../../lib/privateImages";
 
 const router = Router();
 const chatSockets = new Map<number, Set<WebSocket>>();
@@ -133,6 +133,8 @@ router.get("/conversations/:id/payment", async (req, res) => {
           measurements: blouseFitsTable.measurements,
           stylePrefs: blouseFitsTable.stylePrefs,
           notes: blouseFitsTable.notes,
+          imageUrl: blouseFitsTable.imageUrl,
+          thumbnailUrl: blouseFitsTable.thumbnailUrl,
         },
         imageId: privateImages.id,
         }).from(blouseFitsTable)
@@ -146,9 +148,16 @@ router.get("/conversations/:id/payment", async (req, res) => {
           measurements: unknown;
           stylePrefs: unknown;
           notes: string | null;
+          imageUrl: string | null;
+          thumbnailUrl: string | null;
         }; imageId: number | null }[]
       : [];
     const protocol = (req.header("x-forwarded-proto") ?? req.protocol).split(",")[0];
+    const imageUrl = fit && (fit.imageId ||
+      isLegacyFitImage(fit.design.imageUrl) ||
+      isLegacyFitImage(fit.design.thumbnailUrl))
+      ? `${protocol}://${req.get("host")}/api/images/fits/${fit.design.id}`
+      : null;
     return res.json({
       id: convo.id,
       customerId: convo.customerId,
@@ -158,8 +167,12 @@ router.get("/conversations/:id/payment", async (req, res) => {
       fitPaidAt: convo.fitPaidAt,
       quoteCheckoutStarted: Boolean(convo.fitStripeCheckoutSessionId),
       fit: fit ? {
-        ...fit.design,
-        imageUrl: fit.imageId ? `${protocol}://${req.get("host")}/api/images/fits/${fit.design.id}` : null,
+        id: fit.design.id,
+        bodyShape: fit.design.bodyShape,
+        measurements: fit.design.measurements,
+        stylePrefs: fit.design.stylePrefs,
+        notes: fit.design.notes,
+        imageUrl,
       } : null,
     });
   } catch (e: any) {

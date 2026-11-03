@@ -128,6 +128,24 @@ test("missing session sends no native cookie; a 401 clears an invalid stored ses
   assert.equal(f.value(), null);
 });
 
+test("native private fit-image requests use the authenticated API session", async () => {
+  let sentRequest;
+  const f = fixture(async (_url, init) => {
+    sentRequest = init;
+    return new Response(new Uint8Array([137, 80, 78, 71]), {
+      status: 200,
+      headers: { "Content-Type": "image/png" },
+    });
+  });
+  await f.client.request(`${baseUrl}/api/auth/login`, { method: "POST" });
+  const response = await f.client.request(`${baseUrl}/api/images/fits/42`, {
+    credentials: "include",
+  });
+  assert.equal(response.status, 200);
+  assert.equal(sentRequest.headers.get("Cookie"), cookie);
+  assert.equal(sentRequest.credentials, "omit");
+});
+
 test("logout revokes with the cookie and clears secure storage even when the network fails", async () => {
   for (const networkFails of [false, true]) {
     const f = fixture(async (url, init) => {
