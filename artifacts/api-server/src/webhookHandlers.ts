@@ -2,14 +2,17 @@ import Stripe from "stripe";
 import { and, eq, isNull } from "drizzle-orm";
 import { db, customerIdeasTable } from "@workspace/db";
 import { conversations } from "@workspace/db/schema";
-import { getStripeSync } from "./stripeClient";
+import { getStripeMode, getStripeSync } from "./stripeClient";
 
 export async function processStripeWebhook(payload: Buffer, signature: string): Promise<void> {
+  const expectedLiveMode = getStripeMode() === "live";
   const sync = await getStripeSync();
   await sync.processWebhook(payload, signature);
   // Only inspect the payload after the sync library has verified its signature.
   const event = JSON.parse(payload.toString("utf8")) as Stripe.Event;
-  if (event.livemode) throw new Error("Live-mode Stripe events are not accepted");
+  if (event.livemode !== expectedLiveMode) {
+    throw new Error("Stripe event mode does not match STRIPE_MODE");
+  }
 
   if (event.type !== "checkout.session.completed" && event.type !== "checkout.session.async_payment_succeeded") return;
   const session = event.data.object as Stripe.Checkout.Session;

@@ -15,15 +15,54 @@ import { getStripeClient, getStripeSync } from "../src/stripeClient.ts";
 if (process.env.NODE_ENV === "production") {
   throw new Error("Fit-conversation integration tests cannot run against production");
 }
-if (!process.env.STRIPE_SECRET_KEY?.startsWith("sk_test_")) {
-  throw new Error("Fit-conversation integration tests require a Stripe test-mode key");
-}
 
+process.env.STRIPE_MODE = "test";
+process.env.STRIPE_SECRET_KEY = "sk_test_synthetic_fit_fixture";
 process.env.REPLIT_DOMAINS = "localhost";
 process.env.NODE_ENV = "test";
 
 const { default: app } = await import("../src/app.ts");
 const stripe = await getStripeClient();
+const fixtureProducts = new Map();
+const fixturePrices = new Map();
+const fixtureSessions = new Map();
+let fixtureSequence = 0;
+
+stripe.products.search = async () => ({ data: [...fixtureProducts.values()] });
+stripe.products.create = async (params) => {
+  const product = { id: `prod_fixture${++fixtureSequence}`, ...params };
+  fixtureProducts.set(product.id, product);
+  return product;
+};
+stripe.prices.create = async (params) => {
+  const price = { id: `price_fixture${++fixtureSequence}`, ...params };
+  fixturePrices.set(price.id, price);
+  return price;
+};
+stripe.checkout.sessions.create = async (params) => {
+  const id = `cs_test_fixture${++fixtureSequence}`;
+  const session = {
+    id,
+    url: `https://checkout.stripe.test/${id}`,
+    status: "open",
+    payment_status: "unpaid",
+    metadata: params.metadata,
+  };
+  fixtureSessions.set(id, session);
+  return session;
+};
+stripe.checkout.sessions.retrieve = async (id) => {
+  const session = fixtureSessions.get(id);
+  if (!session) throw new Error("Synthetic Checkout session not found");
+  return session;
+};
+stripe.checkout.sessions.list = async () => ({ data: [...fixtureSessions.values()] });
+stripe.checkout.sessions.expire = async (id) => {
+  const session = fixtureSessions.get(id);
+  if (!session) throw new Error("Synthetic Checkout session not found");
+  session.status = "expired";
+  return session;
+};
 
 const userIds = [];
 const fitIds = [];
@@ -574,10 +613,12 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
 test("signed webhook fixtures enforce fit confirmation guards without making a payment", async (t) => {
   const sync = await getStripeSync();
   const signingSecret = `whsec_synthetic_fixture_${randomBytes(16).toString("hex")}`;
+  let verifiedWebhookCount = 0;
   // Isolate StripeSync event persistence/managed-secret lookup, not the application
   // handler or HTTP route. The real Stripe SDK still verifies each fixture signature.
   t.mock.method(sync, "processWebhook", async (payload, signature) => {
     stripe.webhooks.constructEvent(payload, signature, signingSecret);
+    verifiedWebhookCount++;
   });
 
   for (const eventType of ["checkout.session.completed", "checkout.session.async_payment_succeeded"]) {
@@ -632,16 +673,43 @@ test("signed webhook fixtures enforce fit confirmation guards without making a p
           .from(conversations).where(eq(conversations.id, conversationId));
         return stored.value;
       };
+      const beforeInvalidSignature = verifiedWebhookCount;
       assert.equal(await deliver(event, false), 400);
+      assert.equal(verifiedWebhookCount, beforeInvalidSignature, "Invalid signatures must not pass verification");
       assert.equal(await paidAt(), null);
-      assert.equal(await deliver({ ...event, livemode: true }), 400);
+
+      await t.test("STRIPE_MODE=test rejects a signed live event after signature verification", async () => {
+        const before = verifiedWebhookCount;
+        assert.equal(await deliver({ ...event, livemode: true }), 400);
+        assert.equal(verifiedWebhookCount, before + 1);
+        assert.equal(await paidAt(), null);
+      });
+
+      await t.test("STRIPE_MODE=live rejects a signed test event after signature verification", async () => {
+        const previousMode = process.env.STRIPE_MODE;
+        process.env.STRIPE_MODE = "live";
+        try {
+          const before = verifiedWebhookCount;
+          assert.equal(await deliver(event), 400);
+          assert.equal(verifiedWebhookCount, before + 1);
+          assert.equal(await paidAt(), null);
+        } finally {
+          process.env.STRIPE_MODE = previousMode;
+        }
+      });
+
+      const beforeFilteredEvent = verifiedWebhookCount;
+      assert.equal(await deliver({ ...event, type: "customer.updated" }), 200);
+      assert.equal(verifiedWebhookCount, beforeFilteredEvent + 1);
       assert.equal(await paidAt(), null);
+
       for (const invalidSession of [
         { ...session, payment_status: "unpaid" },
         { ...session, currency: "usd" },
         { ...session, amount_total: 8751 },
         { ...session, id: `${sessionId}_mismatch` },
         { ...session, metadata: { ...metadata, fitQuoteCents: "8751" } },
+        { ...session, metadata: { ...metadata, fitConversationId: String(conversationId + 1) } },
         { ...session, metadata: { ...metadata, customerId: nonParticipantId } },
         { ...session, metadata: { ...metadata, tailorId: tailorTwoId } },
       ]) {
