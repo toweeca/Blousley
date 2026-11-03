@@ -27,42 +27,64 @@ const fixtureProducts = new Map();
 const fixturePrices = new Map();
 const fixtureSessions = new Map();
 let fixtureSequence = 0;
+const fixtureStripeCalls = [];
+const stripeProducts = Object.getPrototypeOf(stripe.products);
+const stripePrices = Object.getPrototypeOf(stripe.prices);
+const stripeSessions = Object.getPrototypeOf(stripe.checkout.sessions);
 
-stripe.products.search = async () => ({ data: [...fixtureProducts.values()] });
-stripe.products.create = async (params) => {
+stripeProducts.search = async () => {
+  fixtureStripeCalls.push("products.search");
+  return { data: [...fixtureProducts.values()] };
+};
+stripeProducts.create = async (params) => {
+  fixtureStripeCalls.push("products.create");
   const product = { id: `prod_fixture${++fixtureSequence}`, ...params };
   fixtureProducts.set(product.id, product);
   return product;
 };
-stripe.prices.create = async (params) => {
+stripePrices.create = async (params) => {
+  fixtureStripeCalls.push("prices.create");
   const price = { id: `price_fixture${++fixtureSequence}`, ...params };
   fixturePrices.set(price.id, price);
   return price;
 };
-stripe.checkout.sessions.create = async (params) => {
-  const id = `cs_test_fixture${++fixtureSequence}`;
+stripeSessions.create = async (params) => {
+  fixtureStripeCalls.push("checkout.sessions.create");
+  const id = `cs_test_fixture${randomBytes(8).toString("hex")}`;
+  const lineItems = params.line_items ?? [];
+  const amount_total = lineItems.reduce((total, item) => {
+    const price = fixturePrices.get(item.price);
+    return total + (price?.unit_amount ?? 0) * (item.quantity ?? 1);
+  }, 0);
+  const currency = fixturePrices.get(lineItems[0]?.price)?.currency ?? "cad";
   const session = {
     id,
-    url: `https://checkout.stripe.test/${id}`,
+    url: `https://checkout.stripe.com/pay/${id}`,
     status: "open",
     payment_status: "unpaid",
+    livemode: false,
+    currency,
+    amount_total,
     metadata: params.metadata,
   };
   fixtureSessions.set(id, session);
   return session;
 };
-stripe.checkout.sessions.retrieve = async (id) => {
+stripeSessions.retrieve = async (id) => {
+  fixtureStripeCalls.push("checkout.sessions.retrieve");
   const session = fixtureSessions.get(id);
   if (!session) throw new Error("Synthetic Checkout session not found");
   return session;
 };
-stripe.checkout.sessions.list = async () => ({ data: [...fixtureSessions.values()] });
-stripe.checkout.sessions.expire = async (id) => {
+stripeSessions.list = async () => ({ data: [...fixtureSessions.values()] });
+stripeSessions.listLineItems = async () => ({ data: [] });
+stripeSessions.expire = async (id) => {
   const session = fixtureSessions.get(id);
   if (!session) throw new Error("Synthetic Checkout session not found");
   session.status = "expired";
   return session;
 };
+stripePrices.update = async (id, params) => ({ id, ...params });
 
 const userIds = [];
 const fitIds = [];
@@ -558,7 +580,7 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
       method: "POST",
       body: { userId: customerId },
     });
-    assert.equal(response.status, 200);
+    assert.equal(response.status, 200, `Synthetic Stripe calls: ${fixtureStripeCalls.join(",")}`);
     assert.equal(new URL(response.body.url).hostname, "checkout.stripe.com");
     const sessionId = response.body.url.match(/cs_test_[A-Za-z0-9]+/)?.[0];
     assert.ok(sessionId, "Checkout URL must contain a test-mode session ID");
@@ -611,18 +633,18 @@ test("fit conversation authorization, assignment, quote, and Checkout regression
 });
 
 test("signed webhook fixtures enforce fit confirmation guards without making a payment", async (t) => {
-  const sync = await getStripeSync();
   const signingSecret = `whsec_synthetic_fixture_${randomBytes(16).toString("hex")}`;
-  let verifiedWebhookCount = 0;
-  // Isolate StripeSync event persistence/managed-secret lookup, not the application
-  // handler or HTTP route. The real Stripe SDK still verifies each fixture signature.
-  t.mock.method(sync, "processWebhook", async (payload, signature) => {
-    stripe.webhooks.constructEvent(payload, signature, signingSecret);
-    verifiedWebhookCount++;
-  });
 
   for (const eventType of ["checkout.session.completed", "checkout.session.async_payment_succeeded"]) {
-    await t.test(eventType, async () => {
+    await t.test(eventType, async (eventTestContext) => {
+      const sync = await getStripeSync();
+      let verifiedWebhookCount = 0;
+      // Synthetic signatures pass through Stripe's real verifier without API calls.
+      eventTestContext.mock.method(sync, "processWebhook", async (payload, signature) => {
+        stripe.webhooks.constructEvent(payload, signature, signingSecret);
+        verifiedWebhookCount++;
+      });
+
       const fitId = await addSharedFit();
       const opened = await openFit(tailorOneId, fitId);
       assert.equal(opened.status, 201);
@@ -632,9 +654,9 @@ test("signed webhook fixtures enforce fit confirmation guards without making a p
         method: "POST", body: { amountCents: 8750 },
       })).status, 200);
       const checkout = await request(customerId, `${route}/fit-checkout`, { method: "POST" });
-      assert.equal(checkout.status, 200);
+      assert.equal(checkout.status, 200, `Synthetic Stripe calls: ${fixtureStripeCalls.join(",")}`);
       const sessionId = checkout.body.url.match(/cs_test_[A-Za-z0-9]+/)?.[0];
-      assert.ok(sessionId, "The fixture must use a real test-mode Checkout session");
+      assert.ok(sessionId, "The fixture must use a synthetic test-mode Checkout session");
       assert.equal((await request(tailorOneId, `${route}/quote`, {
         method: "POST", body: { amountCents: 8750 },
       })).status, 409, "Checkout locks the quote");
@@ -678,14 +700,14 @@ test("signed webhook fixtures enforce fit confirmation guards without making a p
       assert.equal(verifiedWebhookCount, beforeInvalidSignature, "Invalid signatures must not pass verification");
       assert.equal(await paidAt(), null);
 
-      await t.test("STRIPE_MODE=test rejects a signed live event after signature verification", async () => {
+      await eventTestContext.test("STRIPE_MODE=test rejects a signed live event after signature verification", async () => {
         const before = verifiedWebhookCount;
         assert.equal(await deliver({ ...event, livemode: true }), 400);
         assert.equal(verifiedWebhookCount, before + 1);
         assert.equal(await paidAt(), null);
       });
 
-      await t.test("STRIPE_MODE=live rejects a signed test event after signature verification", async () => {
+      await eventTestContext.test("STRIPE_MODE=live rejects a signed test event after signature verification", async () => {
         const previousMode = process.env.STRIPE_MODE;
         process.env.STRIPE_MODE = "live";
         try {
